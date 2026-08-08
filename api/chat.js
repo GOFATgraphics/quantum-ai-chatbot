@@ -21,7 +21,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Vercel automatically parses JSON body when Content-Type is application/json
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const messages = body?.messages;
 
@@ -46,7 +45,7 @@ Be clear, direct, and helpful. Use markdown for structure. Lead with the answer.
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2048,
         system: systemPrompt,
         messages: anthropicMessages,
@@ -56,7 +55,8 @@ Be clear, direct, and helpful. Use markdown for structure. Lead with the answer.
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Anthropic error:', response.status, errorText);
-      return res.status(response.status).json({
+      // Always return 502 for upstream errors so client doesn't confuse with route 404
+      return res.status(502).json({
         error: 'Anthropic API error',
         status: response.status,
         details: errorText,
