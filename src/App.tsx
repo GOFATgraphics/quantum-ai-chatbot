@@ -54,6 +54,11 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([])
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState(MODELS[0])
+  const [thinkActive, setThinkActive] = useState(false)
+  const [deepSearchActive, setDeepSearchActive] = useState(false)
+  const [pendingFiles, setPendingFiles] = useState<{ name: string; type: string; text?: string }[]>([])
+  const thinkStartedAt = useRef<number | null>(null)
+  const [thoughtSeconds, setThoughtSeconds] = useState<number | null>(null)
   const [showModelMenu, setShowModelMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
@@ -193,6 +198,8 @@ export default function App() {
         model: selectedModel.anthropic,
         modelId: selectedModel.id,
         stream: true,
+        think: thinkActive,
+        deepSearch: deepSearchActive,
       }),
     })
 
@@ -264,16 +271,27 @@ export default function App() {
   }, [])
 
   const handleSend = async (overrideText?: string) => {
-    const trimmed = (overrideText ?? input).trim()
+    let trimmed = (overrideText ?? input).trim()
+    if (pendingFiles.length > 0) {
+      const fileBlock = pendingFiles
+        .map((f) => `--- File: ${f.name} ---\n${f.text || ''}`)
+        .join('\n\n')
+      trimmed = trimmed
+        ? `${trimmed}\n\n${fileBlock}`
+        : fileBlock
+    }
     if (!trimmed || isLoading || !user) return
     const history = messages
     const userMsg: ChatMessage = { id: generateId(), role: 'user', content: trimmed }
     const assistantId = generateId()
     setMessages((p) => [...p, userMsg, { id: assistantId, role: 'assistant', content: '' }])
     setInput('')
+    setPendingFiles([])
     setLastUserPrompt(trimmed)
     setErrorHint(null)
     setIsLoading(true)
+    thinkStartedAt.current = Date.now()
+    setThoughtSeconds(null)
     let convId: string | null = null
     try {
       convId = await ensureConversation(trimmed)
@@ -303,6 +321,10 @@ export default function App() {
       setErrorHint(hint)
       setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: hint } : m)))
     } finally {
+      if (thinkStartedAt.current) {
+        setThoughtSeconds(Math.max(1, Math.round((Date.now() - thinkStartedAt.current) / 1000)))
+        thinkStartedAt.current = null
+      }
       setIsLoading(false)
       abortRef.current = null
     }
@@ -394,6 +416,7 @@ export default function App() {
             <EmptyState
               greeting={greetingLine || creativeGreeting(firstName)}
               dark={dark}
+              onSuggestion={(text) => handleSend(text)}
             />
           ) : (
             <MessageList
@@ -402,6 +425,12 @@ export default function App() {
               lastUserPrompt={lastUserPrompt}
               dark={dark}
               messagesEndRef={messagesEndRef}
+              thoughtSeconds={thoughtSeconds}
+              thinkActive={thinkActive}
+              deepSearchActive={deepSearchActive}
+              onRegenerate={() => {
+                if (lastUserPrompt) handleSend(lastUserPrompt)
+              }}
             />
           )}
         </main>
@@ -414,8 +443,23 @@ export default function App() {
           isLoading={isLoading}
           dark={dark}
           errorHint={errorHint}
-          fastActive={selectedModel.id === 'quantum-3'}
-          onToggleFast={() => setSelectedModel(MODELS[0])}
+          fastActive={selectedModel.id === 'quantum-3' && !thinkActive}
+          onToggleFast={() => {
+            setThinkActive(false)
+            setSelectedModel(MODELS[0])
+          }}
+          thinkActive={thinkActive}
+          onToggleThink={() => {
+            setThinkActive((v) => {
+              const next = !v
+              if (next) setSelectedModel(MODELS[1])
+              return next
+            })
+          }}
+          deepSearchActive={deepSearchActive}
+          onToggleDeepSearch={() => setDeepSearchActive((v) => !v)}
+          pendingFiles={pendingFiles}
+          onFilesChange={setPendingFiles}
         />
 
         <InstallPWA dark={dark} />
