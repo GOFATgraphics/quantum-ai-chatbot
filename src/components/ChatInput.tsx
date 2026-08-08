@@ -117,165 +117,155 @@ export default function ChatInput({
     : 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white text-slate-600 shadow-sm ring-1 ring-black/[0.03] hover:bg-white disabled:opacity-40'
 
   return (
-    <div
-      className="relative z-10 shrink-0"
-      style={{
-        paddingBottom: 'max(0.65rem, env(safe-area-inset-bottom))',
-        background: dark
-          ? 'linear-gradient(to top, #0a0a0f 55%, rgba(10,10,15,0))'
-          : 'linear-gradient(to top, #f8fafc 55%, rgba(248,250,252,0))',
-      }}
-    >
-      <div className="px-3 sm:px-5 pt-2">
-        <div className="max-w-2xl mx-auto">
-          {errorHint && (
-            <p
-              className={`text-xs text-center mb-2 px-3 py-1.5 rounded-full mx-auto w-fit ${
-                dark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-800'
-              }`}
-              role="status"
-            >
-              {errorHint}
-            </p>
-          )}
-          <div
-            className={`glass-surface rounded-[28px] px-3.5 pt-3.5 pb-2.5 transition-all duration-200 ${
-              dark
-                ? `bg-[#16161f]/92 border shadow-xl shadow-black/40 ${
-                    focused || listening
-                      ? 'border-indigo-400/30 shadow-indigo-500/10'
-                      : 'border-white/[0.08]'
-                  }`
-                : `bg-white/80 border shadow-[0_12px_40px_rgba(79,70,229,0.08)] ${
-                    focused || listening
-                      ? 'border-indigo-300/50 shadow-[0_12px_40px_rgba(99,102,241,0.12)]'
-                      : 'border-white/70'
-                  }`
+    <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-2">
+      <div className="max-w-2xl mx-auto">
+        {errorHint && (
+          <p
+            className={`text-xs text-center mb-2 px-3 py-1.5 rounded-full mx-auto w-fit ${
+              dark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-800'
             }`}
+            role="status"
           >
-            <textarea
-              ref={textareaRef}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              onKeyDown={onKeyDown}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              rows={1}
-              placeholder={listening ? 'Listening…' : 'Ask Anything'}
-              className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${
-                dark
-                  ? 'text-slate-50 placeholder:text-slate-500'
-                  : 'text-slate-900 placeholder:text-slate-400'
+            {errorHint}
+          </p>
+        )}
+        <div
+          className={`glass-surface rounded-[28px] px-3.5 pt-3.5 pb-2.5 transition-all duration-200 ${
+            dark
+              ? `bg-[#16161f]/92 border shadow-xl shadow-black/40 ${
+                  focused || listening
+                    ? 'border-indigo-400/30 shadow-indigo-500/10'
+                    : 'border-white/[0.08]'
+                }`
+              : `bg-white/80 border shadow-[0_12px_40px_rgba(79,70,229,0.08)] ${
+                  focused || listening
+                    ? 'border-indigo-300/50 shadow-[0_12px_40px_rgba(99,102,241,0.12)]'
+                    : 'border-white/70'
+                }`
+          }`}
+        >
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            rows={1}
+            placeholder={listening ? 'Listening…' : 'Ask Anything'}
+            className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${
+              dark
+                ? 'text-slate-50 placeholder:text-slate-500'
+                : 'text-slate-900 placeholder:text-slate-400'
+            }`}
+          />
+          <div className="flex items-center gap-1.5 mt-2.5">
+            <button
+              type="button"
+              disabled
+              title="Attachments coming soon"
+              className={softBtn}
+              aria-label="Add attachment"
+            >
+              <Plus className="w-[18px] h-[18px]" />
+            </button>
+            <button
+              type="button"
+              onClick={onToggleFast}
+              title="Fast responses"
+              className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
+                fastActive
+                  ? dark
+                    ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/35'
+                    : 'bg-white text-slate-800 shadow-sm ring-1 ring-black/[0.05]'
+                  : dark
+                    ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.11]'
+                    : 'bg-white/90 text-slate-700 shadow-sm ring-1 ring-black/[0.03]'
               }`}
-            />
-            <div className="flex items-center gap-1.5 mt-2.5">
-              <button
-                type="button"
-                disabled
-                title="Attachments coming soon"
-                className={softBtn}
-                aria-label="Add attachment"
-              >
-                <Plus className="w-[18px] h-[18px]" />
-              </button>
-              <button
-                type="button"
-                onClick={onToggleFast}
-                title="Fast responses"
-                className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
-                  fastActive
+            >
+              <Zap className={`w-3.5 h-3.5 ${fastActive ? (dark ? 'text-indigo-300' : 'text-indigo-500') : ''}`} />
+              Fast
+            </button>
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={toggleListen}
+              disabled={!speechSupported || isLoading}
+              title={
+                !speechSupported
+                  ? 'Voice input not supported in this browser'
+                  : listening
+                    ? 'Stop listening'
+                    : 'Voice input'
+              }
+              className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${
+                listening
+                  ? dark
+                    ? 'bg-rose-500/25 text-rose-300 ring-1 ring-rose-400/40'
+                    : 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
+                  : speechSupported
                     ? dark
-                      ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/35'
-                      : 'bg-white text-slate-800 shadow-sm ring-1 ring-black/[0.05]'
-                    : dark
-                      ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.11]'
-                      : 'bg-white/90 text-slate-700 shadow-sm ring-1 ring-black/[0.03]'
-                }`}
-              >
-                <Zap className={`w-3.5 h-3.5 ${fastActive ? (dark ? 'text-indigo-300' : 'text-indigo-500') : ''}`} />
-                Fast
-              </button>
-              <div className="flex-1" />
-              <button
+                      ? 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.08]'
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-black/[0.04]'
+                    : 'text-slate-400 opacity-40'
+              }`}
+              aria-label={listening ? 'Stop voice input' : 'Voice input'}
+              aria-pressed={listening}
+            >
+              {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </button>
+            {isLoading ? (
+              <motion.button
                 type="button"
+                initial={{ scale: 0.92, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={onStop}
+                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition ${
+                  dark
+                    ? 'bg-white/15 text-white hover:bg-white/25 ring-1 ring-white/15'
+                    : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/15'
+                }`}
+                aria-label="Stop generating"
+              >
+                <Square className="w-3 h-3 fill-current" />
+                Stop
+              </motion.button>
+            ) : hasText ? (
+              <motion.button
+                type="button"
+                initial={false}
+                animate={{ scale: 1, opacity: 1 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={onSend}
+                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition ${
+                  dark
+                    ? 'bg-white text-slate-900 hover:bg-slate-100'
+                    : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
+                }`}
+                aria-label="Send"
+              >
+                <Send className="w-3.5 h-3.5" />
+                Send
+              </motion.button>
+            ) : (
+              <motion.button
+                type="button"
+                initial={false}
+                animate={{ scale: 1, opacity: 1 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={toggleListen}
-                disabled={!speechSupported || isLoading}
-                title={
-                  !speechSupported
-                    ? 'Voice input not supported in this browser'
-                    : listening
-                      ? 'Stop listening'
-                      : 'Voice input'
-                }
-                className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${
-                  listening
-                    ? dark
-                      ? 'bg-rose-500/25 text-rose-300 ring-1 ring-rose-400/40'
-                      : 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
-                    : speechSupported
-                      ? dark
-                        ? 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.08]'
-                        : 'text-slate-400 hover:text-slate-600 hover:bg-black/[0.04]'
-                      : 'text-slate-400 opacity-40'
+                disabled={!speechSupported}
+                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition disabled:opacity-40 ${
+                  dark
+                    ? 'bg-white text-slate-900 hover:bg-slate-100'
+                    : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
                 }`}
-                aria-label={listening ? 'Stop voice input' : 'Voice input'}
-                aria-pressed={listening}
+                aria-label="Speak"
               >
-                {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-              </button>
-              {isLoading ? (
-                <motion.button
-                  type="button"
-                  initial={{ scale: 0.92, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  onClick={onStop}
-                  className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition ${
-                    dark
-                      ? 'bg-white/15 text-white hover:bg-white/25 ring-1 ring-white/15'
-                      : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/15'
-                  }`}
-                  aria-label="Stop generating"
-                >
-                  <Square className="w-3 h-3 fill-current" />
-                  Stop
-                </motion.button>
-              ) : hasText ? (
-                <motion.button
-                  type="button"
-                  initial={false}
-                  animate={{ scale: 1, opacity: 1 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={onSend}
-                  className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition ${
-                    dark
-                      ? 'bg-white text-slate-900 hover:bg-slate-100'
-                      : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
-                  }`}
-                  aria-label="Send"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  Send
-                </motion.button>
-              ) : (
-                <motion.button
-                  type="button"
-                  initial={false}
-                  animate={{ scale: 1, opacity: 1 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={toggleListen}
-                  disabled={!speechSupported}
-                  className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition disabled:opacity-40 ${
-                    dark
-                      ? 'bg-white text-slate-900 hover:bg-slate-100'
-                      : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
-                  }`}
-                  aria-label="Speak"
-                >
-                  <AudioLines className="w-4 h-4" />
-                  Speak
-                </motion.button>
-              )}
-            </div>
+                <AudioLines className="w-4 h-4" />
+                Speak
+              </motion.button>
+            )}
           </div>
         </div>
       </div>
