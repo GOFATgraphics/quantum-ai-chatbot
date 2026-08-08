@@ -18,6 +18,7 @@ export type Conversation = {
   id: string
   user_id: string
   title: string | null
+  project_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -27,6 +28,25 @@ export type DbMessage = {
   conversation_id: string
   role: 'user' | 'assistant'
   content: string
+  created_at: string
+}
+
+export type Project = {
+  id: string
+  user_id: string
+  name: string
+  description: string | null
+  color: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type UserMemory = {
+  id: string
+  user_id: string
+  fact: string
+  category: string | null
+  source: string | null
   created_at: string
 }
 
