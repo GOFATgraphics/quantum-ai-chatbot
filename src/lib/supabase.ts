@@ -48,6 +48,7 @@ export type UserMemory = {
   category: string | null
   source: string | null
   created_at: string
+  updated_at?: string
 }
 
 /** Safe connector fields only — never select access_token / refresh_token from the client */
