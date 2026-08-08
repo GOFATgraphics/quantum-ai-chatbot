@@ -72,7 +72,7 @@ export function formatMarkdown(text: string): string {
       if (u.hostname.includes('docs.google.com')) {
         if (u.pathname.includes('/document/')) return 'Open Google Doc'
         if (u.pathname.includes('/spreadsheets/')) return 'Open Spreadsheet'
-        if (u.pathname.includes('/presentation/')) return 'Open Slides'
+        if (u.pathname.includes('/presentation/')) return 'Open slides'
         return 'Open in Drive'
       }
       if (u.hostname.includes('drive.google.com')) return 'Open in Drive'
