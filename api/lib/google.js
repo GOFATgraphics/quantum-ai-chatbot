@@ -128,7 +128,7 @@ export async function searchDrive(accessToken, query, maxResults = 10) {
     : 'trashed = false';
   const url = new URL('https://www.googleapis.com/drive/v3/files');
   url.searchParams.set('q', q);
-  url.searchParams.set('pageSize', String(Math.min(20, Math.max(1, maxResults)));
+  url.searchParams.set('pageSize', String(Math.min(20, Math.max(1, maxResults))));
   url.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime,webViewLink,owners)');
   url.searchParams.set('orderBy', 'modifiedTime desc');
 
@@ -177,7 +177,7 @@ export async function readGoogleDoc(accessToken, documentId) {
   };
 }
 
-/** List recent spreadsheets via Drive, or read a sheet range. */
+/** List spreadsheets via Drive. */
 export async function searchSheets(accessToken, query, maxResults = 8) {
   const nameFilter = query?.trim()
     ? ` and name contains '${query.replace(/'/g, "\\'")}'`
@@ -185,7 +185,7 @@ export async function searchSheets(accessToken, query, maxResults = 8) {
   const q = `mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false${nameFilter}`;
   const url = new URL('https://www.googleapis.com/drive/v3/files');
   url.searchParams.set('q', q);
-  url.searchParams.set('pageSize', String(Math.min(15, Math.max(1, maxResults)));
+  url.searchParams.set('pageSize', String(Math.min(15, Math.max(1, maxResults))));
   url.searchParams.set('fields', 'files(id,name,modifiedTime,webViewLink)');
   url.searchParams.set('orderBy', 'modifiedTime desc');
 
