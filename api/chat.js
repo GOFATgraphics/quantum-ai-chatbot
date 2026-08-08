@@ -45,9 +45,9 @@ async function loadProjectContext(userId, projectId) {
   } catch { return null; }
 }
 
-async function runClaude({ apiKey, system, messages, tools, model }) {
+async function runClaude({ apiKey, system, messages, tools, model, maxTokens = 4096 }) {
   const chosen = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
-  const body = { model: chosen, max_tokens: 4096, system, messages };
+  const body = { model: chosen, max_tokens: maxTokens, system, messages };
   if (tools?.length) body.tools = tools;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -64,9 +64,9 @@ async function runClaude({ apiKey, system, messages, tools, model }) {
   return response.json();
 }
 
-async function runClaudeStream({ apiKey, system, messages, tools, model, onDelta }) {
+async function runClaudeStream({ apiKey, system, messages, tools, model, onDelta, maxTokens = 4096 }) {
   const chosen = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
-  const body = { model: chosen, max_tokens: 4096, system, messages, stream: true };
+  const body = { model: chosen, max_tokens: maxTokens, system, messages, stream: true };
   if (tools?.length) body.tools = tools;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -157,7 +157,7 @@ function parseExplicitSend(text) {
   return { to, subject, body };
 }
 
-function buildSystemPrompt({ connected, memory, project, firstName }) {
+function buildSystemPrompt({ connected, memory, project, firstName, think, deepSearch }) {
   const memoryBlock = memory?.length > 0
     ? `## What you know about this user\n${memory.map((m) => `- ${m.fact}${m.category ? ` (${m.category})` : ''}`).join('\n')}\nUse this context naturally.`
     : '## What you know about this user\nNo saved memories yet. When they share stable facts, use save_memory.';
@@ -183,7 +183,16 @@ function buildSystemPrompt({ connected, memory, project, firstName }) {
   const missingLine = missing.length
     ? `Not connected: ${missing.join(', ')}. Tell user to open Connectors if needed.`
     : 'All listed connectors are connected.';
-  return `You are Quantumy AI — a precise personal work assistant that learns about the user over time.\n\n${nameLine}\n\n## Core principles\n- Be accurate, structured, and easy to scan.\n- Lead with the answer, then details.\n- Never invent email, file, calendar, or sheet contents — only tool results and user facts.\n- Prefer clarity over fluff.\n- When the user shares lasting context, call save_memory.\n\n## Formatting\nClean Markdown only. Use ## / ### headings, short paragraphs, numbered or bullet lists, and **bold** labels.\n- NEVER use pipe tables (| col | col |). Mobile cannot render them well.\n- For files/docs: numbered list with **Name** — date, then [Open](url) on its own line.\n- Prefer short link labels. No raw JSON dumps.\n\n## Email\n- If send_email is listed, Gmail is CONNECTED with send permission. You are NOT read-only.\n- When user says send it / send the email: call send_email with to, subject, body.\n- For draft only: call create_email_draft.\n\n## Connected tools\n${toolLines.join('\n')}\n${missingLine}\n\n${memoryBlock}\n\n${projectBlock}`;
+  const modeBlocks = [];
+  if (think) {
+    modeBlocks.push('## Think mode\nReason step by step before answering. Show key intermediate reasoning briefly, then give a clear final answer. Prefer depth and correctness over speed.');
+  }
+  if (deepSearch) {
+    modeBlocks.push('## DeepSearch mode\nTreat this as a research task. Structure the answer with: key findings first, supporting detail, uncertainties, and suggested follow-ups. Prefer cited structure (named sources or [links] when the user or tools provide them). Do not invent URLs or live facts you cannot verify from tools or the conversation.');
+  }
+  const modeBlock = modeBlocks.length ? modeBlocks.join('\n\n') + '\n\n' : '';
+
+  return `You are Quantumy AI — a precise personal work assistant that learns about the user over time.\n\n${nameLine}\n\n${modeBlock}## Core principles\n- Be accurate, structured, and easy to scan.\n- Lead with the answer, then details.\n- Never invent email, file, calendar, or sheet contents — only tool results and user facts.\n- Prefer clarity over fluff.\n- When the user shares lasting context, call save_memory.\n\n## Formatting\nClean Markdown only. Use ## / ### headings, short paragraphs, numbered or bullet lists, and **bold** labels.\n- NEVER use pipe tables (| col | col |). Mobile cannot render them well.\n- For files/docs: numbered list with **Name** — date, then [Open](url) on its own line.\n- Prefer short link labels. No raw JSON dumps.\n\n## Email\n- If send_email is listed, Gmail is CONNECTED with send permission. You are NOT read-only.\n- When user says send it / send the email: call send_email with to, subject, body.\n- For draft only: call create_email_draft.\n\n## Connected tools\n${toolLines.join('\n')}\n${missingLine}\n\n${memoryBlock}\n\n${projectBlock}`;
 }
 
 export default async function handler(req, res) {
@@ -253,7 +262,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const systemPrompt = buildSystemPrompt({ connected, memory, project, firstName });
+    const systemPrompt = buildSystemPrompt({ connected, memory, project, firstName, think: !!body?.think, deepSearch: !!body?.deepSearch });
     let anthropicMessages = messages.map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: String(m.content),
@@ -273,12 +282,14 @@ export default async function handler(req, res) {
         data = await runClaudeStream({
           apiKey, system: systemPrompt, messages: anthropicMessages,
           tools: tools.length ? tools : undefined, model: body?.model,
+          maxTokens: body?.think ? 8192 : 4096,
           onDelta: (delta) => { try { sseWrite(res, { delta }); } catch (_) {} },
         });
       } else {
         data = await runClaude({
           apiKey, system: systemPrompt, messages: anthropicMessages,
           tools: tools.length ? tools : undefined, model: body?.model,
+          maxTokens: body?.think ? 8192 : 4096,
         });
       }
 
