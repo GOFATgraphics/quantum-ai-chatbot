@@ -7,6 +7,8 @@ import {
   readGoogleDoc,
   searchSheets,
   readSheetRange,
+  sendGmail,
+  createGmailDraft,
 } from './lib/google.js';
 
 const GMAIL_TOOL = {
@@ -27,6 +29,40 @@ const GMAIL_TOOL = {
       },
     },
     required: ['query'],
+  },
+};
+
+const SEND_EMAIL_TOOL = {
+  name: 'send_email',
+  description:
+    'Send an email from the user\'s Gmail. Only use when the user explicitly asks to send. Confirm recipient and subject in the message first when unclear.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      to: { type: 'string', description: 'Recipient email address' },
+      subject: { type: 'string', description: 'Email subject' },
+      body: { type: 'string', description: 'Plain-text body' },
+      cc: { type: 'string', description: 'Optional CC addresses, comma-separated' },
+      bcc: { type: 'string', description: 'Optional BCC addresses, comma-separated' },
+    },
+    required: ['to', 'subject', 'body'],
+  },
+};
+
+const DRAFT_EMAIL_TOOL = {
+  name: 'create_email_draft',
+  description:
+    'Create a Gmail draft (does not send). Prefer this when the user wants to review before sending.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      to: { type: 'string', description: 'Recipient email address' },
+      subject: { type: 'string', description: 'Email subject' },
+      body: { type: 'string', description: 'Plain-text body' },
+      cc: { type: 'string', description: 'Optional CC' },
+      bcc: { type: 'string', description: 'Optional BCC' },
+    },
+    required: ['to', 'subject', 'body'],
   },
 };
 
@@ -247,7 +283,11 @@ function buildSystemPrompt({ connected, memory, project, firstName }) {
     : '';
 
   const toolLines = [];
-  if (connected.gmail) toolLines.push('- search_gmail: search/read their Gmail');
+  if (connected.gmail) {
+    toolLines.push('- search_gmail: search/read their Gmail');
+    toolLines.push('- send_email: send email (only when user clearly asks to send)');
+    toolLines.push('- create_email_draft: save a Gmail draft without sending');
+  }
   if (connected.drive) toolLines.push('- search_drive: search files in Google Drive');
   if (connected.docs) toolLines.push('- read_google_doc: read a Google Doc by id (from Drive search)');
   if (connected.sheets) {
@@ -266,7 +306,7 @@ function buildSystemPrompt({ connected, memory, project, firstName }) {
       ? `Not connected: ${missing.join(', ')}. If they need those, tell them to open Connectors and connect.`
       : 'All Google connectors above are connected.';
 
-  return `You are Quantumy AI — a precise personal work assistant that learns about the user over time.\n\n${nameLine}\n\n## Core principles\n- Be accurate, structured, and easy to scan.\n- Lead with the answer, then details.\n- Never invent email, file, or sheet contents — only tool results and user facts.\n- Prefer clarity over fluff.\n- When the user shares lasting context, call save_memory.\n\n## Formatting\nClean Markdown only. Use ## / ### headings, short paragraphs, numbered or bullet lists, and **bold** labels.\n- NEVER use pipe tables (| col | col |). Mobile cannot render them well.\n- For files/docs: use a numbered list. Each item = **Name** — date, then a markdown link on its own line: [Open](url)\n- Prefer short link labels like [Open doc](url) or [Open sheet](url). Never dump raw multi-line URLs.\n- No raw JSON dumps.\n\n## Google Docs / Drive\n- search_drive returns name, link, date, mimeType. Present them as clean lists with [Open](link).\n- You can only READ a Doc's text if the Docs connector is connected AND you call read_google_doc with the document id.\n- If Docs is not connected, say so clearly and still give tappable [Open](link) links. Do not invent contents.\n\n## Email\n- If Gmail is connected with send permission (reconnect after scope update), you can ask the user to confirm then they can send from Gmail.\n- Always show a ready-to-copy draft with **To** / **Subject** / **Body**.\n- Sending via API requires the updated Gmail connector consent.\n\n## Connected tools\n${toolLines.join('\n')}\n${missingLine}\n\n${memoryBlock}\n\n${projectBlock}`;
+  return `You are Quantumy AI — a precise personal work assistant that learns about the user over time.\n\n${nameLine}\n\n## Core principles\n- Be accurate, structured, and easy to scan.\n- Lead with the answer, then details.\n- Never invent email, file, or sheet contents — only tool results and user facts.\n- Prefer clarity over fluff.\n- When the user shares lasting context, call save_memory.\n\n## Formatting\nClean Markdown only. Use ## / ### headings, short paragraphs, numbered or bullet lists, and **bold** labels.\n- NEVER use pipe tables (| col | col |). Mobile cannot render them well.\n- For files/docs: use a numbered list. Each item = **Name** — date, then a markdown link on its own line: [Open](url)\n- Prefer short link labels like [Open doc](url) or [Open sheet](url). Never dump raw multi-line URLs.\n- No raw JSON dumps.\n\n## Google Docs / Drive\n- search_drive returns name, link, date, mimeType. Present them as clean lists with [Open](link).\n- You can only READ a Doc's text if the Docs connector is connected AND you call read_google_doc with the document id.\n- If Docs is not connected, say so clearly and still give tappable [Open](link) links. Do not invent contents.\n\n## Email\n- If Gmail is connected: you CAN send and draft via tools.\n- When the user asks to send: call send_email with to, subject, body.\n- When they want a draft only: call create_email_draft.\n- Always show **To** / **Subject** / **Body** after sending or drafting.\n- If Gmail is not connected: output a copy-paste draft only.\n- Never say you cannot send if Gmail is listed as connected.\n\n## Connected tools\n${toolLines.join('\n')}\n${missingLine}\n\n${memoryBlock}\n\n${projectBlock}`;
 }
 
 export default async function handler(req, res) {
@@ -303,7 +343,7 @@ export default async function handler(req, res) {
       try {
         if (await getValidToken(user.id, 'gmail')) {
           connected.gmail = true;
-          tools.push(GMAIL_TOOL);
+          tools.push(GMAIL_TOOL, SEND_EMAIL_TOOL, DRAFT_EMAIL_TOOL);
         }
         if (await getValidToken(user.id, 'google_drive')) {
           connected.drive = true;
@@ -378,6 +418,52 @@ export default async function handler(req, res) {
                 type: 'tool_result',
                 tool_use_id: block.id,
                 content: JSON.stringify({ count: results.length, messages: results }),
+              });
+            }
+          } else if (block.name === 'send_email' && user) {
+            const accessToken = await getValidToken(user.id, 'gmail');
+            if (!accessToken) {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: 'Gmail is not connected. Ask the user to connect Gmail in Connectors, then reconnect so send permission is granted.',
+                is_error: true,
+              });
+            } else {
+              const result = await sendGmail(accessToken, {
+                to: String(block.input?.to || ''),
+                subject: String(block.input?.subject || ''),
+                body: String(block.input?.body || ''),
+                cc: block.input?.cc ? String(block.input.cc) : undefined,
+                bcc: block.input?.bcc ? String(block.input.bcc) : undefined,
+              });
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: JSON.stringify({ sent: true, ...result }),
+              });
+            }
+          } else if (block.name === 'create_email_draft' && user) {
+            const accessToken = await getValidToken(user.id, 'gmail');
+            if (!accessToken) {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: 'Gmail is not connected.',
+                is_error: true,
+              });
+            } else {
+              const result = await createGmailDraft(accessToken, {
+                to: String(block.input?.to || ''),
+                subject: String(block.input?.subject || ''),
+                body: String(block.input?.body || ''),
+                cc: block.input?.cc ? String(block.input.cc) : undefined,
+                bcc: block.input?.bcc ? String(block.input.bcc) : undefined,
+              });
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: JSON.stringify({ drafted: true, ...result }),
               });
             }
           } else if (block.name === 'search_drive' && user) {
