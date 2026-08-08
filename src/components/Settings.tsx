@@ -207,7 +207,7 @@ export default function Settings({
           </button>
 
           <div className={`${row} opacity-70`}>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-white/10' : 'bg-white shadow-sm'`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-white/10' : 'bg-white shadow-sm'}`}>
               <Bell className="w-5 h-5 text-slate-500" />
             </div>
             <div className="flex-1 min-w-0">
