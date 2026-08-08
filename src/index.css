@@ -57,65 +57,6 @@ html.dark ::-webkit-scrollbar-thumb { background: #334155; }
 }
 .animate-pulse-dot { animation: pulse-dot 1.4s infinite ease-in-out both; }
 
-@keyframes bounce-soft {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-.animate-bounce-soft { animation: bounce-soft 1.2s ease-in-out infinite; }
-
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-fade-up { animation: fade-up 0.35s ease-out; }
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-.animate-shimmer { animation: shimmer 2s linear infinite; }
-
-.glass-panel-light {
-  background: rgba(255, 255, 255, 0.72);
-  border-right: 1px solid rgba(15, 23, 42, 0.06);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.glass-panel-dark {
-  background: rgba(12, 12, 18, 0.85);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-.glass-card-light {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-.glass-card-dark {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.glass-modal-light {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.glass-modal-dark {
-  background: rgba(18, 18, 26, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
 .ai-content {
   font-size: 0.9375rem;
   line-height: 1.65;
@@ -173,7 +114,6 @@ html:not(.dark) .ai-content .md-code { background: #f1f5f9; color: #334155; }
   word-break: break-word;
 }
 html.dark .ai-content .md-link { color: #a5b4fc; }
-.ai-content .md-link:active { opacity: 0.8; }
 
 .ai-content .md-table-wrap {
   width: 100%;
@@ -209,4 +149,14 @@ button, a {
 }
 textarea {
   transition: height 0.12s ease;
+}
+
+/* Glassmorphism toggle */
+html.glass-on .glass-surface {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+html:not(.glass-on) .glass-surface {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
