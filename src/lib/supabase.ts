@@ -60,7 +60,6 @@ export type ConnectorProvider =
   | 'outlook'
   | 'excel'
 
-/** Safe connector fields only — never select access_token / refresh_token from the client */
 export type Connector = {
   id: string
   user_id: string
@@ -105,22 +104,22 @@ export const CONNECTOR_CATALOG = [
     provider: 'google_calendar' as const,
     name: 'Google Calendar',
     description: 'Check events and schedule',
-    scopesLabel: 'Read-only access to Calendar',
-    available: false,
+    scopesLabel: 'Read calendar events',
+    available: true,
   },
   {
     provider: 'outlook' as const,
     name: 'Outlook',
     description: 'Search Microsoft email',
-    scopesLabel: 'Read-only access to Outlook',
-    available: false,
+    scopesLabel: 'Read Outlook mail',
+    available: true,
   },
   {
     provider: 'excel' as const,
-    name: 'Excel',
-    description: 'Query workbook data',
-    scopesLabel: 'Read-only access to Excel',
-    available: false,
+    name: 'Excel Online',
+    description: 'Query Microsoft Excel workbooks',
+    scopesLabel: 'Read Excel workbooks',
+    available: true,
   },
 ]
 
