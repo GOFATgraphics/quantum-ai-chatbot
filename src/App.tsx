@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu, Mic, Send, X,
-  Loader2, PenLine, ArrowLeft,
+  Loader2, PenLine,
   ChevronDown, Copy, Check, ThumbsUp, ThumbsDown, Volume2,
+  Sparkles,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage, type Project, makeChatTitle } from './lib/supabase'
 import { formatMarkdown } from './lib/markdown'
@@ -20,15 +21,22 @@ const MODELS = [
   { id: 'quantum-3-pro', name: 'Quantum 3 Pro', badge: 'Pro' },
 ]
 
+const SUGGESTIONS = [
+  'Summarize my unread emails',
+  'Find recent Drive files',
+  'Draft a short email',
+  'What should I focus on today?',
+]
+
 function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
-function getTimeGreeting() {
+function emptyGreeting(firstName: string) {
   const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
+  if (h < 12) return `Good morning, ${firstName}`
+  if (h < 17) return `Your move, ${firstName}!`
+  return `Evening, ${firstName}`
 }
 
 function MessageActions({ content, dark }: { content: string; dark: boolean }) {
@@ -40,21 +48,27 @@ function MessageActions({ content, dark }: { content: string; dark: boolean }) {
       setTimeout(() => setCopied(false), 1500)
     } catch {}
   }
-  const muted = dark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
+  const muted = dark
+    ? 'text-slate-500 hover:text-slate-300 hover:bg-white/8'
+    : 'text-slate-400 hover:text-slate-600 hover:bg-black/5'
   return (
-    <div className="flex items-center gap-1 mt-2 opacity-70">
-      <button type="button" onClick={copy} className={`p-1.5 rounded-lg transition ${muted}`} aria-label="Copy">
-        {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-      </button>
-      <button type="button" className={`p-1.5 rounded-lg transition ${muted}`} aria-label="Good response">
-        <ThumbsUp className="w-3.5 h-3.5" />
-      </button>
-      <button type="button" className={`p-1.5 rounded-lg transition ${muted}`} aria-label="Bad response">
-        <ThumbsDown className="w-3.5 h-3.5" />
-      </button>
-      <button type="button" className={`p-1.5 rounded-lg transition ${muted}`} aria-label="Read aloud">
-        <Volume2 className="w-3.5 h-3.5" />
-      </button>
+    <div className="flex items-center gap-0.5 mt-2">
+      {[
+        { onClick: copy, label: 'Copy', icon: copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" /> },
+        { onClick: undefined, label: 'Good', icon: <ThumbsUp className="w-3.5 h-3.5" /> },
+        { onClick: undefined, label: 'Bad', icon: <ThumbsDown className="w-3.5 h-3.5" /> },
+        { onClick: undefined, label: 'Read', icon: <Volume2 className="w-3.5 h-3.5" /> },
+      ].map((a) => (
+        <button
+          key={a.label}
+          type="button"
+          onClick={a.onClick}
+          className={`p-1.5 rounded-full transition ${muted}`}
+          aria-label={a.label}
+        >
+          {a.icon}
+        </button>
+      ))}
     </div>
   )
 }
@@ -82,7 +96,7 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
     const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', dark ? '#07070c' : '#f0f2f8')
+    if (meta) meta.setAttribute('content', dark ? '#0a0a0f' : '#f8f9fc')
   }, [dark])
 
   useEffect(() => {
@@ -254,17 +268,20 @@ export default function App() {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px'
   }, [input])
 
   const isEmpty = messages.length === 0 && !isLoading
   const textMain = dark ? 'text-slate-100' : 'text-slate-900'
   const textMuted = dark ? 'text-slate-400' : 'text-slate-500'
+  const shellBg = dark ? 'bg-[#0a0a0f]' : 'bg-[#f8f9fc]'
 
   if (authLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-dvh gap-4 bg-[#05050a]">
-        <Logo size={56} className="opacity-90" dark />
+      <div className={`flex flex-col items-center justify-center h-dvh gap-4 ${shellBg}`}>
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }}>
+          <Logo size={56} className="opacity-90" />
+        </motion.div>
         <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
       </div>
     )
@@ -297,8 +314,8 @@ export default function App() {
   }
 
   return (
-    <div className={`flex h-dvh overflow-hidden ${dark ? 'bg-[#07070c]' : 'bg-[#f0f2f8]'}`}>
-      <div className="hidden lg:flex">
+    <div className={`flex h-dvh overflow-hidden ${shellBg}`}>
+      <div className="hidden lg:flex w-[280px] shrink-0">
         <Sidebar {...sidebarProps} />
       </div>
 
@@ -309,15 +326,16 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
               className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
               onClick={() => setMobileSidebar(false)}
             />
             <motion.div
-              initial={{ x: -280 }}
+              initial={{ x: -300 }}
               animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className="fixed inset-y-0 left-0 z-50 lg:hidden"
+              exit={{ x: -300 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 340 }}
+              className="fixed inset-y-0 left-0 z-50 w-[min(300px,88vw)] lg:hidden"
             >
               <Sidebar {...sidebarProps} showClose onClose={() => setMobileSidebar(false)} />
             </motion.div>
@@ -325,112 +343,148 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative">
         <header className="pt-[env(safe-area-inset-top)] shrink-0 z-10">
-          <div className="h-14 lg:h-16 flex items-center justify-between px-3 lg:px-6">
-            <div className="flex items-center gap-2 min-w-0">
-              {!isEmpty ? (
-                <button
-                  onClick={startNewChat}
-                  className={`p-2 rounded-full transition lg:hidden shrink-0 glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`}
-                >
-                  <ArrowLeft className={`w-5 h-5 ${textMuted}`} />
-                </button>
-              ) : (
-                <button
-                  onClick={() => setMobileSidebar(true)}
-                  className={`p-2 rounded-full transition lg:hidden shrink-0 glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`}
-                >
-                  <Menu className={`w-5 h-5 ${textMuted}`} />
-                </button>
-              )}
+          <div className="h-14 flex items-center justify-between px-2 sm:px-4">
+            <div className="flex items-center gap-1 min-w-0">
+              <button
+                onClick={() => setMobileSidebar(true)}
+                className={`p-2.5 rounded-full transition lg:hidden ${dark ? 'hover:bg-white/8' : 'hover:bg-black/5'}`}
+                aria-label="Menu"
+              >
+                <Menu className={`w-5 h-5 ${textMuted}`} />
+              </button>
 
               <div className="relative min-w-0">
                 <button
                   onClick={() => setShowModelMenu((v) => !v)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium glass-card min-w-0 ${dark ? 'glass-card-dark' : 'glass-card-light'}`}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[15px] font-medium transition min-w-0 ${dark ? 'hover:bg-white/8' : 'hover:bg-black/5'}`}
                 >
                   <span className={`${textMain} truncate`}>{selectedModel.name}</span>
                   {selectedModel.badge && (
-                    <span className={`text-[10px] shrink-0 ${textMuted}`}>{selectedModel.badge}</span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${dark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-indigo-600'}`}>
+                      {selectedModel.badge}
+                    </span>
                   )}
-                  <ChevronDown className={`w-3.5 h-3.5 shrink-0 ${textMuted}`} />
+                  <ChevronDown className={`w-4 h-4 shrink-0 ${textMuted}`} />
                 </button>
-                {showModelMenu && (
-                  <>
-                    <div className="fixed inset-0 z-20" onClick={() => setShowModelMenu(false)} />
-                    <div
-                      className={`absolute left-0 top-full mt-1 z-30 min-w-[160px] rounded-xl py-1 glass-modal ${dark ? 'glass-modal-dark' : 'glass-modal-light'}`}
-                    >
-                      {MODELS.map((m) => (
-                        <button
-                          key={m.id}
-                          onClick={() => {
-                            setSelectedModel(m)
-                            setShowModelMenu(false)
-                          }}
-                          className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between ${dark ? 'hover:bg-white/5' : 'hover:bg-white/50'} ${selectedModel.id === m.id ? (dark ? 'text-indigo-300' : 'text-indigo-600') : textMain}`}
-                        >
-                          <span>{m.name}</span>
-                          {m.badge && <span className={`text-[10px] ${textMuted}`}>{m.badge}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
+                <AnimatePresence>
+                  {showModelMenu && (
+                    <>
+                      <div className="fixed inset-0 z-20" onClick={() => setShowModelMenu(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                        transition={{ duration: 0.15 }}
+                        className={`absolute left-0 top-full mt-1 z-30 min-w-[180px] rounded-2xl py-1.5 shadow-xl border ${
+                          dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/5'
+                        }`}
+                      >
+                        {MODELS.map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => {
+                              setSelectedModel(m)
+                              setShowModelMenu(false)
+                            }}
+                            className={`w-full text-left px-3.5 py-2.5 text-sm flex items-center justify-between transition ${
+                              dark ? 'hover:bg-white/5' : 'hover:bg-black/[0.03]'
+                            } ${selectedModel.id === m.id ? (dark ? 'text-indigo-300' : 'text-indigo-600') : textMain}`}
+                          >
+                            <span className="font-medium">{m.name}</span>
+                            {m.badge && <span className={`text-[10px] ${textMuted}`}>{m.badge}</span>}
+                          </button>
+                        ))}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
             <button
               onClick={startNewChat}
-              className={`hidden lg:flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'} ${textMuted}`}
+              className={`p-2.5 rounded-full transition ${dark ? 'hover:bg-white/8' : 'hover:bg-black/5'}`}
+              aria-label="New chat"
             >
-              <PenLine className="w-4 h-4" />
-              New chat
+              <PenLine className={`w-5 h-5 ${textMuted}`} />
             </button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-4 lg:px-6">
-          <div className="max-w-3xl mx-auto pb-4">
+        <main className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-4">
+          <div className="max-w-2xl mx-auto">
             {isEmpty ? (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35 }}
-                className="flex flex-col items-center justify-center min-h-[calc(100%-2rem)] py-8 text-center"
-              >
-                <Logo size={64} className="mb-5 drop-shadow-lg" dark={dark} />
-                <h1 className={`text-[26px] sm:text-[32px] font-medium tracking-tight leading-tight ${textMain}`}>
-                  {getTimeGreeting()}, {firstName}
-                </h1>
-                <p className={`mt-2 text-sm ${textMuted}`}>What can I help you with?</p>
-                <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
-                  {['Summarize my unread emails', 'Find recent Drive files', 'Draft a short email', 'What should I focus on today?'].map(
-                    (s) => (
-                      <button
+              <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-11rem)] pb-8 text-center">
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex flex-col items-center"
+                >
+                  <motion.div
+                    animate={{ y: [0, -6, 0] }}
+                    transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+                    className="mb-6"
+                  >
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${dark ? 'bg-gradient-to-br from-indigo-500/20 to-violet-500/10' : 'bg-gradient-to-br from-indigo-50 to-violet-50'}`}>
+                      <Logo size={36} />
+                    </div>
+                  </motion.div>
+                  <h1 className={`text-[1.65rem] sm:text-[1.85rem] font-medium tracking-tight ${textMain}`}>
+                    {emptyGreeting(firstName)}
+                  </h1>
+                  <p className={`mt-2 text-[15px] ${textMuted}`}>What can I help you with?</p>
+
+                  <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-md px-1">
+                    {SUGGESTIONS.map((s, i) => (
+                      <motion.button
                         key={s}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.08 + i * 0.05, duration: 0.35 }}
                         onClick={() => handleSend(s)}
-                        className={`text-left text-sm px-4 py-3 rounded-2xl transition glass-card ${dark ? 'glass-card-dark hover:bg-white/5' : 'glass-card-light hover:bg-white/80'} ${textMain}`}
+                        className={`text-left text-[13.5px] px-4 py-3.5 rounded-2xl transition border ${
+                          dark
+                            ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] text-slate-200'
+                            : 'bg-white border-black/[0.04] hover:bg-white shadow-sm text-slate-700'
+                        }`}
                       >
                         {s}
-                      </button>
-                    )
-                  )}
-                </div>
-              </motion.div>
+                      </motion.button>
+                    ))}
+                  </div>
+                </motion.div>
+              </div>
             ) : (
-              <div className="space-y-6 py-4">
-                {messages.map((msg) => (
-                  <div key={msg.id} className={msg.role === 'user' ? 'flex justify-end' : ''}>
-                    <Bubble message={msg} dark={dark} />
-                  </div>
-                ))}
+              <div className="space-y-5 py-3 pb-6">
+                <AnimatePresence initial={false}>
+                  {messages.map((msg) => (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                      className={msg.role === 'user' ? 'flex justify-end' : ''}
+                    >
+                      <Bubble message={msg} dark={dark} />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
                 {isLoading && (
-                  <div className={`inline-flex items-center gap-2 text-sm ${textMuted}`}>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className={`inline-flex items-center gap-2 text-sm ${textMuted}`}
+                  >
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-60" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500" />
+                    </span>
                     Thinking…
-                  </div>
+                  </motion.div>
                 )}
                 <div ref={messagesEndRef} />
               </div>
@@ -438,62 +492,121 @@ export default function App() {
           </div>
         </main>
 
-        <div className="shrink-0 px-3 sm:px-4 lg:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
-          <div className="max-w-3xl mx-auto">
-            <div className={`flex items-end gap-2 rounded-3xl px-3 py-2 glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`}>
+        <div className="shrink-0 px-3 sm:px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
+          <div className="max-w-2xl mx-auto">
+            <motion.div
+              layout
+              className={`flex items-end gap-1.5 rounded-[28px] pl-2 pr-2 py-1.5 shadow-lg border ${
+                dark
+                  ? 'bg-[#16161f] border-white/[0.08] shadow-black/40'
+                  : 'bg-white border-black/[0.06] shadow-slate-200/80'
+              }`}
+            >
+              <button
+                type="button"
+                className={`p-2.5 rounded-full shrink-0 transition ${dark ? 'hover:bg-white/8 text-slate-400' : 'hover:bg-black/5 text-slate-500'}`}
+                aria-label="Attach"
+              >
+                <Sparkles className="w-5 h-5" />
+              </button>
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
                 rows={1}
-                placeholder="Message Quantumy…"
-                className={`flex-1 resize-none bg-transparent border-0 outline-none text-[15px] leading-6 py-2 max-h-40 ${textMain} placeholder:opacity-60`}
+                placeholder="Ask Quantumy…"
+                className={`flex-1 resize-none bg-transparent border-0 outline-none text-[15px] leading-6 py-2.5 max-h-[140px] ${textMain} placeholder:text-slate-400`}
               />
-              <button type="button" className={`p-2 rounded-full shrink-0 ${textMuted}`} aria-label="Voice">
-                <Mic className="w-5 h-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSend()}
-                disabled={!input.trim() || isLoading}
-                className="p-2 rounded-full shrink-0 text-white bg-gradient-to-r from-indigo-600 to-violet-600 disabled:opacity-40 transition"
-                aria-label="Send"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
+              {!input.trim() ? (
+                <button
+                  type="button"
+                  className={`p-2.5 rounded-full shrink-0 transition ${dark ? 'hover:bg-white/8 text-slate-400' : 'hover:bg-black/5 text-slate-500'}`}
+                  aria-label="Voice"
+                >
+                  <Mic className="w-5 h-5" />
+                </button>
+              ) : (
+                <motion.button
+                  type="button"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  onClick={() => handleSend()}
+                  disabled={isLoading}
+                  className="p-2.5 rounded-full shrink-0 text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 transition shadow-md shadow-indigo-600/25"
+                  aria-label="Send"
+                >
+                  <Send className="w-[18px] h-[18px]" />
+                </motion.button>
+              )}
+            </motion.div>
           </div>
         </div>
       </div>
 
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowSettings(false)}>
-          <div className={`w-full max-w-md rounded-2xl p-4 ${dark ? 'bg-slate-900' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
-            <Settings
-              dark={dark}
-              user={user}
-              onSignOut={async () => { await supabase.auth.signOut(); setShowSettings(false) }}
-              onToggleTheme={() => setDark((d) => !d)}
-              onOpenConnectors={() => { setShowSettings(false); setShowConnectors(true) }}
-            />
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowSettings(false)}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className={`w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto ${dark ? 'bg-[#12121a]' : 'bg-white'}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Settings
+                dark={dark}
+                user={user}
+                onSignOut={async () => {
+                  await supabase.auth.signOut()
+                  setShowSettings(false)
+                }}
+                onToggleTheme={() => setDark((d) => !d)}
+                onOpenConnectors={() => {
+                  setShowSettings(false)
+                  setShowConnectors(true)
+                }}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {showConnectors && session?.access_token && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowConnectors(false)}>
-          <div className={`w-full max-w-md rounded-2xl p-4 max-h-[80vh] overflow-y-auto ${dark ? 'bg-slate-900' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className={`font-medium ${textMain}`}>Connectors</h2>
-              <button type="button" onClick={() => setShowConnectors(false)} className={textMuted}>
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <Connectors dark={dark} accessToken={session.access_token} />
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {showConnectors && session?.access_token && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowConnectors(false)}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className={`w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto ${dark ? 'bg-[#12121a]' : 'bg-white'}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h2 className={`font-medium text-lg ${textMain}`}>Connectors</h2>
+                <button type="button" onClick={() => setShowConnectors(false)} className={`p-2 rounded-full ${dark ? 'hover:bg-white/8' : 'hover:bg-black/5'} ${textMuted}`}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <Connectors dark={dark} accessToken={session.access_token} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -502,13 +615,17 @@ function Bubble({ message, dark }: { message: Message; dark: boolean }) {
   const isUser = message.role === 'user'
   if (isUser) {
     return (
-      <div className="max-w-[85%] sm:max-w-[75%] rounded-3xl rounded-br-md px-4 py-2.5 text-[15px] leading-relaxed bg-indigo-600 text-white">
+      <div
+        className={`max-w-[85%] sm:max-w-[75%] rounded-[22px] rounded-br-md px-4 py-2.5 text-[15px] leading-relaxed ${
+          dark ? 'bg-[#2a2a35] text-slate-100' : 'bg-[#e8eaf0] text-slate-900'
+        }`}
+      >
         {message.content}
       </div>
     )
   }
   return (
-    <div className="max-w-[95%] sm:max-w-[90%]">
+    <div className="max-w-[95%] sm:max-w-[92%]">
       <div className={`text-[15px] leading-relaxed ${dark ? 'text-slate-100' : 'text-slate-800'}`}>
         <div className="ai-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(message.content) }} />
       </div>
