@@ -29,3 +29,39 @@ export type DbMessage = {
   content: string
   created_at: string
 }
+
+/** Safe connector fields only — never select access_token / refresh_token from the client */
+export type Connector = {
+  id: string
+  user_id: string
+  provider: 'gmail' | 'google_drive' | 'google_sheets'
+  account_email: string | null
+  status: 'connected' | 'error' | 'revoked'
+  scopes: string[] | null
+  created_at: string
+  updated_at: string
+}
+
+export const CONNECTOR_CATALOG = [
+  {
+    provider: 'gmail' as const,
+    name: 'Gmail',
+    description: 'Search and summarize your email',
+    scopesLabel: 'Read-only access to Gmail',
+    available: true,
+  },
+  {
+    provider: 'google_drive' as const,
+    name: 'Google Drive',
+    description: 'Search files and documents',
+    scopesLabel: 'Read-only access to Drive',
+    available: false,
+  },
+  {
+    provider: 'google_sheets' as const,
+    name: 'Google Sheets',
+    description: 'Query spreadsheet data',
+    scopesLabel: 'Read-only access to Sheets',
+    available: false,
+  },
+]
