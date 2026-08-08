@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Link2, Unlink, Check } from 'lucide-react'
 import { supabase, CONNECTOR_CATALOG, type Connector } from '../lib/supabase'
-import { GmailIcon, DriveIcon, SheetsIcon } from './BrandIcons'
+import {
+  GmailIcon, DriveIcon, SheetsIcon, DocsIcon, CalendarIcon, OutlookIcon, ExcelIcon,
+} from './BrandIcons'
 
 type Props = {
   dark: boolean
@@ -9,9 +11,13 @@ type Props = {
 }
 
 const BRAND: Record<string, React.ReactNode> = {
-  gmail: <GmailIcon size={24} />,
-  google_drive: <DriveIcon size={24} />,
-  google_sheets: <SheetsIcon size={24} />,
+  gmail: <GmailIcon size={26} />,
+  google_drive: <DriveIcon size={26} />,
+  google_sheets: <SheetsIcon size={26} />,
+  google_docs: <DocsIcon size={26} />,
+  google_calendar: <CalendarIcon size={26} />,
+  outlook: <OutlookIcon size={26} />,
+  excel: <ExcelIcon size={26} />,
 }
 
 export default function Connectors({ dark, accessToken }: Props) {
@@ -105,7 +111,7 @@ export default function Connectors({ dark, accessToken }: Props) {
           <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {CONNECTOR_CATALOG.map((item) => {
             const connected = getConnected(item.provider)
             const isBusy = busy === item.provider
@@ -113,14 +119,14 @@ export default function Connectors({ dark, accessToken }: Props) {
             return (
               <div
                 key={item.provider}
-                className={`glass-card flex items-center gap-3 rounded-2xl p-3.5 ${dark ? 'glass-card-dark' : 'glass-card-light'}`}
+                className={`glass-card flex items-center gap-3 rounded-2xl p-3 ${dark ? 'glass-card-dark' : 'glass-card-light'}`}
               >
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-white/10' : 'bg-white/80 shadow-sm'}`}>
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden ${dark ? 'bg-white/10' : 'bg-white shadow-sm'}`}>
                   {BRAND[item.provider]}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className={`text-sm font-medium ${textMain}`}>{item.name}</span>
                     {connected && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
