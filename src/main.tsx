@@ -9,11 +9,20 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-// Register service worker for PWA (Android, desktop, iOS Add to Home Screen)
+// PWA: register SW and force clients onto the latest version after deploys
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      /* offline / private mode — ignore */
-    })
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js')
+      reg.update().catch(() => {})
+      let refreshing = false
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return
+        refreshing = true
+        window.location.reload()
+      })
+    } catch {
+      /* offline / private mode */
+    }
   })
 }
