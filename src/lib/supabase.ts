@@ -51,11 +51,20 @@ export type UserMemory = {
   updated_at?: string
 }
 
+export type ConnectorProvider =
+  | 'gmail'
+  | 'google_drive'
+  | 'google_sheets'
+  | 'google_docs'
+  | 'google_calendar'
+  | 'outlook'
+  | 'excel'
+
 /** Safe connector fields only — never select access_token / refresh_token from the client */
 export type Connector = {
   id: string
   user_id: string
-  provider: 'gmail' | 'google_drive' | 'google_sheets'
+  provider: ConnectorProvider
   account_email: string | null
   status: 'connected' | 'error' | 'revoked'
   scopes: string[] | null
@@ -79,10 +88,55 @@ export const CONNECTOR_CATALOG = [
     available: false,
   },
   {
+    provider: 'google_docs' as const,
+    name: 'Google Docs',
+    description: 'Read and summarize documents',
+    scopesLabel: 'Read-only access to Docs',
+    available: false,
+  },
+  {
     provider: 'google_sheets' as const,
     name: 'Google Sheets',
     description: 'Query spreadsheet data',
     scopesLabel: 'Read-only access to Sheets',
     available: false,
   },
+  {
+    provider: 'google_calendar' as const,
+    name: 'Google Calendar',
+    description: 'Check events and schedule',
+    scopesLabel: 'Read-only access to Calendar',
+    available: false,
+  },
+  {
+    provider: 'outlook' as const,
+    name: 'Outlook',
+    description: 'Search Microsoft email',
+    scopesLabel: 'Read-only access to Outlook',
+    available: false,
+  },
+  {
+    provider: 'excel' as const,
+    name: 'Excel',
+    description: 'Query workbook data',
+    scopesLabel: 'Read-only access to Excel',
+    available: false,
+  },
 ]
+
+/** Build a short chat title from message content (not a raw first-line dump). */
+export function makeChatTitle(raw: string): string {
+  let t = raw.replace(/\s+/g, ' ').trim()
+  t = t.replace(
+    /^(please |can you |could you |would you |i want (you )?to |i need (you )?to |help me (to )?|hey[, ]+|hi[, ]+)/i,
+    ''
+  )
+  t = t.replace(/[.?!]+$/g, '').trim()
+  if (!t) t = 'New chat'
+  if (t.length > 42) {
+    const cut = t.slice(0, 42)
+    const sp = cut.lastIndexOf(' ')
+    t = (sp > 18 ? cut.slice(0, sp) : cut).trim() + '…'
+  }
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
