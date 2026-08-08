@@ -55,6 +55,39 @@ function generateId() {
   return Math.random().toString(36).slice(2, 11)
 }
 
+/** Lightweight markdown → HTML for assistant messages */
+function formatMarkdown(text: string) {
+  let html = text
+    // Escape HTML
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+
+    // Bold **text**
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Italic *text*
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    // Inline code `code`
+    .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-slate-100 text-[13px] font-mono">$1</code>')
+    // Unordered lists
+    .replace(/^[•\-]\s+(.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
+    // Numbered lists
+    .replace(/^\d+\.\s+(.+)$/gm, '<li class="ml-4 list-decimal">$1</li>')
+    // Line breaks
+    .replace(/\n\n/g, '</p><p class="mt-3">')
+    .replace(/\n/g, '<br/>')
+
+  // Wrap consecutive <li> in <ul>
+  html = html.replace(/(<li[^>]*>.*?<\/li>)/gs, (match) => {
+    if (match.includes('list-disc')) {
+      return `<ul class="my-2 space-y-1">${match}</ul>`
+    }
+    return `<ol class="my-2 space-y-1">${match}</ol>`
+  })
+
+  return `<p>${html}</p>`
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
@@ -471,7 +504,6 @@ export default function App() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
         <header className="h-14 flex items-center justify-between px-4 lg:px-6 border-b border-slate-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-20">
           <div className="flex items-center gap-3">
             <button
@@ -497,7 +529,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Messages */}
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4 lg:px-6">
             <AnimatePresence mode="wait">
@@ -582,7 +613,6 @@ export default function App() {
           </div>
         </main>
 
-        {/* Input area */}
         <div className="border-t border-slate-200/80 bg-white/90 backdrop-blur-md">
           <div className="max-w-3xl mx-auto px-4 lg:px-6 py-4">
             <div className="relative">
@@ -681,7 +711,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Settings modal */}
       <AnimatePresence>
         {showSettings && (
           <>
@@ -745,9 +774,7 @@ function MessageBubble({ message }: { message: Message }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className={`flex gap-3 ${
-        isUser ? 'justify-end' : 'justify-start'
-      }`}
+      className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
     >
       {!isUser && (
         <div className="w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -764,7 +791,14 @@ function MessageBubble({ message }: { message: Message }) {
             : 'bg-white border border-slate-200/80 text-slate-800 rounded-2xl rounded-bl-md shadow-sm'
         }`}
       >
-        <div className="whitespace-pre-wrap break-words">{message.content}</div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap break-words">{message.content}</div>
+        ) : (
+          <div
+            className="break-words prose-sm"
+            dangerouslySetInnerHTML={{ __html: formatMarkdown(message.content) }}
+          />
+        )}
       </div>
     </motion.div>
   )
