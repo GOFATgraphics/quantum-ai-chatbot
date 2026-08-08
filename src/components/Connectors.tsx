@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Link2, Unlink, Mail, HardDrive, Table2, Check } from 'lucide-react'
+import { Loader2, Link2, Unlink, Check } from 'lucide-react'
 import { supabase, CONNECTOR_CATALOG, type Connector } from '../lib/supabase'
+import { GmailIcon, DriveIcon, SheetsIcon } from './BrandIcons'
 
 type Props = {
   dark: boolean
   accessToken: string
 }
 
-const ICONS = {
-  gmail: Mail,
-  google_drive: HardDrive,
-  google_sheets: Table2,
+const BRAND: Record<string, React.ReactNode> = {
+  gmail: <GmailIcon size={24} />,
+  google_drive: <DriveIcon size={24} />,
+  google_sheets: <SheetsIcon size={24} />,
 }
 
 export default function Connectors({ dark, accessToken }: Props) {
@@ -21,8 +22,6 @@ export default function Connectors({ dark, accessToken }: Props) {
 
   const textMuted = dark ? 'text-slate-400' : 'text-slate-500'
   const textMain = dark ? 'text-slate-100' : 'text-slate-900'
-  const rowBg = dark ? 'bg-white/5' : 'bg-slate-50'
-  const border = dark ? 'border-white/10' : 'border-slate-200'
 
   const load = async () => {
     setLoading(true)
@@ -106,34 +105,25 @@ export default function Connectors({ dark, accessToken }: Props) {
           <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {CONNECTOR_CATALOG.map((item) => {
-            const Icon = ICONS[item.provider]
             const connected = getConnected(item.provider)
             const isBusy = busy === item.provider
 
             return (
               <div
                 key={item.provider}
-                className={`flex items-center gap-3 rounded-2xl p-3 border ${rowBg} ${border}`}
+                className={`glass-card flex items-center gap-3 rounded-2xl p-3.5 ${dark ? 'glass-card-dark' : 'glass-card-light'}`}
               >
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    connected
-                      ? 'bg-indigo-500/15 text-indigo-400'
-                      : dark
-                        ? 'bg-white/5 text-slate-400'
-                        : 'bg-white text-slate-500'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-white/10' : 'bg-white/80 shadow-sm'}`}>
+                  {BRAND[item.provider]}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className={`text-sm font-medium ${textMain}`}>{item.name}</span>
                     {connected && (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
                         <Check className="w-3 h-3" /> Connected
                       </span>
                     )}
@@ -153,7 +143,7 @@ export default function Connectors({ dark, accessToken }: Props) {
                     <button
                       onClick={() => disconnect(item.provider)}
                       disabled={isBusy}
-                      className={`shrink-0 h-8 px-3 rounded-xl text-xs font-medium border transition flex items-center gap-1.5 ${border} ${dark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-600 hover:bg-white'}`}
+                      className={`shrink-0 h-8 px-3 rounded-xl text-xs font-medium transition flex items-center gap-1.5 ${dark ? 'bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10' : 'bg-white/60 border border-white/80 text-slate-600 hover:bg-white'}`}
                     >
                       {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlink className="w-3.5 h-3.5" />}
                       Disconnect
