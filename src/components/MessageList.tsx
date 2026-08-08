@@ -13,6 +13,7 @@ type Props = {
   lastUserPrompt: string
   dark: boolean
   messagesEndRef: RefObject<HTMLDivElement>
+  onRegenerate?: () => void
 }
 
 export default function MessageList({
@@ -21,6 +22,7 @@ export default function MessageList({
   lastUserPrompt,
   dark,
   messagesEndRef,
+  onRegenerate,
 }: Props) {
   const last = messages[messages.length - 1]
   const streaming =
@@ -87,7 +89,11 @@ export default function MessageList({
                       ) : null}
                     </div>
                     {msg.content && !isStreamingThis && (
-                      <MessageActions content={msg.content} dark={dark} />
+                      <MessageActions
+                        content={msg.content}
+                        dark={dark}
+                        onRegenerate={isLast && msg.role === 'assistant' ? onRegenerate : undefined}
+                      />
                     )}
                   </div>
                 </div>
