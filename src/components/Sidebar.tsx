@@ -50,24 +50,23 @@ export default function Sidebar({
     return conversations.filter((c) => (c.title || '').toLowerCase().includes(q))
   }, [conversations, query])
 
-  const bg = dark ? 'bg-[#0f0f16]' : 'bg-white'
   const textMain = dark ? 'text-slate-100' : 'text-slate-900'
   const textMuted = dark ? 'text-slate-500' : 'text-slate-500'
-  const hoverRow = dark ? 'hover:bg-white/5' : 'hover:bg-slate-100'
-  const activeRow = dark ? 'bg-white/10' : 'bg-slate-100'
+  const hoverRow = dark ? 'hover:bg-white/8' : 'hover:bg-white/50'
+  const activeRow = dark ? 'bg-white/10' : 'bg-white/70'
   const pill = dark
-    ? 'bg-white/10 text-slate-100 hover:bg-white/15'
-    : 'bg-slate-100 text-slate-800 hover:bg-slate-200/80'
-  const navItem = dark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-700 hover:bg-slate-100'
+    ? 'bg-white/10 text-slate-100 hover:bg-white/15 border border-white/10'
+    : 'bg-white/70 text-slate-800 hover:bg-white/90 border border-white/80 shadow-sm'
+  const navItem = dark ? 'text-slate-300 hover:bg-white/8' : 'text-slate-700 hover:bg-white/50'
 
   return (
-    <div className={`flex flex-col h-full min-h-0 ${bg}`}>
+    <div className={`flex flex-col h-full min-h-0 glass-panel ${dark ? 'glass-panel-dark' : 'glass-panel-light'}`}>
       <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
         <span className={`text-[17px] font-medium tracking-tight ${textMain}`}>Quantumy</span>
         {showClose && onClose && (
           <button
             onClick={onClose}
-            className={`p-2 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+            className={`p-2 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-white/60'}`}
             aria-label="Close menu"
           >
             <X className={`w-5 h-5 ${textMuted}`} />
@@ -108,7 +107,7 @@ export default function Sidebar({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats…"
-            className={`w-full h-10 rounded-full px-4 text-sm outline-none ${dark ? 'bg-white/5 text-slate-100 placeholder:text-slate-500' : 'bg-slate-100 text-slate-900 placeholder:text-slate-400'}`}
+            className={`w-full h-10 rounded-full px-4 text-sm outline-none ${dark ? 'bg-white/8 text-slate-100 placeholder:text-slate-500 border border-white/10' : 'bg-white/60 text-slate-900 placeholder:text-slate-400 border border-white/80'}`}
           />
         </div>
       )}
@@ -159,8 +158,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Only Settings entry — next to profile */}
-      <div className={`shrink-0 px-3 py-3 border-t ${dark ? 'border-white/5' : 'border-slate-100'}`}>
+      <div className={`shrink-0 px-3 py-3 border-t ${dark ? 'border-white/5' : 'border-white/50'}`}>
         <button
           onClick={onOpenSettings}
           className={`w-full flex items-center gap-3 rounded-2xl px-2 py-2 transition ${hoverRow}`}

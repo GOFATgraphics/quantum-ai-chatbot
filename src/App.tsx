@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Menu, Plus, Mic, Send, X, LogOut, MessageSquare,
-  Loader2, GraduationCap, Cpu, PenLine, ArrowLeft,
+  Menu, Plus, Mic, Send, X, LogOut,
+  Loader2, PenLine, ArrowLeft,
   Moon, Sun, ChevronDown,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage } from './lib/supabase'
@@ -20,13 +20,6 @@ type Model = { id: string; name: string; badge?: string }
 const MODELS: Model[] = [
   { id: 'quantum-2', name: 'Quantum 2' },
   { id: 'quantum-3', name: 'Quantum 3', badge: 'Pro' },
-]
-
-const CATEGORIES = [
-  { id: 'emails', title: 'Emails', desc: 'Find and summarize messages', icon: MessageSquare, light: 'bg-blue-50 text-blue-600', dark: 'bg-blue-500/15 text-blue-400', prompt: 'Summarize my latest important emails' },
-  { id: 'docs', title: 'Documents', desc: 'Search files and reports', icon: GraduationCap, light: 'bg-amber-50 text-amber-600', dark: 'bg-amber-500/15 text-amber-400', prompt: 'Help me find a document about recent orders' },
-  { id: 'data', title: 'Data & Trades', desc: 'Orders, invoices, status', icon: Cpu, light: 'bg-emerald-50 text-emerald-600', dark: 'bg-emerald-500/15 text-emerald-400', prompt: 'Which trades or orders are still pending?' },
-  { id: 'writing', title: 'Writing', desc: 'Drafts, replies, notes', icon: PenLine, light: 'bg-rose-50 text-rose-600', dark: 'bg-rose-500/15 text-rose-400', prompt: 'Help me draft a professional follow-up email' },
 ]
 
 function getGreeting() {
@@ -58,7 +51,7 @@ function ModalShell({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+        className="fixed inset-0 bg-black/40 backdrop-blur-md z-50"
         onClick={onClose}
       />
       <motion.div
@@ -66,14 +59,14 @@ function ModalShell({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 24 }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className={`fixed z-50 left-4 right-4 top-[max(1rem,env(safe-area-inset-top))] bottom-[max(1rem,env(safe-area-inset-bottom))] sm:left-1/2 sm:right-auto sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md sm:h-auto sm:max-h-[min(85dvh,640px)] flex flex-col rounded-3xl shadow-2xl overflow-hidden ${dark ? 'bg-[#12121a] border border-white/10' : 'bg-white'}`}
+        className={`fixed z-50 left-4 right-4 top-[max(1rem,env(safe-area-inset-top))] bottom-[max(1rem,env(safe-area-inset-bottom))] sm:left-1/2 sm:right-auto sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md sm:h-auto sm:max-h-[min(85dvh,640px)] flex flex-col rounded-3xl overflow-hidden glass-modal ${dark ? 'glass-modal-dark' : 'glass-modal-light'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <h2 className={`text-lg font-semibold ${textMain}`}>{title}</h2>
           <button
             onClick={onClose}
-            className={`p-1.5 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+            className={`p-1.5 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-white/70'}`}
           >
             <X className="w-5 h-5 text-slate-400" />
           </button>
@@ -270,7 +263,7 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className={`flex items-center justify-center h-dvh ${dark ? 'bg-[#0a0a0f]' : 'bg-[#f7f8fa]'}`}>
+      <div className="flex items-center justify-center h-dvh">
         <Loader2 className="w-7 h-7 animate-spin text-indigo-400" />
       </div>
     )
@@ -280,10 +273,6 @@ export default function App() {
 
   const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'
 
-  const shell = dark ? 'bg-[#0a0a0f] text-slate-100' : 'bg-[#f7f8fa] text-slate-900'
-  const inputBar = dark
-    ? 'bg-[#16161c] border border-white/10 shadow-lg focus-within:border-indigo-500/30'
-    : 'bg-white border border-slate-200/80 shadow-[0_4px_24px_rgba(0,0,0,0.06)] focus-within:border-slate-300'
   const textMuted = dark ? 'text-slate-400' : 'text-slate-500'
   const textMain = dark ? 'text-slate-100' : 'text-slate-900'
 
@@ -301,15 +290,15 @@ export default function App() {
   }
 
   return (
-    <div className={`flex h-dvh max-h-dvh overflow-hidden transition-colors duration-300 ${shell}`}>
-      <aside className={`hidden lg:flex w-[300px] flex-col border-r min-h-0 ${dark ? 'border-white/5 bg-[#0f0f16]' : 'border-slate-200/70 bg-white'}`}>
+    <div className="flex h-dvh max-h-dvh overflow-hidden">
+      <aside className={`hidden lg:flex w-[300px] flex-col min-h-0 border-r ${dark ? 'border-white/5' : 'border-white/40'}`}>
         <Sidebar {...sidebarProps} />
       </aside>
 
       <AnimatePresence>
         {mobileSidebar && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setMobileSidebar(false)} />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden" onClick={() => setMobileSidebar(false)} />
             <motion.aside initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }} transition={{ type: 'spring', damping: 32, stiffness: 340 }} className="fixed left-0 top-0 bottom-0 w-[min(100%,320px)] z-50 flex flex-col lg:hidden shadow-2xl">
               <Sidebar {...sidebarProps} showClose onClose={() => setMobileSidebar(false)} />
             </motion.aside>
@@ -321,11 +310,11 @@ export default function App() {
         <header className="h-14 lg:h-16 flex items-center justify-between px-3 lg:px-6 shrink-0 z-10">
           <div className="flex items-center gap-2">
             {!isEmpty ? (
-              <button onClick={startNewChat} className={`p-2 rounded-full transition lg:hidden ${dark ? 'hover:bg-white/10' : 'hover:bg-white'}`}>
+              <button onClick={startNewChat} className={`p-2 rounded-full transition lg:hidden glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`}>
                 <ArrowLeft className={`w-5 h-5 ${textMuted}`} />
               </button>
             ) : (
-              <button onClick={() => setMobileSidebar(true)} className={`p-2 rounded-full transition lg:hidden ${dark ? 'hover:bg-white/10 bg-white/5' : 'hover:bg-white bg-white shadow-sm'}`}>
+              <button onClick={() => setMobileSidebar(true)} className={`p-2 rounded-full transition lg:hidden glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`}>
                 <Menu className={`w-5 h-5 ${textMuted}`} />
               </button>
             )}
@@ -333,7 +322,7 @@ export default function App() {
             <div className="relative">
               <button
                 onClick={() => setShowModelMenu((v) => !v)}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${dark ? 'hover:bg-white/5' : 'hover:bg-white'}`}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`}
               >
                 <span className={textMain}>{selectedModel.name}</span>
                 {selectedModel.badge && <span className={`text-[10px] ${textMuted}`}>{selectedModel.badge}</span>}
@@ -342,7 +331,7 @@ export default function App() {
               {showModelMenu && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setShowModelMenu(false)} />
-                  <div className={`absolute left-0 top-full mt-1 z-30 min-w-[160px] rounded-xl border py-1 shadow-lg ${dark ? 'bg-[#16161c] border-white/10' : 'bg-white border-slate-200'}`}>
+                  <div className={`absolute left-0 top-full mt-1 z-30 min-w-[160px] rounded-xl py-1 glass-modal ${dark ? 'glass-modal-dark' : 'glass-modal-light'}`}>
                     {MODELS.map((m) => (
                       <button
                         key={m.id}
@@ -350,7 +339,7 @@ export default function App() {
                           setSelectedModel(m)
                           setShowModelMenu(false)
                         }}
-                        className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between ${dark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} ${selectedModel.id === m.id ? (dark ? 'text-indigo-300' : 'text-indigo-600') : textMain}`}
+                        className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between ${dark ? 'hover:bg-white/5' : 'hover:bg-white/50'} ${selectedModel.id === m.id ? (dark ? 'text-indigo-300' : 'text-indigo-600') : textMain}`}
                       >
                         <span>{m.name}</span>
                         {m.badge && <span className={`text-[10px] ${textMuted}`}>{m.badge}</span>}
@@ -363,10 +352,10 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1">
-            <button onClick={startNewChat} className={`p-2 rounded-full transition ${dark ? 'hover:bg-white/10' : 'hover:bg-white shadow-sm bg-white/80'}`} title="New chat">
+            <button onClick={startNewChat} className={`p-2 rounded-full transition glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`} title="New chat">
               <PenLine className={`w-4 h-4 ${textMuted}`} />
             </button>
-            <button onClick={() => setDark(!dark)} className={`p-2 rounded-full transition ${dark ? 'hover:bg-white/10 text-amber-300' : 'hover:bg-white text-slate-500'}`}>
+            <button onClick={() => setDark(!dark)} className={`p-2 rounded-full transition glass-card ${dark ? 'glass-card-dark text-amber-300' : 'glass-card-light text-slate-500'}`}>
               {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
           </div>
@@ -384,30 +373,13 @@ export default function App() {
                   transition={{ duration: 0.4 }}
                   className="flex flex-col items-center justify-center min-h-[calc(100%-2rem)] py-10 text-center"
                 >
-                  <Logo size={56} className="mb-5 drop-shadow-md" />
-                  <h1 className={`text-[26px] sm:text-[32px] font-medium tracking-tight leading-tight ${textMain}`}>
+                  <Logo size={64} className="mb-6 drop-shadow-lg" />
+                  <h1 className={`text-[28px] sm:text-[34px] font-medium tracking-tight leading-tight ${textMain}`}>
                     Any new ideas<br className="sm:hidden" /> to explore?
                   </h1>
                   <p className={`mt-3 text-sm ${textMuted}`}>
                     {getGreeting()}, {displayName}
                   </p>
-
-                  <div className="mt-10 grid grid-cols-2 gap-2.5 w-full max-w-md">
-                    {CATEGORIES.map((cat) => {
-                      const Icon = cat.icon
-                      return (
-                        <button
-                          key={cat.id}
-                          onClick={() => handleSend(cat.prompt)}
-                          className={`text-left p-3.5 rounded-2xl transition active:scale-[0.98] ${dark ? 'bg-white/[0.04] border border-white/10 hover:bg-white/[0.07]' : 'bg-white border border-slate-200/80 hover:border-slate-300 shadow-sm'}`}
-                        >
-                          <Icon className={`w-4 h-4 mb-2 ${dark ? 'text-slate-400' : 'text-slate-500'}`} />
-                          <div className={`text-[13px] font-medium ${textMain}`}>{cat.title}</div>
-                          <div className={`text-[11px] mt-0.5 leading-snug ${textMuted}`}>{cat.desc}</div>
-                        </button>
-                      )
-                    })}
-                  </div>
                 </motion.div>
               ) : (
                 <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-4 space-y-6 pb-6">
@@ -433,8 +405,8 @@ export default function App() {
 
         <div className="px-3 lg:px-6 pt-1 shrink-0 z-10 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
-            <div className={`flex items-end gap-1.5 rounded-full pl-2 pr-1.5 py-1.5 transition-all ${inputBar}`}>
-              <button className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-50'}`}>
+            <div className={`flex items-end gap-1.5 rounded-full pl-2 pr-1.5 py-1.5 transition-all glass-input ${dark ? 'glass-input-dark' : 'glass-input-light'}`}>
+              <button className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-white/50'}`}>
                 <Plus className="w-5 h-5" />
               </button>
               <textarea
@@ -449,7 +421,7 @@ export default function App() {
               />
               <button
                 onClick={toggleListening}
-                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${isListening ? 'bg-red-500/15 text-red-400' : dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-50'}`}
+                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${isListening ? 'bg-red-500/15 text-red-400' : dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-white/50'}`}
               >
                 <Mic className="w-5 h-5" />
               </button>
@@ -458,10 +430,10 @@ export default function App() {
                 disabled={!input.trim() || isLoading}
                 className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${
                   input.trim() && !isLoading
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-500'
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-500/25'
                     : dark
                       ? 'bg-white/10 text-slate-500'
-                      : 'bg-slate-100 text-slate-400'
+                      : 'bg-white/50 text-slate-400'
                 }`}
               >
                 <Send className="w-4 h-4" />
@@ -478,15 +450,15 @@ export default function App() {
         {showSettings && (
           <ModalShell dark={dark} title="Settings" onClose={() => setShowSettings(false)}>
             <div className="space-y-4">
-              <div className={`rounded-2xl p-4 ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
+              <div className={`rounded-2xl p-4 glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`}>
                 <p className={`text-xs font-medium mb-1 ${textMuted}`}>Signed in as</p>
                 <p className={`text-sm truncate ${textMain}`}>{user.email}</p>
               </div>
-              <button onClick={() => setDark(!dark)} className={`w-full h-11 rounded-2xl border text-sm font-medium transition flex items-center justify-center gap-2 ${dark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
+              <button onClick={() => setDark(!dark)} className={`w-full h-11 rounded-2xl text-sm font-medium transition flex items-center justify-center gap-2 glass-card ${dark ? 'glass-card-dark text-slate-300' : 'glass-card-light text-slate-700'}`}>
                 {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 {dark ? 'Switch to light mode' : 'Switch to dark mode'}
               </button>
-              <button onClick={handleSignOut} className={`w-full h-11 rounded-2xl border text-sm font-medium transition flex items-center justify-center gap-2 ${dark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
+              <button onClick={handleSignOut} className={`w-full h-11 rounded-2xl text-sm font-medium transition flex items-center justify-center gap-2 glass-card ${dark ? 'glass-card-dark text-slate-300' : 'glass-card-light text-slate-700'}`}>
                 <LogOut className="w-4 h-4" /> Sign out
               </button>
             </div>
@@ -517,8 +489,8 @@ function MessageBubble({ message, dark }: { message: Message; dark: boolean }) {
         className="flex justify-end"
       >
         <div
-          className={`max-w-[85%] px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap break-words rounded-[22px] ${
-            dark ? 'bg-white/10 text-slate-100' : 'bg-[#e8e8ed] text-slate-900'
+          className={`max-w-[85%] px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap break-words rounded-[22px] glass-card ${
+            dark ? 'glass-card-dark text-slate-100' : 'glass-card-light text-slate-900'
           }`}
         >
           {message.content}
