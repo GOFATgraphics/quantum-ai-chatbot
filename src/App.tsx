@@ -6,6 +6,7 @@ import {
   Moon, Sun,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage } from './lib/supabase'
+import { formatMarkdown } from './lib/markdown'
 import Auth from './components/Auth'
 import Connectors from './components/Connectors'
 import Sidebar from './components/Sidebar'
@@ -35,24 +36,6 @@ function getGreeting() {
 
 function generateId() {
   return Math.random().toString(36).slice(2, 11)
-}
-
-function formatMarkdown(text: string) {
-  let html = text
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/^[•\-]\s+(.+)$/gm, '<li class="ml-1 list-disc">$1</li>')
-    .replace(/^\d+\.\s+(.+)$/gm, '<li class="ml-1 list-decimal">$1</li>')
-    .replace(/\n\n/g, '</p><p class="mt-3">')
-    .replace(/\n/g, '<br/>')
-  html = html.replace(/(<li[^>]*>.*?<\/li>)/gs, (m) =>
-    m.includes('list-disc') ? `<ul class="my-2 space-y-1">${m}</ul>` : `<ol class="my-2 space-y-1">${m}</ol>`
-  )
-  return `<p>${html}</p>`
 }
 
 function ModalShell({
@@ -443,7 +426,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Settings only — account + theme + sign out */}
       <AnimatePresence>
         {showSettings && (
           <ModalShell dark={dark} title="Settings" onClose={() => setShowSettings(false)}>
@@ -464,7 +446,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Connectors — separate panel */}
       <AnimatePresence>
         {showConnectors && session?.access_token && (
           <ModalShell dark={dark} title="Connectors" onClose={() => setShowConnectors(false)}>
