@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quantumy AI — Personal AI assistant for email and work</title>
-  <meta name="description" content="Quantumy AI is a personal AI assistant that helps you chat, search your connected Gmail, and get answers about your work in plain language." />
+  <title>Quantumy AI — Personal AI that remembers you</title>
+  <meta name="description" content="Quantumy AI is a personal assistant that remembers you, drafts email, and optionally connects to Gmail so you can ask about your work in plain language." />
+  <meta name="theme-color" content="#07070c" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/logo.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -15,23 +18,20 @@
       min-height: 100vh;
       line-height: 1.65;
     }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
-    header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0 2rem; flex-wrap: wrap; gap: 0.75rem; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 1.25rem 1.25rem 4rem; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 0 2rem; flex-wrap: wrap; gap: 0.75rem; }
     .brand { display: flex; align-items: center; gap: 0.65rem; font-weight: 600; font-size: 1.05rem; color: #f8fafc; text-decoration: none; }
-    .logo {
-      width: 36px; height: 36px; border-radius: 10px;
-      background: linear-gradient(135deg, #6366f1, #7c3aed);
-      display: flex; align-items: center; justify-content: center;
-    }
-    nav a { color: #94a3b8; text-decoration: none; margin-left: 1.25rem; font-size: 0.9rem; }
+    .brand img { width: 36px; height: 36px; }
+    nav a { color: #94a3b8; text-decoration: none; margin-left: 1.1rem; font-size: 0.9rem; }
     nav a:hover { color: #e2e8f0; }
-    .hero { padding: 2.5rem 0 2rem; }
+    .hero { padding: 2rem 0 1.5rem; }
     .hero h1 {
-      font-size: clamp(2rem, 5vw, 2.75rem);
+      font-size: clamp(1.85rem, 4.5vw, 2.65rem);
       font-weight: 600;
       letter-spacing: -0.03em;
       line-height: 1.2;
       color: #f8fafc;
+      max-width: 16ch;
     }
     .hero h1 span {
       background: linear-gradient(90deg, #a5b4fc, #c4b5fd, #67e8f9);
@@ -39,11 +39,11 @@
       background-clip: text;
       color: transparent;
     }
-    .hero p { margin-top: 1.25rem; color: #94a3b8; font-size: 1.1rem; max-width: 40rem; }
-    .cta { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .hero p { margin-top: 1.1rem; color: #94a3b8; font-size: 1.05rem; max-width: 36rem; }
+    .cta { margin-top: 1.75rem; display: flex; flex-wrap: wrap; gap: 0.75rem; }
     .btn {
       display: inline-flex; align-items: center; justify-content: center;
-      height: 48px; padding: 0 1.35rem; border-radius: 12px;
+      height: 48px; padding: 0 1.35rem; border-radius: 14px;
       font-weight: 500; font-size: 0.95rem; text-decoration: none;
     }
     .btn-primary {
@@ -51,32 +51,29 @@
       color: white;
       box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
     }
-    .btn-ghost {
-      border: 1px solid rgba(255,255,255,0.12);
-      color: #cbd5e1;
-    }
-    .section { margin-top: 2.75rem; }
-    .section h2 { font-size: 1.25rem; color: #f1f5f9; margin-bottom: 0.75rem; }
-    .section p, .section li { color: #94a3b8; font-size: 1rem; }
-    .section ul { margin: 0.75rem 0 0 1.25rem; }
-    .section li { margin-bottom: 0.4rem; }
+    .btn-ghost { border: 1px solid rgba(255,255,255,0.12); color: #cbd5e1; }
+    .section { margin-top: 2.5rem; }
+    .section h2 { font-size: 1.15rem; color: #f1f5f9; margin-bottom: 0.65rem; }
+    .section p, .section li { color: #94a3b8; font-size: 0.98rem; }
+    .section ul { margin: 0.65rem 0 0 1.2rem; }
+    .section li { margin-bottom: 0.35rem; }
     .features {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-top: 1.25rem;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 0.85rem;
+      margin-top: 1rem;
     }
     .card {
       background: rgba(255,255,255,0.03);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 16px;
-      padding: 1.25rem;
+      padding: 1.15rem;
     }
-    .card h3 { font-size: 1rem; color: #f1f5f9; margin-bottom: 0.4rem; }
-    .card p { font-size: 0.9rem; color: #94a3b8; }
+    .card h3 { font-size: 0.95rem; color: #f1f5f9; margin-bottom: 0.35rem; }
+    .card p { font-size: 0.88rem; color: #94a3b8; }
     footer {
-      margin-top: 4rem;
-      padding-top: 1.5rem;
+      margin-top: 3.5rem;
+      padding-top: 1.35rem;
       border-top: 1px solid rgba(255,255,255,0.08);
       display: flex;
       flex-wrap: wrap;
@@ -93,11 +90,7 @@
   <div class="wrap">
     <header>
       <a class="brand" href="/home.html">
-        <span class="logo">
-          <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
-            <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fill-opacity="0.95"/>
-          </svg>
-        </span>
+        <img src="/logo.svg" alt="Quantumy" width="36" height="36" />
         Quantumy AI
       </a>
       <nav>
@@ -108,63 +101,51 @@
     </header>
 
     <section class="hero">
-      <h1>Quantumy AI — <span>your personal work assistant</span></h1>
+      <h1>Your AI that <span>knows your work</span></h1>
       <p>
-        <strong style="color:#cbd5e1">Purpose of this app:</strong>
-        Quantumy AI is a web application that lets you chat with an AI assistant about your work.
-        You can optionally connect your Gmail account (read-only) so the assistant can search and
-        summarize your email when you ask. Connecting Google is optional and controlled by you.
+        <strong style="color:#cbd5e1">Purpose:</strong>
+        Quantumy AI is a personal assistant for chat, memory, and optional Gmail access.
+        It remembers your preferences, can draft emails, and answers questions about your mail when you connect Gmail.
       </p>
       <div class="cta">
-        <a class="btn btn-primary" href="/">Open the app</a>
+        <a class="btn btn-primary" href="/">Open Quantumy</a>
         <a class="btn btn-ghost" href="/privacy.html">Privacy Policy</a>
       </div>
     </section>
 
     <section class="section">
-      <h2>What Quantumy AI does</h2>
+      <h2>What you can do</h2>
       <ul>
-        <li>Sign in with email to use a private AI chat workspace.</li>
-        <li>Ask questions in everyday language and get clear answers.</li>
-        <li>Optionally connect <strong>Gmail</strong> so the AI can find and summarize messages you request.</li>
-        <li>Disconnect Gmail anytime from Settings → Connectors.</li>
+        <li>Chat with an AI that remembers facts and preferences you save.</li>
+        <li>Ask it to <strong>draft emails</strong> (subject + body) you can copy and send.</li>
+        <li>Optionally connect <strong>Gmail</strong> (read-only) to search and summarize messages.</li>
+        <li>Install as an app on phone, tablet, or desktop (PWA).</li>
       </ul>
-    </section>
-
-    <section class="section">
-      <h2>How Google access is used</h2>
-      <p>
-        If you choose to connect Gmail, Quantumy AI requests <em>read-only</em> access so it can
-        search your mailbox when you ask (for example: “summarize unread emails from this week”).
-        We do not use Gmail data for advertising. Details are in our
-        <a href="/privacy.html" style="color:#a5b4fc">Privacy Policy</a> and
-        <a href="/terms.html" style="color:#a5b4fc">Terms of Service</a>.
-      </p>
     </section>
 
     <section class="section">
       <h2>Features</h2>
       <div class="features">
         <div class="card">
-          <h3>Private chat</h3>
-          <p>Conversations are saved to your account so you can continue later.</p>
+          <h3>Memory</h3>
+          <p>Preferences and learned facts stay with your account across chats.</p>
         </div>
         <div class="card">
-          <h3>Optional Gmail connector</h3>
-          <p>Connect only if you want email search. One source at a time, clear permissions.</p>
+          <h3>Email drafts</h3>
+          <p>Ask for a reply or outreach draft — get a clear subject and body ready to paste.</p>
         </div>
         <div class="card">
-          <h3>Your control</h3>
-          <p>Disconnect anytime. You decide what the assistant can access.</p>
+          <h3>Optional Gmail</h3>
+          <p>Connect only if you want. Disconnect anytime from Settings → Connectors.</p>
         </div>
       </div>
     </section>
 
     <footer>
       <div>
-        <a href="/privacy.html">Privacy Policy</a>
-        <a href="/terms.html">Terms of Service</a>
-        <a href="/">App sign in</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/terms.html">Terms</a>
+        <a href="/">App</a>
       </div>
       <div>© 2026 Quantumy AI</div>
     </footer>
