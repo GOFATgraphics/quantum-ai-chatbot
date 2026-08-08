@@ -3,11 +3,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.XAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
+    console.error('ANTHROPIC_API_KEY is missing');
     return res.status(500).json({
       error: 'Server is missing ANTHROPIC_API_KEY environment variable',
+      hint: 'Add ANTHROPIC_API_KEY in Vercel → Project Settings → Environment Variables, then redeploy',
     });
   }
 
@@ -33,10 +35,6 @@ How you respond:
 - If you don't have access to their real data yet, be honest and still give the most useful possible guidance
 - Ask clarifying questions only when necessary
 
-Tone examples:
-- Good: "The wheat order confirmation from ABC Importers came in on Tuesday. Here's what it said…"
-- Bad: "Sure! I'd be happy to help you with that. Let me see what I can find…"
-
 Keep responses focused and high-signal.`;
 
     const anthropicMessages = messages.map((m) => ({
@@ -52,7 +50,7 @@ Keep responses focused and high-signal.`;
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 2048,
         system: systemPrompt,
         messages: anthropicMessages,
@@ -63,7 +61,8 @@ Keep responses focused and high-signal.`;
       const errorText = await response.text();
       console.error('Anthropic API error:', response.status, errorText);
       return res.status(response.status).json({
-        error: 'Failed to get response from AI provider',
+        error: 'Anthropic API error',
+        status: response.status,
         details: errorText,
       });
     }
@@ -76,6 +75,9 @@ Keep responses focused and high-signal.`;
     return res.status(200).json({ content });
   } catch (err) {
     console.error('Proxy error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: err.message,
+    });
   }
 }
