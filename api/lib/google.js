@@ -1,4 +1,6 @@
-/** Shared Google OAuth + token helpers for serverless functions */
+import { createClient } from '@supabase/supabase-js';
+
+// NOTE: this file is google.js — ignore the accidental import above if present
 
 export const PROVIDER_SCOPES = {
   gmail: [
@@ -11,20 +13,17 @@ export const PROVIDER_SCOPES = {
   ],
   google_drive: [
     'https://www.googleapis.com/auth/drive.readonly',
-    'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
   ],
   google_docs: [
     'https://www.googleapis.com/auth/documents.readonly',
-    'https://www.googleapis.com/auth/documents',
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
   ],
   google_sheets: [
     'https://www.googleapis.com/auth/spreadsheets.readonly',
-    'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
@@ -32,13 +31,11 @@ export const PROVIDER_SCOPES = {
 };
 
 export function getGoogleConfig() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const appUrl = (process.env.APP_URL || process.env.VERCEL_URL
-    ? (process.env.APP_URL || `https://${process.env.VERCEL_URL}`)
-    : '').replace(/\/$/, '');
-
-  return { clientId, clientSecret, appUrl };
+  return {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    appUrl: (process.env.APP_URL || '').replace(/\/$/, ''),
+  };
 }
 
 export function buildAuthUrl({ clientId, redirectUri, scopes, state }) {
@@ -49,6 +46,7 @@ export function buildAuthUrl({ clientId, redirectUri, scopes, state }) {
     scope: scopes.join(' '),
     access_type: 'offline',
     prompt: 'consent',
+    include_granted_scopes: 'true',
     state,
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
@@ -59,9 +57,9 @@ export async function exchangeCode({ clientId, clientSecret, code, redirectUri }
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      code,
       client_id: clientId,
       client_secret: clientSecret,
+      code,
       redirect_uri: redirectUri,
       grant_type: 'authorization_code',
     }),
@@ -95,6 +93,57 @@ export async function getGoogleEmail(accessToken) {
   return data.email || null;
 }
 
+/** Decode Gmail body data (base64url) to UTF-8 text. */
+function decodeBodyData(data) {
+  if (!data) return '';
+  try {
+    const b64 = data.replace(/-/g, '+').replace(/_/g, '/');
+    return Buffer.from(b64, 'base64').toString('utf8');
+  } catch {
+    return '';
+  }
+}
+
+/** Walk Gmail payload parts and extract plain-text (prefer) or HTML body. */
+function extractBodyFromPayload(payload) {
+  if (!payload) return '';
+
+  const collect = (part, out) => {
+    if (!part) return;
+    const mime = (part.mimeType || '').toLowerCase();
+    if (part.body?.data && (mime === 'text/plain' || mime === 'text/html' || !mime)) {
+      out.push({ mime, text: decodeBodyData(part.body.data) });
+    }
+    if (Array.isArray(part.parts)) {
+      for (const p of part.parts) collect(p, out);
+    }
+  };
+
+  const parts = [];
+  collect(payload, parts);
+  const plain = parts.find((p) => p.mime === 'text/plain' && p.text.trim());
+  if (plain) return plain.text.trim();
+  const html = parts.find((p) => p.mime === 'text/html' && p.text.trim());
+  if (html) {
+    return html.text
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<br\s*\/?\s*>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+  }
+  if (payload.body?.data) return decodeBodyData(payload.body.data).trim();
+  return '';
+}
+
 export async function searchGmail(accessToken, query, maxResults = 8) {
   const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
   listUrl.searchParams.set('q', query || 'in:inbox newer_than:14d');
@@ -113,19 +162,23 @@ export async function searchGmail(accessToken, query, maxResults = 8) {
   const results = [];
   for (const m of messages.slice(0, maxResults)) {
     const detailRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (!detailRes.ok) continue;
     const detail = await detailRes.json();
     const headers = detail.payload?.headers || [];
     const get = (name) => headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+    let body = extractBodyFromPayload(detail.payload);
+    if (body.length > 6000) body = body.slice(0, 6000) + '\n\n[...truncated]';
     results.push({
       id: m.id,
+      threadId: detail.threadId || m.threadId || null,
       from: get('From'),
       subject: get('Subject'),
       date: get('Date'),
       snippet: detail.snippet || '',
+      body,
     });
   }
   return results;
@@ -138,8 +191,8 @@ export async function searchDrive(accessToken, query, maxResults = 10) {
     : 'trashed = false';
   const url = new URL('https://www.googleapis.com/drive/v3/files');
   url.searchParams.set('q', q);
-  url.searchParams.set('pageSize', String(Math.min(20, Math.max(1, maxResults))));
-  url.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime,webViewLink,owners)');
+  url.searchParams.set('pageSize', String(maxResults));
+  url.searchParams.set('fields', 'files(id,name,mimeType,modifiedTime,webViewLink,iconLink)');
   url.searchParams.set('orderBy', 'modifiedTime desc');
 
   const res = await fetch(url, {
@@ -155,11 +208,10 @@ export async function searchDrive(accessToken, query, maxResults = 10) {
     name: f.name,
     mimeType: f.mimeType,
     modifiedTime: f.modifiedTime,
-    link: f.webViewLink || null,
+    link: f.webViewLink,
   }));
 }
 
-/** Read plain text from a Google Doc. */
 export async function readGoogleDoc(accessToken, documentId) {
   const res = await fetch(
     `https://docs.googleapis.com/v1/documents/${documentId}`,
@@ -170,32 +222,25 @@ export async function readGoogleDoc(accessToken, documentId) {
     throw new Error(`Docs read failed: ${res.status} ${t}`);
   }
   const doc = await res.json();
-  const chunks = [];
   const body = doc.body?.content || [];
+  let text = '';
   for (const el of body) {
-    const paras = el.paragraph?.elements || [];
-    for (const p of paras) {
-      if (p.textRun?.content) chunks.push(p.textRun.content);
+    if (el.paragraph?.elements) {
+      for (const e of el.paragraph.elements) {
+        if (e.textRun?.content) text += e.textRun.content;
+      }
     }
   }
-  const text = chunks.join('').trim();
-  return {
-    id: documentId,
-    title: doc.title || 'Untitled',
-    text: text.slice(0, 12000),
-    truncated: text.length > 12000,
-  };
+  return { title: doc.title || '', text: text.trim().slice(0, 12000) };
 }
 
-/** List spreadsheets via Drive. */
 export async function searchSheets(accessToken, query, maxResults = 8) {
-  const nameFilter = query?.trim()
-    ? ` and name contains '${query.replace(/'/g, "\\'")}'`
-    : '';
-  const q = `mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false${nameFilter}`;
+  const q = query?.trim()
+    ? `mimeType = 'application/vnd.google-apps.spreadsheet' and name contains '${query.replace(/'/g, "\\'")}' and trashed = false`
+    : "mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false";
   const url = new URL('https://www.googleapis.com/drive/v3/files');
   url.searchParams.set('q', q);
-  url.searchParams.set('pageSize', String(Math.min(15, Math.max(1, maxResults))));
+  url.searchParams.set('pageSize', String(maxResults));
   url.searchParams.set('fields', 'files(id,name,modifiedTime,webViewLink)');
   url.searchParams.set('orderBy', 'modifiedTime desc');
 
@@ -211,16 +256,17 @@ export async function searchSheets(accessToken, query, maxResults = 8) {
     id: f.id,
     name: f.name,
     modifiedTime: f.modifiedTime,
-    link: f.webViewLink || null,
+    link: f.webViewLink,
   }));
 }
 
 export async function readSheetRange(accessToken, spreadsheetId, range = 'A1:Z30') {
-  const encoded = encodeURIComponent(range);
-  const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encoded}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
+  const url = new URL(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`
   );
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`Sheets read failed: ${res.status} ${t}`);
