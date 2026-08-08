@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" rx="28" fill="#07070c"/>
   <defs>
     <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#8b9bff"/>
@@ -11,7 +12,9 @@
       <stop offset="100%" stop-color="#050508"/>
     </radialGradient>
   </defs>
-  <ellipse cx="64" cy="72" rx="54" ry="15" fill="url(#ring)" transform="rotate(-20 64 64)" opacity="0.85"/>
-  <circle cx="64" cy="64" r="38" fill="url(#sphere)"/>
-  <ellipse cx="64" cy="56" rx="54" ry="15" fill="url(#ring)" transform="rotate(-20 64 64)"/>
+  <g transform="translate(0 2)">
+    <ellipse cx="64" cy="72" rx="44" ry="12" fill="url(#ring)" transform="rotate(-20 64 64)" opacity="0.85"/>
+    <circle cx="64" cy="64" r="30" fill="url(#sphere)"/>
+    <ellipse cx="64" cy="56" rx="44" ry="12" fill="url(#ring)" transform="rotate(-20 64 64)"/>
+  </g>
 </svg>
