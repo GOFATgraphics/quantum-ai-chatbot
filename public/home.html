@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quantum AI — Your AI that knows your work</title>
-  <meta name="description" content="Quantum AI is a personal assistant that connects to your email and documents so you can ask questions in plain language and get instant answers." />
+  <title>Quantumy AI — Personal AI assistant for email and work</title>
+  <meta name="description" content="Quantumy AI is a personal AI assistant that helps you chat, search your connected Gmail, and get answers about your work in plain language." />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -13,10 +13,10 @@
       background: #05050a;
       color: #e2e8f0;
       min-height: 100vh;
-      line-height: 1.6;
+      line-height: 1.65;
     }
     .wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
-    header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0 2rem; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0 2rem; flex-wrap: wrap; gap: 0.75rem; }
     .brand { display: flex; align-items: center; gap: 0.65rem; font-weight: 600; font-size: 1.05rem; color: #f8fafc; text-decoration: none; }
     .logo {
       width: 36px; height: 36px; border-radius: 10px;
@@ -25,14 +25,13 @@
     }
     nav a { color: #94a3b8; text-decoration: none; margin-left: 1.25rem; font-size: 0.9rem; }
     nav a:hover { color: #e2e8f0; }
-    .hero { padding: 3rem 0 2.5rem; }
+    .hero { padding: 2.5rem 0 2rem; }
     .hero h1 {
-      font-size: clamp(2rem, 5vw, 3rem);
+      font-size: clamp(2rem, 5vw, 2.75rem);
       font-weight: 600;
       letter-spacing: -0.03em;
-      line-height: 1.15;
+      line-height: 1.2;
       color: #f8fafc;
-      max-width: 18ch;
     }
     .hero h1 span {
       background: linear-gradient(90deg, #a5b4fc, #c4b5fd, #67e8f9);
@@ -40,7 +39,7 @@
       background-clip: text;
       color: transparent;
     }
-    .hero p { margin-top: 1.25rem; color: #94a3b8; font-size: 1.125rem; max-width: 36rem; }
+    .hero p { margin-top: 1.25rem; color: #94a3b8; font-size: 1.1rem; max-width: 40rem; }
     .cta { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: 0.75rem; }
     .btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -56,11 +55,16 @@
       border: 1px solid rgba(255,255,255,0.12);
       color: #cbd5e1;
     }
+    .section { margin-top: 2.75rem; }
+    .section h2 { font-size: 1.25rem; color: #f1f5f9; margin-bottom: 0.75rem; }
+    .section p, .section li { color: #94a3b8; font-size: 1rem; }
+    .section ul { margin: 0.75rem 0 0 1.25rem; }
+    .section li { margin-bottom: 0.4rem; }
     .features {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 1rem;
-      margin-top: 3rem;
+      margin-top: 1.25rem;
     }
     .card {
       background: rgba(255,255,255,0.03);
@@ -94,7 +98,7 @@
             <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fill-opacity="0.95"/>
           </svg>
         </span>
-        Quantum AI
+        Quantumy AI
       </a>
       <nav>
         <a href="/privacy.html">Privacy</a>
@@ -104,29 +108,55 @@
     </header>
 
     <section class="hero">
-      <h1>Your AI that <span>knows your work</span></h1>
+      <h1>Quantumy AI — <span>your personal work assistant</span></h1>
       <p>
-        Quantum is a personal AI assistant for professionals. Chat in plain language,
-        optionally connect sources like Gmail, and get answers grounded in your own data.
+        <strong style="color:#cbd5e1">Purpose of this app:</strong>
+        Quantumy AI is a web application that lets you chat with an AI assistant about your work.
+        You can optionally connect your Gmail account (read-only) so the assistant can search and
+        summarize your email when you ask. Connecting Google is optional and controlled by you.
       </p>
       <div class="cta">
-        <a class="btn btn-primary" href="/">Open Quantum</a>
+        <a class="btn btn-primary" href="/">Open the app</a>
         <a class="btn btn-ghost" href="/privacy.html">Privacy Policy</a>
       </div>
     </section>
 
-    <section class="features">
-      <div class="card">
-        <h3>Chat with context</h3>
-        <p>Conversations are saved to your account so you can pick up where you left off.</p>
-      </div>
-      <div class="card">
-        <h3>Optional connectors</h3>
-        <p>Connect Gmail only if you want — one source at a time, with clear permissions.</p>
-      </div>
-      <div class="card">
-        <h3>Your data, your control</h3>
-        <p>Disconnect anytime. We don’t sell your content. Read our Privacy Policy for details.</p>
+    <section class="section">
+      <h2>What Quantumy AI does</h2>
+      <ul>
+        <li>Sign in with email to use a private AI chat workspace.</li>
+        <li>Ask questions in everyday language and get clear answers.</li>
+        <li>Optionally connect <strong>Gmail</strong> so the AI can find and summarize messages you request.</li>
+        <li>Disconnect Gmail anytime from Settings → Connectors.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>How Google access is used</h2>
+      <p>
+        If you choose to connect Gmail, Quantumy AI requests <em>read-only</em> access so it can
+        search your mailbox when you ask (for example: “summarize unread emails from this week”).
+        We do not use Gmail data for advertising. Details are in our
+        <a href="/privacy.html" style="color:#a5b4fc">Privacy Policy</a> and
+        <a href="/terms.html" style="color:#a5b4fc">Terms of Service</a>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Features</h2>
+      <div class="features">
+        <div class="card">
+          <h3>Private chat</h3>
+          <p>Conversations are saved to your account so you can continue later.</p>
+        </div>
+        <div class="card">
+          <h3>Optional Gmail connector</h3>
+          <p>Connect only if you want email search. One source at a time, clear permissions.</p>
+        </div>
+        <div class="card">
+          <h3>Your control</h3>
+          <p>Disconnect anytime. You decide what the assistant can access.</p>
+        </div>
       </div>
     </section>
 
@@ -136,7 +166,7 @@
         <a href="/terms.html">Terms of Service</a>
         <a href="/">App sign in</a>
       </div>
-      <div>© 2026 Quantum AI</div>
+      <div>© 2026 Quantumy AI</div>
     </footer>
   </div>
 </body>
