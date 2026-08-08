@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu, Mic, Send, X, Plus,
   Loader2, PenLine,
-  ChevronDown, Copy, Check, ThumbsUp, ThumbsDown, Volume2, Share, Zap, AudioLines,
+  ChevronDown, Zap,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage, type Project, makeChatTitle } from './lib/supabase'
 import { formatMarkdown } from './lib/markdown'
@@ -14,12 +14,13 @@ import Connectors from './components/Connectors'
 import ThinkingStatus from './components/ThinkingStatus'
 import Onboarding from './components/Onboarding'
 import Logo from './components/Logo'
+import MessageActions from './components/MessageActions'
 
 type Message = { id: string; role: 'user' | 'assistant'; content: string }
 
 const MODELS = [
-  { id: 'quantum-3', name: 'Quantum 3', badge: null as string | null },
-  { id: 'quantum-3-pro', name: 'Quantum 3 Pro', badge: 'Pro' },
+  { id: 'quantum-3', name: 'Quantum 3', badge: null as string | null, anthropic: 'claude-sonnet-4-6' },
+  { id: 'quantum-3-pro', name: 'Quantum 3 Pro', badge: 'Pro', anthropic: 'claude-sonnet-4-6' },
 ]
 
 function generateId() {
@@ -41,27 +42,6 @@ function creativeGreeting(firstName: string) {
   const n = firstName || 'there'
   const i = Math.floor(Math.random() * GREETINGS.length)
   return GREETINGS[i](n)
-}
-
-function MessageActions({ content }: { content: string }) {
-  const [copied, setCopied] = useState(false)
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(content)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {}
-  }
-  const btn = 'p-2 rounded-full text-slate-500 hover:bg-black/[0.05] transition'
-  return (
-    <div className="flex items-center gap-0.5 mt-1.5 -ml-1">
-      <button type="button" onClick={copy} className={btn} aria-label="Copy">{copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}</button>
-      <button type="button" className={btn} aria-label="Share"><Share className="w-4 h-4" /></button>
-      <button type="button" className={btn} aria-label="Read aloud"><Volume2 className="w-4 h-4" /></button>
-      <button type="button" className={btn} aria-label="Good"><ThumbsUp className="w-4 h-4" /></button>
-      <button type="button" className={btn} aria-label="Bad"><ThumbsDown className="w-4 h-4" /></button>
-    </div>
-  )
 }
 
 export default function App() {
@@ -86,6 +66,7 @@ export default function App() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [lastUserPrompt, setLastUserPrompt] = useState('')
   const [greetingLine, setGreetingLine] = useState('')
+  const [errorHint, setErrorHint] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -129,6 +110,7 @@ export default function App() {
   const loadMessages = async (conversationId: string) => {
     setCurrentConversationId(conversationId)
     setMobileSidebar(false)
+    setErrorHint(null)
     const { data } = await supabase.from('messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true })
     if (data) setMessages(data.map((m: DbMessage) => ({ id: m.id, role: m.role, content: m.content })))
   }
@@ -137,6 +119,7 @@ export default function App() {
     setCurrentConversationId(null)
     setMessages([])
     setMobileSidebar(false)
+    setErrorHint(null)
     setGreetingLine(creativeGreeting(firstName))
   }
 
@@ -191,12 +174,16 @@ export default function App() {
       method: 'POST', headers,
       body: JSON.stringify({
         messages: [...history.map((m) => ({ role: m.role, content: m.content })), { role: 'user', content: userMessage }],
-        firstName, projectId: currentProjectId,
+        firstName,
+        projectId: currentProjectId,
+        model: selectedModel.anthropic,
+        modelId: selectedModel.id,
       }),
     })
     const data = await response.json().catch(() => ({}))
     if (response.ok && data.content) return data.content as string
-    throw new Error(data.error || data.message || 'Request failed')
+    const msg = data.error || data.message || data.hint || 'Request failed'
+    throw new Error(typeof msg === 'string' ? msg : 'Request failed')
   }
 
   const handleSend = async (overrideText?: string) => {
@@ -205,6 +192,7 @@ export default function App() {
     setMessages((p) => [...p, { id: generateId(), role: 'user', content: trimmed }])
     setInput('')
     setLastUserPrompt(trimmed)
+    setErrorHint(null)
     setIsLoading(true)
     try {
       const convId = await ensureConversation(trimmed)
@@ -213,8 +201,10 @@ export default function App() {
       setMessages((p) => [...p, { id: generateId(), role: 'assistant', content: reply }])
       await saveMessage(convId, 'assistant', reply)
       await loadConversations()
-    } catch {
-      setMessages((p) => [...p, { id: generateId(), role: 'assistant', content: 'Something went wrong. Please try again.' }])
+    } catch (err: any) {
+      const hint = err?.message || 'Something went wrong. Please try again.'
+      setErrorHint(hint)
+      setMessages((p) => [...p, { id: generateId(), role: 'assistant', content: hint }])
     } finally { setIsLoading(false) }
   }
 
@@ -254,6 +244,10 @@ export default function App() {
     onSelectProject: setCurrentProjectId, onCreateProject: createProject, onDeleteProject: deleteProject,
   }
 
+  const iconBtn = dark
+    ? 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white/[0.08] text-slate-300 hover:bg-white/[0.12] disabled:opacity-40'
+    : 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white text-slate-600 hover:bg-white shadow-sm disabled:opacity-40'
+
   return (
     <div className={`flex h-dvh overflow-hidden ${dark ? 'bg-[#0a0a0f]' : 'bg-white'}`}>
       <div className="hidden lg:flex w-[300px] shrink-0"><Sidebar {...sidebarProps} /></div>
@@ -277,7 +271,7 @@ export default function App() {
                 <Menu className="w-5 h-5" />
               </button>
               <div className="relative">
-                <button onClick={() => setShowModelMenu((v) => !v)} className={`flex items-center gap-1 px-2 py-1.5 rounded-full text-[15px] font-medium transition ${dark ? 'text-slate-100 hover:bg-white/8' : 'text-slate-800 hover:bg-black/[0.04]'`}>
+                <button onClick={() => setShowModelMenu((v) => !v)} className={`flex items-center gap-1 px-2 py-1.5 rounded-full text-[15px] font-medium transition ${dark ? 'text-slate-100 hover:bg-white/8' : 'text-slate-800 hover:bg-black/[0.04]'}`}>
                   {selectedModel.name}
                   <ChevronDown className="w-4 h-4 text-slate-400" />
                 </button>
@@ -285,9 +279,9 @@ export default function App() {
                   {showModelMenu && (
                     <>
                       <div className="fixed inset-0 z-20" onClick={() => setShowModelMenu(false)} />
-                      <motion.div initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0 }} scale={1} exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.15 }} className={`absolute left-0 top-full mt-1 z-30 min-w-[180px] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}>
+                      <motion.div initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.15 }} className={`absolute left-0 top-full mt-1 z-30 min-w-[180px] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}>
                         {MODELS.map((m) => (
-                          <button key={m.id} onClick={() => { setSelectedModel(m); setShowModelMenu(false) }} className={`w-full text-left px-4 py-2.5 text-sm ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'}`}>
+                          <button key={m.id} onClick={() => { setSelectedModel(m); setShowModelMenu(false) }} className={`w-full text-left px-4 py-2.5 text-sm ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'} ${selectedModel.id === m.id ? (dark ? 'bg-white/8' : 'bg-black/[0.04]') : ''}`}>
                             {m.name}{m.badge && <span className="ml-2 text-[10px] text-slate-400">{m.badge}</span>}
                           </button>
                         ))}
@@ -310,7 +304,7 @@ export default function App() {
                 <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }} className="mb-6">
                   <Logo size={56} dark={dark} />
                 </motion.div>
-                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'`}>
+                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'}`}>
                   {greetingLine || creativeGreeting(firstName)}
                 </h1>
               </motion.div>
@@ -331,7 +325,7 @@ export default function App() {
                           <div className={`text-[15px] leading-relaxed ${dark ? 'text-slate-100' : 'text-slate-900'}`}>
                             <div className="ai-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} />
                           </div>
-                          <MessageActions content={msg.content} />
+                          <MessageActions content={msg.content} dark={dark} />
                         </div>
                       </div>
                     )}
@@ -351,18 +345,42 @@ export default function App() {
 
         <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
+            {errorHint && (
+              <p className={`text-xs text-center mb-1.5 ${dark ? 'text-amber-400/90' : 'text-amber-700'}`} role="status">{errorHint}</p>
+            )}
             <div className={`glass-surface rounded-[28px] px-3 pt-2.5 pb-2 transition-shadow ${dark ? 'bg-[#1a1a22] border border-white/[0.08] shadow-lg shadow-black/30' : 'bg-[#f3f4f6] border border-black/[0.04] shadow-[0_4px_24px_rgba(0,0,0,0.06)]'}`}>
               <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} rows={1} placeholder="Ask Anything" className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'}`} />
               <div className="flex items-center gap-1.5 mt-1.5">
-                <button type="button" className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${dark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-white text-slate-600 hover:bg-white shadow-sm'}`} aria-label="Add"><Plus className="w-[18px] h-[18px]" /></button>
-                <button type="button" className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${dark ? 'bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]' : 'bg-white text-slate-700 hover:bg-white shadow-sm'}`}><Zap className="w-3.5 h-3.5" />Fast</button>
+                <button type="button" disabled title="Attachments coming soon" className={iconBtn} aria-label="Add attachment">
+                  <Plus className="w-[18px] h-[18px]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedModel(MODELS[0])}
+                  title="Fast responses"
+                  className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
+                    selectedModel.id === 'quantum-3'
+                      ? (dark ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/30' : 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200')
+                      : (dark ? 'bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]' : 'bg-white text-slate-700 hover:bg-white shadow-sm')
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />Fast
+                </button>
                 <div className="flex-1" />
-                <button type="button" className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${dark ? 'text-slate-400 hover:bg-white/8' : 'text-slate-500 hover:bg-black/[0.04]'}`} aria-label="Voice input"><Mic className="w-5 h-5" /></button>
-                {input.trim() ? (
-                  <motion.button type="button" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={() => handleSend()} disabled={isLoading} className="h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 text-white bg-slate-900 hover:bg-black disabled:opacity-40 transition dark:bg-white dark:text-slate-900" aria-label="Send"><Send className="w-3.5 h-3.5" />Send</motion.button>
-                ) : (
-                  <button type="button" className={`h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black'}`} aria-label="Speak"><AudioLines className="w-4 h-4" />Speak</button>
-                )}
+                <button type="button" disabled title="Voice input coming soon" className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition opacity-40 ${dark ? 'text-slate-400' : 'text-slate-500'}`} aria-label="Voice input">
+                  <Mic className="w-5 h-5" />
+                </button>
+                <motion.button
+                  type="button"
+                  initial={false}
+                  animate={{ scale: 1, opacity: 1 }}
+                  onClick={() => handleSend()}
+                  disabled={isLoading || !input.trim()}
+                  className="h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 text-white bg-slate-900 hover:bg-black disabled:opacity-40 transition dark:bg-white dark:text-slate-900"
+                  aria-label="Send"
+                >
+                  <Send className="w-3.5 h-3.5" />Send
+                </motion.button>
               </div>
             </div>
           </div>
