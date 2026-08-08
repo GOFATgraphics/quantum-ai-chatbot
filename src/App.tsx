@@ -495,7 +495,7 @@ export default function App() {
           </div>
         </main>
 
-        <div className="px-3 lg:px-6 pt-2 shrink-0 z-10 pb-[max(1.35rem,calc(env(safe-area-inset-bottom)+0.5rem))]">
+        <div className="px-3 lg:px-6 pt-1.5 shrink-0 z-10 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
             <div
               className={`flex items-end gap-1.5 rounded-[28px] pl-2.5 pr-2 py-2 transition-all glass-input ${
