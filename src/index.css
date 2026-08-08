@@ -187,3 +187,41 @@ html:not(.dark) .ai-content strong { color: #0f172a; }
 }
 html.dark .ai-content .md-code { background: #1e293b; color: #e2e8f0; }
 html:not(.dark) .ai-content .md-code { background: #f1f5f9; color: #334155; }
+
+.ai-content .md-link {
+  color: #4f46e5;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+html.dark .ai-content .md-link { color: #a5b4fc; }
+.ai-content .md-link:active { opacity: 0.8; }
+
+.ai-content .md-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 0.5rem 0 0.85rem;
+  -webkit-overflow-scrolling: touch;
+}
+.ai-content .md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  text-align: left;
+}
+.ai-content .md-table th,
+.ai-content .md-table td {
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid currentColor;
+  border-color: rgba(148, 163, 184, 0.25);
+  vertical-align: top;
+}
+.ai-content .md-table th {
+  font-weight: 600;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+html.dark .ai-content .md-table th,
+html.dark .ai-content .md-table td {
+  border-color: rgba(255, 255, 255, 0.08);
+}
