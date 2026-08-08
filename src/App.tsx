@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu,
-  Bot,
   Plus,
   Mic,
   Send,
@@ -13,6 +12,8 @@ import {
   LogOut,
   MessageSquare,
   Loader2,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage } from './lib/supabase'
 import Auth from './components/Auth'
@@ -45,9 +46,9 @@ const DEMO_RESPONSES = [
 
 function getGreeting() {
   const hour = new Date().getHours()
-  if (hour < 12) return 'Good Morning'
-  if (hour < 17) return 'Good Afternoon'
-  return 'Good Evening'
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
 }
 
 function generateId() {
@@ -65,17 +66,16 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState(MODELS[0])
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [showSidebar, setShowSidebar] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileSidebar, setMobileSidebar] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
-  const [saving, setSaving] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
-  // Auth state
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -94,7 +94,6 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Load conversations when user logs in
   useEffect(() => {
     if (user) {
       loadConversations()
@@ -111,9 +110,7 @@ export default function App() {
       .select('*')
       .order('updated_at', { ascending: false })
 
-    if (!error && data) {
-      setConversations(data)
-    }
+    if (!error && data) setConversations(data)
   }
 
   const loadMessages = async (conversationId: string) => {
@@ -132,6 +129,7 @@ export default function App() {
         }))
       )
       setCurrentConversationId(conversationId)
+      setMobileSidebar(false)
     }
   }
 
@@ -142,10 +140,7 @@ export default function App() {
 
     const { data, error } = await supabase
       .from('conversations')
-      .insert({
-        user_id: user.id,
-        title,
-      })
+      .insert({ user_id: user.id, title })
       .select()
       .single()
 
@@ -170,7 +165,6 @@ export default function App() {
       content,
     })
 
-    // Touch updated_at
     await supabase
       .from('conversations')
       .update({ updated_at: new Date().toISOString() })
@@ -185,7 +179,6 @@ export default function App() {
     scrollToBottom()
   }, [messages, isLoading, scrollToBottom])
 
-  // Web Speech API
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -228,12 +221,8 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'grok-3',
           messages: [
-            ...history.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
+            ...history.map((m) => ({ role: m.role, content: m.content })),
             { role: 'user', content: userMessage },
           ],
         }),
@@ -243,12 +232,10 @@ export default function App() {
         const data = await response.json()
         return data.content || 'Sorry, I could not generate a response.'
       }
-      console.warn('API proxy returned', response.status)
     } catch (err) {
       console.error('Proxy call failed:', err)
     }
 
-    // Demo fallback
     await new Promise((r) => setTimeout(r, 900 + Math.random() * 800))
     const lower = userMessage.toLowerCase()
     if (lower.includes('slogan') || lower.includes('tagline')) return DEMO_RESPONSES[2]
@@ -263,16 +250,11 @@ export default function App() {
     const trimmed = input.trim()
     if (!trimmed || isLoading || !user) return
 
-    const userMsg: Message = {
-      id: generateId(),
-      role: 'user',
-      content: trimmed,
-    }
+    const userMsg: Message = { id: generateId(), role: 'user', content: trimmed }
 
     setMessages((prev) => [...prev, userMsg])
     setInput('')
     setIsLoading(true)
-    setSaving(true)
 
     try {
       let convId = currentConversationId
@@ -282,21 +264,13 @@ export default function App() {
         if (!convId) throw new Error('Could not create conversation')
       }
 
-      // Save user message
       await saveMessage(convId, 'user', trimmed)
 
       const reply = await callAI(trimmed, messages)
-      const assistantMsg: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: reply,
-      }
+      const assistantMsg: Message = { id: generateId(), role: 'assistant', content: reply }
       setMessages((prev) => [...prev, assistantMsg])
 
-      // Save assistant message
       await saveMessage(convId, 'assistant', reply)
-
-      // Refresh conversation list so title/updated_at are fresh
       loadConversations()
     } catch (err) {
       console.error(err)
@@ -310,7 +284,6 @@ export default function App() {
       ])
     } finally {
       setIsLoading(false)
-      setSaving(false)
       inputRef.current?.focus()
     }
   }
@@ -325,7 +298,7 @@ export default function App() {
   const startNewChat = () => {
     setCurrentConversationId(null)
     setMessages([])
-    setShowSidebar(false)
+    setMobileSidebar(false)
   }
 
   const handleSignOut = async () => {
@@ -335,50 +308,131 @@ export default function App() {
 
   const isEmpty = messages.length === 0 && !isLoading
 
-  // Loading auth
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center h-full bg-white">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      <div className="flex items-center justify-center h-screen bg-[#0a0a0b]">
+        <Loader2 className="w-7 h-7 animate-spin text-slate-500" />
       </div>
     )
   }
 
-  // Not logged in
   if (!session || !user) {
     return <Auth onSuccess={() => {}} />
   }
 
   const displayName =
-    user.user_metadata?.full_name ||
-    user.email?.split('@')[0] ||
-    'there'
+    user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'
 
   return (
-    <div className="flex h-full max-w-lg mx-auto bg-white relative overflow-hidden">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-[#fafafa] overflow-hidden">
+      {/* Desktop Sidebar */}
+      <aside
+        className={`hidden lg:flex flex-col border-r border-slate-200/80 bg-white transition-all duration-300 ${
+          sidebarOpen ? 'w-[260px]' : 'w-[68px]'
+        }`}
+      >
+        <div className="h-14 flex items-center justify-between px-4 border-b border-slate-100">
+          {sidebarOpen && (
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 32 32" fill="none">
+                  <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fillOpacity="0.95" />
+                  <path d="M16 12L24 8V16L16 20V12Z" fill="white" fillOpacity="0.7" />
+                  <path d="M8 16L16 12V20L8 24V16Z" fill="white" fillOpacity="0.5" />
+                </svg>
+              </div>
+              <span className="font-semibold text-slate-900 text-[15px]">Quantum</span>
+            </div>
+          )}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 transition"
+          >
+            {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+          </button>
+        </div>
+
+        <div className="p-3">
+          <button
+            onClick={startNewChat}
+            className={`w-full flex items-center gap-2 h-9 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition ${
+              sidebarOpen ? 'px-3 justify-start' : 'justify-center'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            {sidebarOpen && 'New chat'}
+          </button>
+        </div>
+
+        {sidebarOpen && (
+          <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5">
+            {conversations.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-10 px-4">
+                No conversations yet
+              </p>
+            )}
+            {conversations.map((conv) => (
+              <button
+                key={conv.id}
+                onClick={() => loadMessages(conv.id)}
+                className={`w-full text-left px-3 py-2 rounded-lg text-[13px] transition flex items-center gap-2.5 ${
+                  currentConversationId === conv.id
+                    ? 'bg-slate-100 text-slate-900 font-medium'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
+                <span className="truncate">{conv.title || 'Untitled'}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="p-3 border-t border-slate-100">
+          <button
+            onClick={() => setShowSettings(true)}
+            className={`w-full flex items-center gap-2.5 h-9 rounded-lg text-slate-600 hover:bg-slate-50 text-sm transition ${
+              sidebarOpen ? 'px-3' : 'justify-center'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            {sidebarOpen && <span className="truncate">{user.email}</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
-        {showSidebar && (
+        {mobileSidebar && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/30 z-40"
-              onClick={() => setShowSidebar(false)}
+              className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+              onClick={() => setMobileSidebar(false)}
             />
             <motion.aside
-              initial={{ x: -300 }}
+              initial={{ x: -280 }}
               animate={{ x: 0 }}
-              exit={{ x: -300 }}
+              exit={{ x: -280 }}
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className="fixed left-0 top-0 bottom-0 w-72 bg-white z-50 flex flex-col shadow-xl"
+              className="fixed left-0 top-0 bottom-0 w-[280px] bg-white z-50 flex flex-col lg:hidden shadow-2xl"
             >
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="font-semibold text-slate-900">Chats</h2>
+              <div className="h-14 flex items-center justify-between px-4 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 32 32" fill="none">
+                      <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fillOpacity="0.95" />
+                      <path d="M16 12L24 8V16L16 20V12Z" fill="white" fillOpacity="0.7" />
+                      <path d="M8 16L16 12V20L8 24V16Z" fill="white" fillOpacity="0.5" />
+                    </svg>
+                  </div>
+                  <span className="font-semibold text-slate-900">Quantum</span>
+                </div>
                 <button
-                  onClick={() => setShowSidebar(false)}
-                  className="p-1.5 rounded-full hover:bg-slate-100"
+                  onClick={() => setMobileSidebar(false)}
+                  className="p-1.5 rounded-md hover:bg-slate-100"
                 >
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
@@ -387,32 +441,26 @@ export default function App() {
               <div className="p-3">
                 <button
                   onClick={startNewChat}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition"
+                  className="w-full flex items-center gap-2 px-3 h-9 rounded-lg bg-slate-900 text-white text-sm font-medium"
                 >
                   <Plus className="w-4 h-4" />
                   New chat
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
-                {conversations.length === 0 && (
-                  <p className="text-sm text-slate-400 text-center py-8">No conversations yet</p>
-                )}
+              <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
                 {conversations.map((conv) => (
                   <button
                     key={conv.id}
-                    onClick={() => {
-                      loadMessages(conv.id)
-                      setShowSidebar(false)
-                    }}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition flex items-start gap-2 ${
+                    onClick={() => loadMessages(conv.id)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition flex items-center gap-2.5 ${
                       currentConversationId === conv.id
-                        ? 'bg-slate-100 text-slate-900'
+                        ? 'bg-slate-100 text-slate-900 font-medium'
                         : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span className="line-clamp-2">{conv.title || 'Untitled'}</span>
+                    <MessageSquare className="w-4 h-4 flex-shrink-0 opacity-60" />
+                    <span className="truncate">{conv.title || 'Untitled'}</span>
                   </button>
                 ))}
               </div>
@@ -421,195 +469,167 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Main column */}
-      <div className="flex flex-col flex-1 min-w-0">
-        <div className="safe-top bg-white" />
-
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-slate-100/80 bg-white/90 backdrop-blur-md sticky top-0 z-20">
-          <button
-            onClick={() => setShowSidebar(true)}
-            className="p-2 -ml-1 rounded-full hover:bg-slate-100 transition-colors"
-            aria-label="Menu"
-          >
-            <Menu className="w-5 h-5 text-slate-700" strokeWidth={1.75} />
-          </button>
-
-          <button
-            onClick={() => setShowSettings(true)}
-            className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-          >
-            <span>Free plan</span>
-            <span className="text-slate-300">·</span>
-            <span className="text-blue-600 underline underline-offset-2 decoration-blue-600/40">
-              Upgrade
+        <header className="h-14 flex items-center justify-between px-4 lg:px-6 border-b border-slate-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileSidebar(true)}
+              className="lg:hidden p-2 -ml-1 rounded-lg hover:bg-slate-100"
+            >
+              <Menu className="w-5 h-5 text-slate-700" />
+            </button>
+            <span className="text-sm font-medium text-slate-500 hidden sm:block">
+              {currentConversationId
+                ? conversations.find((c) => c.id === currentConversationId)?.title || 'Chat'
+                : 'New conversation'}
             </span>
-          </button>
+          </div>
 
-          <button
-            className="p-2 -mr-1 rounded-full hover:bg-slate-100 transition-colors"
-            aria-label="AI"
-          >
-            <Bot className="w-5 h-5 text-slate-700" strokeWidth={1.75} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition"
+            >
+              <Settings className="w-4.5 h-4.5" />
+            </button>
+          </div>
         </header>
 
-        {/* Chat area */}
-        <main className="flex-1 overflow-y-auto chat-scroll px-4 relative">
-          <AnimatePresence mode="wait">
-            {isEmpty ? (
-              <motion.div
-                key="greeting"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center"
-              >
+        {/* Messages */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 lg:px-6">
+            <AnimatePresence mode="wait">
+              {isEmpty ? (
                 <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1, type: 'spring', stiffness: 260, damping: 20 }}
-                  className="mb-6"
+                  key="empty"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4 }}
+                  className="flex flex-col items-center justify-center min-h-[calc(100vh-14rem)] text-center"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center shadow-soft">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                      <path
-                        d="M8 8L16 4L24 8V16L16 20L8 16V8Z"
-                        fill="white"
-                        fillOpacity="0.95"
-                      />
-                      <path
-                        d="M16 12L24 8V16L16 20V12Z"
-                        fill="white"
-                        fillOpacity="0.7"
-                      />
-                      <path
-                        d="M8 16L16 12V20L8 24V16Z"
-                        fill="white"
-                        fillOpacity="0.5"
-                      />
+                  <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center mb-6 shadow-lg shadow-slate-900/10">
+                    <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+                      <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fillOpacity="0.95" />
+                      <path d="M16 12L24 8V16L16 20V12Z" fill="white" fillOpacity="0.7" />
+                      <path d="M8 16L16 12V20L8 24V16Z" fill="white" fillOpacity="0.5" />
                     </svg>
                   </div>
+
+                  <h1 className="text-2xl font-semibold text-slate-900 tracking-tight mb-2">
+                    {getGreeting()}, {displayName}
+                  </h1>
+                  <p className="text-slate-500 text-[15px] max-w-sm">
+                    Ask me anything. I can help with your emails, documents, data, and more.
+                  </p>
+
+                  <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
+                    {[
+                      'What did I receive about the wheat order?',
+                      'Show me invoices from last month',
+                      'Summarize my latest emails',
+                      'Which trades are still pending?',
+                    ].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        onClick={() => {
+                          setInput(suggestion)
+                          inputRef.current?.focus()
+                        }}
+                        className="text-left px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
                 </motion.div>
-
-                <motion.h1
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="text-2xl font-semibold text-slate-900 tracking-tight"
-                >
-                  {getGreeting()}, {displayName}
-                </motion.h1>
-
-                <motion.p
+              ) : (
+                <motion.div
+                  key="messages"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.35 }}
-                  className="mt-2 text-slate-500 text-sm max-w-[240px]"
+                  className="py-8 space-y-6"
                 >
-                  How can I help you today?
-                </motion.p>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="chat"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="py-4 space-y-4"
-              >
-                {messages.map((msg) => (
-                  <MessageBubble key={msg.id} message={msg} />
-                ))}
+                  {messages.map((msg) => (
+                    <MessageBubble key={msg.id} message={msg} />
+                  ))}
 
-                {isLoading && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex justify-start"
-                  >
-                    <div className="bg-slate-100 rounded-2xl rounded-bl-md px-4 py-3 shadow-bubble">
-                      <div className="flex gap-1.5 items-center h-5">
-                        <span
-                          className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse-dot"
-                          style={{ animationDelay: '0ms' }}
-                        />
-                        <span
-                          className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse-dot"
-                          style={{ animationDelay: '160ms' }}
-                        />
-                        <span
-                          className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse-dot"
-                          style={{ animationDelay: '320ms' }}
-                        />
+                  {isLoading && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex gap-3"
+                    >
+                      <div className="w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg width="12" height="12" viewBox="0 0 32 32" fill="none">
+                          <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" />
+                        </svg>
                       </div>
-                    </div>
-                  </motion.div>
-                )}
+                      <div className="flex gap-1.5 items-center h-7">
+                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse-dot" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse-dot" style={{ animationDelay: '160ms' }} />
+                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse-dot" style={{ animationDelay: '320ms' }} />
+                      </div>
+                    </motion.div>
+                  )}
 
-                <div ref={messagesEndRef} />
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  <div ref={messagesEndRef} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </main>
 
-        {/* Input */}
-        <div className="safe-bottom border-t border-slate-100 bg-white/95 backdrop-blur-md px-3 pt-3 pb-3">
-          <div className="flex items-end gap-2">
-            <button
-              className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors mb-0.5"
-              aria-label="Attach"
-            >
-              <Plus className="w-5 h-5 text-slate-600" strokeWidth={2} />
-            </button>
-
-            <div className="flex-1 relative">
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl overflow-hidden focus-within:border-slate-300 focus-within:ring-2 focus-within:ring-slate-100 transition-all">
+        {/* Input area */}
+        <div className="border-t border-slate-200/80 bg-white/90 backdrop-blur-md">
+          <div className="max-w-3xl mx-auto px-4 lg:px-6 py-4">
+            <div className="relative">
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm focus-within:border-slate-300 focus-within:shadow-md transition-all">
                 <textarea
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="How can I help you today?"
+                  placeholder="Ask anything…"
                   rows={1}
-                  className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-[15px] text-slate-900 placeholder:text-slate-400 leading-relaxed max-h-32"
-                  style={{ minHeight: '44px' }}
+                  className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-[15px] text-slate-900 placeholder:text-slate-400 leading-relaxed max-h-40 outline-none"
+                  style={{ minHeight: '48px' }}
                 />
 
-                <div className="flex items-center justify-between px-3 pb-2.5">
+                <div className="flex items-center justify-between px-3 pb-3">
                   <button
                     onClick={() => setShowModelPicker(!showModelPicker)}
-                    className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors py-1 px-1.5 rounded-md hover:bg-slate-100"
+                    className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 py-1.5 px-2 rounded-lg hover:bg-slate-50 transition"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>{selectedModel.name}</span>
+                    {selectedModel.name}
                     <ChevronDown className="w-3.5 h-3.5" />
                   </button>
 
                   <div className="flex items-center gap-1">
                     <button
                       onClick={toggleListening}
-                      className={`p-1.5 rounded-full transition-colors ${
+                      className={`p-2 rounded-lg transition ${
                         isListening
-                          ? 'bg-red-100 text-red-600'
-                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                          ? 'bg-red-50 text-red-600'
+                          : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
                       }`}
-                      aria-label="Voice input"
                     >
-                      <Mic className="w-4 h-4" strokeWidth={2} />
+                      <Mic className="w-4 h-4" />
                     </button>
 
                     <button
                       onClick={handleSend}
                       disabled={!input.trim() || isLoading}
-                      className={`p-1.5 rounded-full transition-all ${
+                      className={`p-2 rounded-lg transition ${
                         input.trim() && !isLoading
-                          ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-800'
-                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          ? 'bg-slate-900 text-white hover:bg-slate-800'
+                          : 'bg-slate-100 text-slate-300 cursor-not-allowed'
                       }`}
-                      aria-label="Send"
                     >
-                      <Send className="w-4 h-4" strokeWidth={2} />
+                      <Send className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -618,19 +638,15 @@ export default function App() {
               <AnimatePresence>
                 {showModelPicker && (
                   <>
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
+                    <div
                       className="fixed inset-0 z-30"
                       onClick={() => setShowModelPicker(false)}
                     />
                     <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                      initial={{ opacity: 0, y: 6, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                      transition={{ duration: 0.18 }}
-                      className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden z-40"
+                      exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                      className="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-40"
                     >
                       {MODELS.map((model) => (
                         <button
@@ -639,7 +655,7 @@ export default function App() {
                             setSelectedModel(model)
                             setShowModelPicker(false)
                           }}
-                          className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between ${
+                          className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition flex items-center justify-between ${
                             selectedModel.id === model.id ? 'bg-slate-50' : ''
                           }`}
                         >
@@ -657,11 +673,15 @@ export default function App() {
                 )}
               </AnimatePresence>
             </div>
+
+            <p className="text-center text-[11px] text-slate-400 mt-3">
+              Quantum can make mistakes. Verify important information.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Settings */}
+      {/* Settings modal */}
       <AnimatePresence>
         {showSettings && (
           <>
@@ -669,56 +689,44 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/30 z-50"
+              className="fixed inset-0 bg-black/40 z-50"
               onClick={() => setShowSettings(false)}
             />
             <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl z-50 p-6 safe-bottom"
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl z-50 p-6 shadow-2xl"
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Settings
-                </h2>
+                <h2 className="text-lg font-semibold text-slate-900">Settings</h2>
                 <button
                   onClick={() => setShowSettings(false)}
-                  className="p-2 rounded-full hover:bg-slate-100"
+                  className="p-1.5 rounded-lg hover:bg-slate-100"
                 >
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
 
               <div className="space-y-4">
-                <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-600">
-                  <p className="font-medium text-slate-800 mb-1">Signed in as</p>
-                  <p className="truncate">{user.email}</p>
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <p className="text-xs font-medium text-slate-500 mb-1">Signed in as</p>
+                  <p className="text-sm text-slate-900 truncate">{user.email}</p>
                 </div>
 
                 <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-600 leading-relaxed">
-                  <p className="font-medium text-slate-800 mb-1">API Key is secure</p>
-                  <p>
-                    Your xAI API key lives only on the server (Vercel Environment Variables). It is
-                    never sent to the browser.
+                  <p className="font-medium text-slate-800 mb-1">API key is secure</p>
+                  <p className="text-[13px]">
+                    Your Anthropic key lives only on the server and is never exposed to the browser.
                   </p>
                 </div>
 
                 <button
                   onClick={handleSignOut}
-                  className="w-full py-3 rounded-xl border border-slate-200 text-slate-700 font-medium text-sm hover:bg-slate-50 transition flex items-center justify-center gap-2"
+                  className="w-full h-10 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition flex items-center justify-center gap-2"
                 >
                   <LogOut className="w-4 h-4" />
                   Sign out
-                </button>
-
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="w-full py-3 rounded-xl bg-slate-900 text-white font-medium text-sm hover:bg-slate-800 transition"
-                >
-                  Done
                 </button>
               </div>
             </motion.div>
@@ -734,16 +742,26 @@ function MessageBubble({ message }: { message: Message }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className={`flex gap-3 ${
+        isUser ? 'justify-end' : 'justify-start'
+      }`}
     >
+      {!isUser && (
+        <div className="w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <svg width="12" height="12" viewBox="0 0 32 32" fill="none">
+            <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" />
+          </svg>
+        </div>
+      )}
+
       <div
-        className={`max-w-[85%] px-4 py-2.5 text-[15px] leading-relaxed shadow-bubble ${
+        className={`max-w-[80%] px-4 py-2.5 text-[15px] leading-relaxed ${
           isUser
             ? 'bg-slate-900 text-white rounded-2xl rounded-br-md'
-            : 'bg-slate-100 text-slate-800 rounded-2xl rounded-bl-md'
+            : 'bg-white border border-slate-200/80 text-slate-800 rounded-2xl rounded-bl-md shadow-sm'
         }`}
       >
         <div className="whitespace-pre-wrap break-words">{message.content}</div>
