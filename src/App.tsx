@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Menu, Plus, Mic, Send, X, Settings, LogOut, MessageSquare,
-  Loader2, Trash2, GraduationCap, Cpu, PenLine, ArrowLeft,
+  Menu, Plus, Mic, Send, X, LogOut, MessageSquare,
+  Loader2, GraduationCap, Cpu, PenLine, ArrowLeft,
   MoreHorizontal, Moon, Sun,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage } from './lib/supabase'
 import Auth from './components/Auth'
 import Connectors from './components/Connectors'
+import Sidebar from './components/Sidebar'
 import type { User, Session } from '@supabase/supabase-js'
 
 type Message = { id: string; role: 'user' | 'assistant'; content: string }
@@ -98,7 +99,6 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Open settings if returning from OAuth
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('connected') || params.get('connector_error')) {
@@ -233,6 +233,7 @@ export default function App() {
 
   const startNewChat = () => { setCurrentConversationId(null); setMessages([]); setMobileSidebar(false) }
   const handleSignOut = async () => { await supabase.auth.signOut(); setShowSettings(false) }
+  const openSettings = () => { setShowSettings(true); setMobileSidebar(false) }
   const isEmpty = messages.length === 0 && !isLoading
 
   if (authLoading) {
@@ -248,88 +249,54 @@ export default function App() {
   const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'
 
   const shell = dark ? 'bg-[#0a0a0f] text-slate-100' : 'bg-gradient-to-b from-[#eef2ff] via-[#f8fafc] to-[#f1f5f9] text-slate-900'
-  const sidebar = dark ? 'border-white/5 bg-[#0f0f16]/80 backdrop-blur-xl' : 'border-white/60 bg-white/70 backdrop-blur-xl'
   const card = dark ? 'bg-white/[0.04] border border-white/10 hover:border-indigo-500/30 hover:shadow-indigo-500/10' : 'bg-white/95 border border-white shadow-sm hover:shadow-lg hover:shadow-indigo-500/10 hover:ring-1 hover:ring-indigo-500/20'
   const inputBar = dark ? 'bg-white/[0.05] border border-white/10 shadow-xl shadow-indigo-500/5 focus-within:border-indigo-500/40 focus-within:ring-2 focus-within:ring-indigo-500/20' : 'bg-white/95 border border-white shadow-xl shadow-indigo-500/10 focus-within:ring-2 focus-within:ring-indigo-500/20'
   const textMuted = dark ? 'text-slate-400' : 'text-slate-500'
   const textMain = dark ? 'text-slate-100' : 'text-slate-900'
 
+  const sidebarProps = {
+    dark,
+    user,
+    conversations,
+    currentConversationId,
+    deletingId,
+    onNewChat: startNewChat,
+    onSelectChat: loadMessages,
+    onDeleteChat: deleteConversation,
+    onOpenSettings: openSettings,
+    onOpenConnectors: openSettings,
+  }
+
   return (
     <div className={`flex h-dvh max-h-dvh overflow-hidden transition-colors duration-300 ${shell}`}>
-      <aside className={`hidden lg:flex w-[280px] flex-col border-r transition-colors min-h-0 ${sidebar}`}>
-        <div className="h-16 flex items-center gap-2.5 px-5 shrink-0">
-          <div className="relative">
-            <div className="absolute inset-0 rounded-xl bg-indigo-500/40 blur-md" />
-            <div className="relative w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
-                <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fillOpacity="0.95" />
-                <path d="M16 12L24 8V16L16 20V12Z" fill="white" fillOpacity="0.7" />
-                <path d="M8 16L16 12V20L8 24V16Z" fill="white" fillOpacity="0.5" />
-              </svg>
-            </div>
-          </div>
-          <span className={`font-semibold text-[15px] tracking-tight ${textMain}`}>Quantum</span>
-        </div>
-
-        <div className="px-4 mb-3 shrink-0">
-          <button onClick={startNewChat} className="w-full flex items-center gap-2 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-medium hover:from-indigo-500 hover:to-violet-500 transition shadow-lg shadow-indigo-500/25 px-4">
-            <Plus className="w-4 h-4" /> New chat
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-3 space-y-0.5 pb-4 min-h-0">
-          {conversations.length === 0 && <p className={`text-xs text-center py-12 ${textMuted}`}>No chats yet</p>}
-          {conversations.map((conv) => (
-            <div key={conv.id} className={`group flex items-center gap-1 rounded-xl transition ${currentConversationId === conv.id ? (dark ? 'bg-white/10' : 'bg-white shadow-sm') : (dark ? 'hover:bg-white/5' : 'hover:bg-white/60')}`}>
-              <button onClick={() => loadMessages(conv.id)} className="flex-1 text-left px-3 py-2.5 text-[13px] flex items-center gap-2.5 min-w-0">
-                <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${textMuted}`} />
-                <span className={`truncate ${dark ? 'text-slate-300' : 'text-slate-700'}`}>{conv.title || 'Untitled'}</span>
-              </button>
-              <button onClick={() => deleteConversation(conv.id)} disabled={deletingId === conv.id} className="opacity-0 group-hover:opacity-100 p-2 mr-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition" title="Delete">
-                {deletingId === conv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <div className={`p-3 border-t shrink-0 ${dark ? 'border-white/5' : 'border-slate-100/80'}`}>
-          <button onClick={() => setShowSettings(true)} className={`w-full flex items-center gap-2.5 h-10 rounded-xl px-3 text-sm transition ${dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-600 hover:bg-white'}`}>
-            <Settings className="w-4 h-4" />
-            <span className="truncate">{user.email}</span>
-          </button>
-        </div>
+      {/* Desktop sidebar */}
+      <aside className={`hidden lg:flex w-[300px] flex-col border-r min-h-0 ${dark ? 'border-white/5' : 'border-slate-200/80'}`}>
+        <Sidebar {...sidebarProps} />
       </aside>
 
+      {/* Mobile drawer */}
       <AnimatePresence>
         {mobileSidebar && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden" onClick={() => setMobileSidebar(false)} />
-            <motion.aside initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} transition={{ type: 'spring', damping: 30, stiffness: 320 }} className={`fixed left-0 top-0 bottom-0 w-[300px] z-50 flex flex-col lg:hidden shadow-2xl ${dark ? 'bg-[#0f0f16]' : 'bg-white'}`}>
-              <div className="h-16 flex items-center justify-between px-4 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-                    <svg width="16" height="16" viewBox="0 0 32 32" fill="none"><path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fillOpacity="0.95" /></svg>
-                  </div>
-                  <span className={`font-semibold ${textMain}`}>Quantum</span>
-                </div>
-                <button onClick={() => setMobileSidebar(false)} className={`p-2 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}><X className="w-5 h-5 text-slate-400" /></button>
-              </div>
-              <div className="px-4 mb-3 shrink-0">
-                <button onClick={startNewChat} className="w-full flex items-center gap-2 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-medium shadow-lg shadow-indigo-500/25 px-4">
-                  <Plus className="w-4 h-4" /> New chat
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-3 space-y-0.5 min-h-0">
-                {conversations.map((conv) => (
-                  <div key={conv.id} className={`flex items-center rounded-xl ${currentConversationId === conv.id ? (dark ? 'bg-white/10' : 'bg-slate-100') : ''}`}>
-                    <button onClick={() => loadMessages(conv.id)} className="flex-1 text-left px-3 py-2.5 text-sm flex items-center gap-2.5 min-w-0">
-                      <MessageSquare className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                      <span className={`truncate ${dark ? 'text-slate-300' : 'text-slate-700'}`}>{conv.title || 'Untitled'}</span>
-                    </button>
-                    <button onClick={() => deleteConversation(conv.id)} className="p-2 mr-1 text-slate-400 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                ))}
-              </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+              onClick={() => setMobileSidebar(false)}
+            />
+            <motion.aside
+              initial={{ x: -320 }}
+              animate={{ x: 0 }}
+              exit={{ x: -320 }}
+              transition={{ type: 'spring', damping: 32, stiffness: 340 }}
+              className="fixed left-0 top-0 bottom-0 w-[min(100%,320px)] z-50 flex flex-col lg:hidden shadow-2xl"
+            >
+              <Sidebar
+                {...sidebarProps}
+                showClose
+                onClose={() => setMobileSidebar(false)}
+              />
             </motion.aside>
           </>
         )}
