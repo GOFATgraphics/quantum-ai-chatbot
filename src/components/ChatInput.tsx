@@ -47,7 +47,8 @@ export default function ChatInput({
     rec.onresult = (event: SpeechRecognitionEvent) => {
       let interim = ''
       let finalText = ''
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      const start = (event as SpeechRecognitionEvent & { resultIndex?: number }).resultIndex ?? 0
+      for (let i = start; i < event.results.length; i++) {
         const piece = event.results[i][0]?.transcript || ''
         if (event.results[i].isFinal) finalText += piece
         else interim += piece
