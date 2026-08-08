@@ -87,7 +87,7 @@ export default function Sidebar({
 
   return (
     <div className={`flex flex-col h-full min-h-0 glass-panel ${dark ? 'glass-panel-dark' : 'glass-panel-light'}`}>
-      <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0">
+      <div className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-3 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <Logo size={28} className="shrink-0" />
           <span className={`text-[16px] font-semibold tracking-tight ${textMain}`}>Quantumy</span>
