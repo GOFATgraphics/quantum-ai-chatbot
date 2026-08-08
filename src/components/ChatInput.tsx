@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mic, Send, Plus, Zap } from 'lucide-react'
+import { Mic, MicOff, Send, Plus, Zap } from 'lucide-react'
 
 type Props = {
   value: string
@@ -24,6 +24,52 @@ export default function ChatInput({
   onToggleFast,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [listening, setListening] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(false)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const baseValueRef = useRef('')
+
+  useEffect(() => {
+    const SR =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null
+    setSpeechSupported(!!SR)
+    if (!SR) return
+
+    const rec: SpeechRecognition = new SR()
+    rec.continuous = false
+    rec.interimResults = true
+    rec.lang = typeof navigator !== 'undefined' ? navigator.language || 'en-US' : 'en-US'
+
+    rec.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = ''
+      let finalText = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const piece = event.results[i][0]?.transcript || ''
+        if (event.results[i].isFinal) finalText += piece
+        else interim += piece
+      }
+      const next = (baseValueRef.current + ' ' + (finalText || interim)).replace(/\s+/g, ' ').trimStart()
+      onChange(next)
+      if (finalText) {
+        baseValueRef.current = (baseValueRef.current + ' ' + finalText).replace(/\s+/g, ' ').trim()
+      }
+    }
+
+    rec.onerror = () => setListening(false)
+    rec.onend = () => setListening(false)
+    recognitionRef.current = rec
+
+    return () => {
+      try {
+        rec.abort()
+      } catch {
+        /* ignore */
+      }
+      recognitionRef.current = null
+    }
+  }, [onChange])
 
   useEffect(() => {
     const el = textareaRef.current
@@ -31,6 +77,27 @@ export default function ChatInput({
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 140) + 'px'
   }, [value])
+
+  const toggleListen = () => {
+    const rec = recognitionRef.current
+    if (!rec || isLoading) return
+    if (listening) {
+      try {
+        rec.stop()
+      } catch {
+        /* ignore */
+      }
+      setListening(false)
+      return
+    }
+    baseValueRef.current = value
+    try {
+      rec.start()
+      setListening(true)
+    } catch {
+      setListening(false)
+    }
+  }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -64,7 +131,7 @@ export default function ChatInput({
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={onKeyDown}
             rows={1}
-            placeholder="Ask Anything"
+            placeholder={listening ? 'Listening…' : 'Ask Anything'}
             className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${
               dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
             }`}
@@ -93,14 +160,32 @@ export default function ChatInput({
             <div className="flex-1" />
             <button
               type="button"
-              disabled
-              title="Voice input coming soon"
-              className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition opacity-40 ${
-                dark ? 'text-slate-400' : 'text-slate-500'
+              onClick={toggleListen}
+              disabled={!speechSupported || isLoading}
+              title={
+                !speechSupported
+                  ? 'Voice input not supported in this browser'
+                  : listening
+                    ? 'Stop listening'
+                    : 'Voice input'
+              }
+              className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${
+                listening
+                  ? dark
+                    ? 'bg-rose-500/25 text-rose-300 ring-1 ring-rose-400/40'
+                    : 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
+                  : speechSupported
+                    ? dark
+                      ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]'
+                      : 'bg-white text-slate-600 hover:bg-white shadow-sm'
+                    : dark
+                      ? 'text-slate-500 opacity-40'
+                      : 'text-slate-400 opacity-40'
               }`}
-              aria-label="Voice input"
+              aria-label={listening ? 'Stop voice input' : 'Voice input'}
+              aria-pressed={listening}
             >
-              <Mic className="w-5 h-5" />
+              {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             </button>
             <motion.button
               type="button"
