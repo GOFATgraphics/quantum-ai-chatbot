@@ -1,127 +1,104 @@
 # Quantum AI Chatbot
 
-Premium mobile-first AI chatbot with **Supabase Auth + conversation history**.
+Premium mobile-first AI chatbot with **Supabase Auth**, **conversation history**, and **granular Connectors** (Gmail first).
 
-## Phase 1 Features (current)
+## Features
 
-- Beautiful, smooth UI matching modern design systems
-- Supabase authentication (email + password)
-- Persistent conversation history per user
-- Sidebar with past chats
-- Secure Anthropic Claude proxy (API key never exposed to browser)
-- Voice input
-- Model selector
+- Smooth mobile-first UI (dark/light)
+- Supabase email/password auth
+- Persistent chat history per user
+- **Connectors**: connect Gmail alone (Drive & Sheets coming next)
+- AI can search connected Gmail via tool calling
+- Secure Anthropic proxy (API key never in the browser)
 
 ## Setup
 
-### 1. Supabase Database
+### 1. Supabase — Phase 1 tables
 
-Go to your Supabase project → **SQL Editor** → New query and run this:
+Run the conversations/messages SQL from the earlier setup (or see git history).
+
+### 2. Supabase — Connectors table
+
+**SQL Editor → New query → run** `supabase/connectors.sql` (also below):
 
 ```sql
--- Conversations table
-create table public.conversations (
+create table if not exists public.connectors (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
-  title text,
+  provider text not null check (provider in ('gmail', 'google_drive', 'google_sheets')),
+  account_email text,
+  access_token text,
+  refresh_token text,
+  token_expires_at timestamptz,
+  scopes text[] default '{}',
+  status text not null default 'connected' check (status in ('connected', 'error', 'revoked')),
   created_at timestamptz default now() not null,
-  updated_at timestamptz default now() not null
+  updated_at timestamptz default now() not null,
+  unique (user_id, provider)
 );
 
--- Messages table
-create table public.messages (
-  id uuid primary key default gen_random_uuid(),
-  conversation_id uuid references public.conversations(id) on delete cascade not null,
-  role text check (role in ('user', 'assistant')) not null,
-  content text not null,
-  created_at timestamptz default now() not null
-);
+create index if not exists connectors_user_id_idx on public.connectors(user_id);
+alter table public.connectors enable row level security;
 
--- Indexes
-create index conversations_user_id_idx on public.conversations(user_id);
-create index messages_conversation_id_idx on public.messages(conversation_id);
+create policy "Users can view own connectors"
+  on public.connectors for select using (auth.uid() = user_id);
 
--- Enable RLS
-alter table public.conversations enable row level security;
-alter table public.messages enable row level security;
-
--- Policies: users can only see/edit their own data
-create policy "Users can view own conversations"
-  on public.conversations for select
-  using (auth.uid() = user_id);
-
-create policy "Users can insert own conversations"
-  on public.conversations for insert
-  with check (auth.uid() = user_id);
-
-create policy "Users can update own conversations"
-  on public.conversations for update
-  using (auth.uid() = user_id);
-
-create policy "Users can delete own conversations"
-  on public.conversations for delete
-  using (auth.uid() = user_id);
-
-create policy "Users can view messages of own conversations"
-  on public.messages for select
-  using (
-    exists (
-      select 1 from public.conversations
-      where conversations.id = messages.conversation_id
-      and conversations.user_id = auth.uid()
-    )
-  );
-
-create policy "Users can insert messages into own conversations"
-  on public.messages for insert
-  with check (
-    exists (
-      select 1 from public.conversations
-      where conversations.id = messages.conversation_id
-      and conversations.user_id = auth.uid()
-    )
-  );
+create policy "Users can delete own connectors"
+  on public.connectors for delete using (auth.uid() = user_id);
 ```
 
-### 2. Environment Variables
+### 3. Google Cloud OAuth (for Gmail connector)
 
-**Local development**  
-Create a file named `.env` in the project root (copy from `.env.example`):
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create/select a project
+3. **APIs & Services → Enable APIs**: Gmail API
+4. **OAuth consent screen** → External → add scopes:
+   - `.../auth/gmail.readonly`
+   - `.../auth/userinfo.email`
+5. **Credentials → Create OAuth client ID** → Web application
+6. Authorized redirect URIs:
+   - `https://YOUR-APP.vercel.app/api/connectors/google-callback`
+   - `http://localhost:5173/api/connectors/google-callback` (local, if testing API)
+7. Copy **Client ID** and **Client Secret**
 
-```env
-VITE_SUPABASE_URL=https://ypzrczwyfvqlydeocbmm.supabase.co
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_public_key_here
-```
+### 4. Environment variables
 
-**Vercel (Production)**  
-In Project Settings → Environment Variables add:
+**Vercel → Project → Settings → Environment Variables:**
 
-| Name                    | Value                          |
-|-------------------------|--------------------------------|
-| `VITE_SUPABASE_URL`     | `https://ypzrczwyfvqlydeocbmm.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY`| your Supabase anon key         |
-| `ANTHROPIC_API_KEY`     | your Anthropic API key         |
+| Name | Where |
+|------|--------|
+| `VITE_SUPABASE_URL` | Client + server |
+| `VITE_SUPABASE_ANON_KEY` | Client |
+| `ANTHROPIC_API_KEY` | Server |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server (Supabase → Settings → API) |
+| `GOOGLE_CLIENT_ID` | Server |
+| `GOOGLE_CLIENT_SECRET` | Server |
+| `APP_URL` | Server, e.g. `https://quantumy-xi.vercel.app` |
 
-> Get the anon key from Supabase → Project Settings → API → `anon` `public`
+Redeploy after adding env vars.
 
-### 3. Run locally
+### 5. Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-### 4. Deploy
+Note: OAuth callback and tool APIs need the Vercel deployment (or a local serverless adapter). Connect Gmail on the production URL.
 
-Push to GitHub. Vercel will redeploy automatically.
+## How Connectors work
 
-## Next Phases
+1. Settings → **Connectors** → **Connect** on Gmail
+2. User is sent to Google and only asked for Gmail read access
+3. Tokens stored in `connectors` (server uses service role)
+4. When the user asks about email, Claude can call `search_gmail`
+5. **Disconnect** removes the row and access
 
-- **Phase 2**: Google OAuth + Gmail / Drive / Sheets search tools
-- **Phase 3**: Multi-source orchestration + more providers
+Drive / Sheets buttons are visible but marked **Soon** — same pattern when you enable them.
 
-## Security notes
+## Security
 
-- Anthropic API key stays on the server only (`ANTHROPIC_API_KEY`)
-- All chat data is protected by Row Level Security
-- Users can only see their own conversations
+- Anthropic + Google client secret stay on the server
+- Service role is only used in API routes
+- Client only selects non-token columns from `connectors`
+- Each connector is opt-in with minimal scopes

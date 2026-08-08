@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage } from './lib/supabase'
 import Auth from './components/Auth'
+import Connectors from './components/Connectors'
 import type { User, Session } from '@supabase/supabase-js'
 
 type Message = { id: string; role: 'user' | 'assistant'; content: string }
@@ -97,6 +98,14 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Open settings if returning from OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('connected') || params.get('connector_error')) {
+      setShowSettings(true)
+    }
+  }, [])
+
   useEffect(() => {
     if (user) loadConversations()
     else { setConversations([]); setCurrentConversationId(null); setMessages([]) }
@@ -173,9 +182,13 @@ export default function App() {
 
   const callAI = async (userMessage: string, history: Message[]) => {
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`
+      }
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           messages: [...history.map((m) => ({ role: m.role, content: m.content })), { role: 'user', content: userMessage }],
         }),
@@ -323,7 +336,6 @@ export default function App() {
       </AnimatePresence>
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full">
-        {/* Static header */}
         <header className="h-14 lg:h-16 flex items-center justify-between px-4 lg:px-8 shrink-0 z-10">
           <div className="flex items-center gap-2">
             {!isEmpty ? (
@@ -356,7 +368,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Scrollable messages only */}
         <main className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
           <div className="max-w-2xl mx-auto px-4 lg:px-6 h-full">
             <AnimatePresence mode="wait">
@@ -410,7 +421,6 @@ export default function App() {
           </div>
         </main>
 
-        {/* Static footer / input */}
         <div className="px-4 lg:px-6 pt-2 shrink-0 z-10 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
             <div className={`flex items-end gap-2 rounded-2xl px-2 py-2 transition-all ${inputBar}`}>
@@ -433,16 +443,27 @@ export default function App() {
         {showSettings && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowSettings(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 12 }} className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-3xl z-50 p-6 shadow-2xl ${dark ? 'bg-[#12121a] border border-white/10' : 'bg-white'}`}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-3xl z-50 p-6 shadow-2xl ${dark ? 'bg-[#12121a] border border-white/10' : 'bg-white'}`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex items-center justify-between mb-6">
                 <h2 className={`text-lg font-semibold ${textMain}`}>Settings</h2>
                 <button onClick={() => setShowSettings(false)} className={`p-1.5 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}><X className="w-5 h-5 text-slate-400" /></button>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-5">
                 <div className={`rounded-2xl p-4 ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
                   <p className={`text-xs font-medium mb-1 ${textMuted}`}>Signed in as</p>
                   <p className={`text-sm truncate ${textMain}`}>{user.email}</p>
                 </div>
+
+                {session?.access_token && (
+                  <Connectors dark={dark} accessToken={session.access_token} />
+                )}
+
                 <button onClick={() => setDark(!dark)} className={`w-full h-11 rounded-2xl border text-sm font-medium transition flex items-center justify-center gap-2 ${dark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
                   {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                   {dark ? 'Switch to light mode' : 'Switch to dark mode'}
