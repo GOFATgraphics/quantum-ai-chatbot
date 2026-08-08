@@ -88,3 +88,120 @@ export async function refreshAccessToken({ clientId, clientSecret, refreshToken 
   if (!res.ok) throw new Error(data.error_description || data.error || 'Token refresh failed');
   return data;
 }
+
+export async function getGoogleEmail(accessToken) {
+  const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.email || null;
+}
+
+export async function searchGmail(accessToken, query, maxResults = 10) {
+  const q = encodeURIComponent(query || 'in:inbox');
+  const listRes = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=${maxResults}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!listRes.ok) {
+    const t = await listRes.text();
+    throw new Error(`Gmail search failed: ${listRes.status} ${t}`);
+  }
+  const list = await listRes.json();
+  const messages = list.messages || [];
+  const out = [];
+  for (const m of messages.slice(0, maxResults)) {
+    const detail = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!detail.ok) continue;
+    const msg = await detail.json();
+    const headers = msg.payload?.headers || [];
+    const getH = (n) => headers.find((h) => h.name.toLowerCase() === n.toLowerCase())?.value || '';
+    out.push({
+      id: msg.id,
+      threadId: msg.threadId,
+      snippet: msg.snippet || '',
+      subject: getH('Subject'),
+      from: getH('From'),
+      date: getH('Date'),
+      body: extractBody(msg.payload),
+    });
+  }
+  return out;
+}
+
+function extractBody(payload) {
+  if (!payload) return '';
+  if (payload.body?.data) return decodeB64(payload.body.data);
+  const parts = payload.parts || [];
+  for (const p of parts) {
+    if (p.mimeType === 'text/plain' && p.body?.data) return decodeB64(p.body.data);
+  }
+  for (const p of parts) {
+    if (p.mimeType === 'text/html' && p.body?.data) {
+      return decodeB64(p.body.data).replace(/<[^>]+>/g, ' ');
+    }
+    if (p.parts) {
+      const inner = extractBody(p);
+      if (inner) return inner;
+    }
+  }
+  return '';
+}
+
+function decodeB64(data) {
+  try {
+    return Buffer.from(data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  } catch {
+    return '';
+  }
+}
+
+function encodeRawMessage({ to, subject, body, cc, bcc, from }) {
+  const headers = [
+    from ? `From: ${from}` : null,
+    `To: ${to}`,
+    cc ? `Cc: ${cc}` : null,
+    bcc ? `Bcc: ${bcc}` : null,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset="UTF-8"',
+  ].filter(Boolean);
+  const raw = `${headers.join('\r\n')}\r\n\r\n${body || ''}`;
+  return Buffer.from(raw).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export async function sendGmail(accessToken, { to, subject, body, cc, bcc }) {
+  if (!to || !subject) throw new Error('to and subject are required');
+  const raw = encodeRawMessage({ to, subject, body, cc, bcc });
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Gmail send failed: ${res.status} ${t}`);
+  }
+  const data = await res.json();
+  return { id: data.id, threadId: data.threadId, labelIds: data.labelIds || [] };
+}
+
+export async function createGmailDraft(accessToken, { to, subject, body, cc, bcc }) {
+  if (!to || !subject) throw new Error('to and subject are required');
+  const raw = encodeRawMessage({ to, subject, body, cc, bcc });
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { raw } }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Gmail draft failed: ${res.status} ${t}`);
+  }
+  const data = await res.json();
+  return { id: data.id, messageId: data.message?.id };
+}
