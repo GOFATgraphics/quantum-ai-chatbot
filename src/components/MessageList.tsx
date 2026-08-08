@@ -14,6 +14,9 @@ type Props = {
   dark: boolean
   messagesEndRef: RefObject<HTMLDivElement>
   onRegenerate?: () => void
+  thoughtSeconds?: number | null
+  thinkActive?: boolean
+  deepSearchActive?: boolean
 }
 
 export default function MessageList({
@@ -23,6 +26,9 @@ export default function MessageList({
   dark,
   messagesEndRef,
   onRegenerate,
+  thoughtSeconds,
+  thinkActive,
+  deepSearchActive,
 }: Props) {
   const last = messages[messages.length - 1]
   const streaming =
@@ -89,11 +95,26 @@ export default function MessageList({
                       ) : null}
                     </div>
                     {msg.content && !isStreamingThis && (
-                      <MessageActions
-                        content={msg.content}
-                        dark={dark}
-                        onRegenerate={isLast && msg.role === 'assistant' ? onRegenerate : undefined}
-                      />
+                      <>
+                        {isLast && thoughtSeconds != null && thoughtSeconds > 0 && (
+                          <div
+                            className={`mt-2 text-[12px] font-medium ${
+                              dark ? 'text-slate-500' : 'text-slate-400'
+                            }`}
+                          >
+                            {thinkActive
+                              ? `Thought for ${thoughtSeconds}s`
+                              : deepSearchActive
+                                ? `Researched for ${thoughtSeconds}s`
+                                : `Responded in ${thoughtSeconds}s`}
+                          </div>
+                        )}
+                        <MessageActions
+                          content={msg.content}
+                          dark={dark}
+                          onRegenerate={isLast && msg.role === 'assistant' ? onRegenerate : undefined}
+                        />
+                      </>
                     )}
                   </div>
                 </div>
@@ -119,7 +140,12 @@ export default function MessageList({
             >
               <Logo size={22} dark={dark} />
             </div>
-            <ThinkingStatus prompt={lastUserPrompt} dark={dark} />
+            <ThinkingStatus
+              prompt={lastUserPrompt}
+              dark={dark}
+              thinkActive={thinkActive}
+              deepSearchActive={deepSearchActive}
+            />
           </motion.div>
         )}
 
