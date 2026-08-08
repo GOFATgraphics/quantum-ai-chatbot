@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Quantumy AI — personal assistant that remembers you, drafts email, and connects to your work." />
-    <meta name="theme-color" content="#07070c" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#f0f2f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0a0f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#eef2ff" media="(prefers-color-scheme: light)" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -21,7 +21,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
     <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /></noscript>
     <style>
-      html, body { margin: 0; height: 100%; background: #07070c; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #eef2ff;
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #0a0a0f; }
+      }
       #root { min-height: 100%; }
     </style>
   </head>
