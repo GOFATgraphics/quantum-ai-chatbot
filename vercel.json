@@ -5,7 +5,7 @@
       "destination": "/api/$1"
     },
     {
-      "source": "/((?!privacy\\.html|terms\\.html|favicon\\.svg).*)",
+      "source": "/((?!home\\.html|privacy\\.html|terms\\.html|favicon\\.svg).*)",
       "destination": "/index.html"
     }
   ]
