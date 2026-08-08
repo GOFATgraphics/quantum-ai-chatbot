@@ -11,6 +11,7 @@ import Logo from './components/Logo'
 import MessageList, { type ChatMessage } from './components/MessageList'
 import EmptyState from './components/EmptyState'
 import ChatInput from './components/ChatInput'
+import InstallPWA from './components/InstallPWA'
 
 const MODELS = [
   { id: 'quantum-3', name: 'Quantum 3', badge: null as string | null, anthropic: 'claude-sonnet-4-6' },
@@ -62,6 +63,16 @@ export default function App() {
   const [errorHint, setErrorHint] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const messagesRef = useRef<ChatMessage[]>([])
+  const currentConversationIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  useEffect(() => {
+    currentConversationIdRef.current = currentConversationId
+  }, [currentConversationId])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -109,6 +120,9 @@ export default function App() {
   }
 
   const startNewChat = () => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setIsLoading(false)
     setCurrentConversationId(null)
     setMessages([])
     setMobileSidebar(false)
@@ -202,41 +216,53 @@ export default function App() {
     let buffer = ''
     let full = ''
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const parts = buffer.split('\n')
-      buffer = parts.pop() || ''
-      for (const line of parts) {
-        const trimmed = line.trim()
-        if (!trimmed.startsWith('data:')) continue
-        const payload = trimmed.slice(5).trim()
-        if (payload === '[DONE]') continue
-        try {
-          const evt = JSON.parse(payload)
-          if (evt.error) throw new Error(evt.error)
-          if (evt.status === 'tool_use') {
-            full = ''
-            setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: '' } : m)))
-          } else if (typeof evt.delta === 'string') {
-            full += evt.delta
-            setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
-          } else if (typeof evt.content === 'string') {
-            full = evt.content
-            setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
-          }
-        } catch (e: any) {
-          if (e?.message && e.message !== 'Unexpected end of JSON input') {
-            if (String(e.message).includes('error') || !String(e.message).includes('JSON')) throw e
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n')
+        buffer = parts.pop() || ''
+        for (const line of parts) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data:')) continue
+          const payload = trimmed.slice(5).trim()
+          if (payload === '[DONE]') continue
+          try {
+            const evt = JSON.parse(payload)
+            if (evt.error) throw new Error(evt.error)
+            if (evt.status === 'tool_use') {
+              full = ''
+              setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: '' } : m)))
+            } else if (typeof evt.delta === 'string') {
+              full += evt.delta
+              setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
+            } else if (typeof evt.content === 'string') {
+              full = evt.content
+              setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
+            }
+          } catch (e: any) {
+            if (e?.message && e.message !== 'Unexpected end of JSON input') {
+              if (String(e.message).includes('error') || !String(e.message).includes('JSON')) throw e
+            }
           }
         }
       }
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        // Return whatever was streamed so far so caller can persist it
+        return full
+      }
+      throw err
     }
 
     if (!full.trim()) throw new Error('Empty response')
     return full
   }
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
   const handleSend = async (overrideText?: string) => {
     const trimmed = (overrideText ?? input).trim()
@@ -249,19 +275,40 @@ export default function App() {
     setLastUserPrompt(trimmed)
     setErrorHint(null)
     setIsLoading(true)
+    let convId: string | null = null
     try {
-      const convId = await ensureConversation(trimmed)
+      convId = await ensureConversation(trimmed)
       await saveMessage(convId, 'user', trimmed)
       const reply = await streamAI(trimmed, history, assistantId)
-      await saveMessage(convId, 'assistant', reply)
+      // reply may be partial if user stopped
+      if (reply && reply.trim()) {
+        await saveMessage(convId, 'assistant', reply)
+      } else {
+        // empty after abort — remove the empty assistant bubble
+        setMessages((p) => p.filter((m) => m.id !== assistantId))
+      }
       await loadConversations()
     } catch (err: any) {
-      if (err?.name === 'AbortError') return
+      if (err?.name === 'AbortError') {
+        // Capture partial from messagesRef (streamAI may have returned early)
+        const partial = messagesRef.current.find((m) => m.id === assistantId)?.content || ''
+        if (partial.trim() && convId) {
+          try {
+            await saveMessage(convId, 'assistant', partial)
+          } catch {
+            /* best-effort */
+          }
+        } else if (!partial.trim()) {
+          setMessages((p) => p.filter((m) => m.id !== assistantId))
+        }
+        return
+      }
       const hint = err?.message || 'Something went wrong. Please try again.'
       setErrorHint(hint)
       setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: hint } : m)))
     } finally {
       setIsLoading(false)
+      abortRef.current = null
     }
   }
 
@@ -361,12 +408,15 @@ export default function App() {
           value={input}
           onChange={setInput}
           onSend={() => handleSend()}
+          onStop={handleStop}
           isLoading={isLoading}
           dark={dark}
           errorHint={errorHint}
           fastActive={selectedModel.id === 'quantum-3'}
           onToggleFast={() => setSelectedModel(MODELS[0])}
         />
+
+        <InstallPWA dark={dark} />
       </div>
 
       <AnimatePresence>
