@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  SquarePen, Search, Link2, Settings, X, Trash2, Loader2, MessageSquare,
+  SquarePen, Search, Link2, Settings, X, Trash2, Loader2,
   FolderKanban, Plus,
 } from 'lucide-react'
 import type { Conversation, Project } from '../lib/supabase'
@@ -87,7 +87,6 @@ export default function Sidebar({
 
   return (
     <div className={`flex flex-col h-full min-h-0 glass-panel ${dark ? 'glass-panel-dark' : 'glass-panel-light'}`}>
-      {/* Brand header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <Logo size={28} className="shrink-0" />
@@ -142,7 +141,6 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* Projects */}
       <div className="px-3 mt-4 shrink-0">
         <div className="flex items-center justify-between px-1 mb-1.5">
           <p className={`text-[11px] font-semibold uppercase tracking-wider ${textMuted}`}>Projects</p>
@@ -232,10 +230,9 @@ export default function Sidebar({
               >
                 <button
                   onClick={() => onSelectChat(conv.id)}
-                  className="flex-1 text-left px-3 py-2.5 text-[14px] flex items-center gap-2.5 min-w-0"
+                  className="flex-1 text-left px-3.5 py-2.5 text-[14px] min-w-0"
                 >
-                  <MessageSquare className={`w-4 h-4 shrink-0 ${textMuted}`} />
-                  <span className={`truncate ${dark ? 'text-slate-200' : 'text-slate-800'}`}>
+                  <span className={`block truncate ${dark ? 'text-slate-200' : 'text-slate-800'}`}>
                     {conv.title || 'Untitled'}
                   </span>
                 </button>
