@@ -429,8 +429,8 @@ export default function App() {
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: 24, opacity: 0 }}
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className={`w-full sm:max-w-[720px] h-[min(640px,88vh)] sm:h-[min(560px,85vh)] rounded-t-[20px] sm:rounded-[20px] overflow-hidden shadow-2xl ring-1 ${
-                dark ? 'bg-[#111113] ring-white/[0.06]' : 'bg-white ring-black/[0.06]'
+              className={`w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden shadow-2xl ${
+                dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
               }`}
               onClick={(e) => e.stopPropagation()}
             >
@@ -445,7 +445,7 @@ export default function App() {
                 onOpenConnectors={() => { setShowSettings(false); setShowConnectors(true) }}
                 onProfileUpdated={(name) => {
                   setGreetingLine(creativeGreeting(name))
-                  supabase.auth.getSession().then(({ data }) => setSession(data.session))
+                  supabase.auth.getSession().then(({ data }) => setSession(data.session)}
                 }}
               />
             </motion.div>
