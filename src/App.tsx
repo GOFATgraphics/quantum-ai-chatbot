@@ -277,7 +277,7 @@ export default function App() {
                 <Menu className="w-5 h-5" />
               </button>
               <div className="relative">
-                <button onClick={() => setShowModelMenu((v) => !v)} className={`flex items-center gap-1 px-2 py-1.5 rounded-full text-[15px] font-medium transition ${dark ? 'text-slate-100 hover:bg-white/8' : 'text-slate-800 hover:bg-black/[0.04]'}`}>
+                <button onClick={() => setShowModelMenu((v) => !v)} className={`flex items-center gap-1 px-2 py-1.5 rounded-full text-[15px] font-medium transition ${dark ? 'text-slate-100 hover:bg-white/8' : 'text-slate-800 hover:bg-black/[0.04]'`}>
                   {selectedModel.name}
                   <ChevronDown className="w-4 h-4 text-slate-400" />
                 </button>
@@ -285,7 +285,7 @@ export default function App() {
                   {showModelMenu && (
                     <>
                       <div className="fixed inset-0 z-20" onClick={() => setShowModelMenu(false)} />
-                      <motion.div initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.15 }} className={`absolute left-0 top-full mt-1 z-30 min-w-[180px] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}>
+                      <motion.div initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0 }} scale={1} exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.15 }} className={`absolute left-0 top-full mt-1 z-30 min-w-[180px] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}>
                         {MODELS.map((m) => (
                           <button key={m.id} onClick={() => { setSelectedModel(m); setShowModelMenu(false) }} className={`w-full text-left px-4 py-2.5 text-sm ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'}`}>
                             {m.name}{m.badge && <span className="ml-2 text-[10px] text-slate-400">{m.badge}</span>}
@@ -310,7 +310,7 @@ export default function App() {
                 <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }} className="mb-6">
                   <Logo size={56} dark={dark} />
                 </motion.div>
-                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'}`}>
+                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'`}>
                   {greetingLine || creativeGreeting(firstName)}
                 </h1>
               </motion.div>
@@ -323,18 +323,24 @@ export default function App() {
                     {msg.role === 'user' ? (
                       <div className={`max-w-[85%] rounded-3xl px-4 py-2.5 text-[15px] leading-relaxed ${dark ? 'bg-[#2a2a35] text-slate-100' : 'bg-[#f0f1f5] text-slate-900'}`}>{msg.content}</div>
                     ) : (
-                      <div className="max-w-[95%]">
-                        <div className={`text-[15px] leading-relaxed ${dark ? 'text-slate-100' : 'text-slate-900'}`}>
-                          <div className="ai-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} />
+                      <div className="max-w-[95%] flex gap-2.5">
+                        <div className="shrink-0 mt-0.5">
+                          <Logo size={28} dark={dark} className="rounded-full" />
                         </div>
-                        <MessageActions content={msg.content} />
+                        <div className="min-w-0 flex-1">
+                          <div className={`text-[15px] leading-relaxed ${dark ? 'text-slate-100' : 'text-slate-900'}`}>
+                            <div className="ai-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} />
+                          </div>
+                          <MessageActions content={msg.content} />
+                        </div>
                       </div>
                     )}
                   </motion.div>
                 ))}
               </AnimatePresence>
               {isLoading && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2.5">
+                  <Logo size={28} dark={dark} />
                   <ThinkingStatus prompt={lastUserPrompt} dark={dark} />
                 </motion.div>
               )}
