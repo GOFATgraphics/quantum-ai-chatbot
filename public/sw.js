@@ -1,5 +1,5 @@
 /* Quantumy AI service worker — network-first so UI updates show up */
-const CACHE = 'quantumy-v6';
+const CACHE = 'quantumy-v7';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
@@ -20,12 +20,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Never cache API or auth
   if (url.pathname.startsWith('/api/') || url.pathname.includes('supabase')) {
     return;
   }
 
-  // Network-first for HTML and JS so deploys show up
   if (
     request.mode === 'navigate' ||
     url.pathname.endsWith('.js') ||
@@ -45,7 +43,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for static assets
   event.respondWith(
     caches.match(request).then(
       (cached) =>
