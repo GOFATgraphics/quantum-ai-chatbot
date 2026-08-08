@@ -3,9 +3,9 @@ import Logo from './Logo'
 
 const SUGGESTIONS = [
   'Summarize my unread emails',
-  'Draft a short follow-up email',
-  'What should I focus on today?',
+  'What is on my calendar this week?',
   'Search my Drive for recent docs',
+  'Draft a short follow-up email',
 ]
 
 type Props = {
