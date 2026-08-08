@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mic, MicOff, Send, Plus, Zap } from 'lucide-react'
+import { Mic, MicOff, Send, Plus, Zap, Square } from 'lucide-react'
 
 type Props = {
   value: string
   onChange: (v: string) => void
   onSend: () => void
+  onStop?: () => void
   isLoading: boolean
   dark: boolean
   errorHint?: string | null
@@ -17,6 +18,7 @@ export default function ChatInput({
   value,
   onChange,
   onSend,
+  onStop,
   isLoading,
   dark,
   errorHint,
@@ -102,7 +104,7 @@ export default function ChatInput({
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      onSend()
+      if (!isLoading) onSend()
     }
   }
 
@@ -187,18 +189,36 @@ export default function ChatInput({
             >
               {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             </button>
-            <motion.button
-              type="button"
-              initial={false}
-              animate={{ scale: 1, opacity: 1 }}
-              onClick={onSend}
-              disabled={isLoading || !value.trim()}
-              className="h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 text-white bg-slate-900 hover:bg-black disabled:opacity-40 transition dark:bg-white dark:text-slate-900"
-              aria-label="Send"
-            >
-              <Send className="w-3.5 h-3.5" />
-              Send
-            </motion.button>
+            {isLoading ? (
+              <motion.button
+                type="button"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={onStop}
+                className={`h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
+                  dark
+                    ? 'bg-white/15 text-white hover:bg-white/25 ring-1 ring-white/20'
+                    : 'bg-slate-800 text-white hover:bg-slate-900'
+                }`}
+                aria-label="Stop generating"
+              >
+                <Square className="w-3 h-3 fill-current" />
+                Stop
+              </motion.button>
+            ) : (
+              <motion.button
+                type="button"
+                initial={false}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={onSend}
+                disabled={!value.trim()}
+                className="h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 text-white bg-slate-900 hover:bg-black disabled:opacity-40 transition dark:bg-white dark:text-slate-900"
+                aria-label="Send"
+              >
+                <Send className="w-3.5 h-3.5" />
+                Send
+              </motion.button>
+            )}
           </div>
         </div>
       </div>
