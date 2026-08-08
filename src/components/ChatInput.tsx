@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mic, MicOff, Send, Plus, Zap, Square } from 'lucide-react'
+import { Mic, MicOff, Send, Plus, Zap, Square, AudioLines } from 'lucide-react'
 
 type Props = {
   value: string
@@ -105,16 +105,18 @@ export default function ChatInput({
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (!isLoading) onSend()
+      if (!isLoading && value.trim()) onSend()
     }
   }
 
-  const iconBtn = dark
-    ? 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white/[0.08] text-slate-300 hover:bg-white/[0.12] disabled:opacity-40'
-    : 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white text-slate-600 hover:bg-white shadow-sm disabled:opacity-40'
+  const hasText = !!value.trim()
+
+  const softBtn = dark
+    ? 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white/[0.08] text-slate-200 hover:bg-white/[0.14] disabled:opacity-40'
+    : 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white/90 text-slate-600 shadow-sm hover:bg-white disabled:opacity-40'
 
   return (
-    <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
+    <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <div className="max-w-2xl mx-auto">
         {errorHint && (
           <p className={`text-xs text-center mb-1.5 ${dark ? 'text-amber-400/90' : 'text-amber-700'}`} role="status">
@@ -122,10 +124,10 @@ export default function ChatInput({
           </p>
         )}
         <div
-          className={`glass-surface rounded-[28px] px-3 pt-2.5 pb-2 transition-shadow ${
+          className={`glass-surface rounded-[28px] px-3 pt-3 pb-2.5 transition-shadow ${
             dark
-              ? 'bg-[#1a1a22] border border-white/[0.08] shadow-lg shadow-black/30'
-              : 'bg-[#f3f4f6] border border-black/[0.04] shadow-[0_4px_24px_rgba(0,0,0,0.06)]'
+              ? 'bg-[#1a1a22]/90 border border-white/[0.08] shadow-lg shadow-black/30'
+              : 'bg-white/75 border border-white/60 shadow-[0_8px_32px_rgba(99,102,241,0.08)]'
           }`}
         >
           <textarea
@@ -135,12 +137,12 @@ export default function ChatInput({
             onKeyDown={onKeyDown}
             rows={1}
             placeholder={listening ? 'Listening…' : 'Ask Anything'}
-            className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${
+            className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1.5 ${
               dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
             }`}
           />
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <button type="button" disabled title="Attachments coming soon" className={iconBtn} aria-label="Add attachment">
+          <div className="flex items-center gap-1.5 mt-2">
+            <button type="button" disabled title="Attachments coming soon" className={softBtn} aria-label="Add attachment">
               <Plus className="w-[18px] h-[18px]" />
             </button>
             <button
@@ -150,11 +152,11 @@ export default function ChatInput({
               className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
                 fastActive
                   ? dark
-                    ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/30'
-                    : 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200'
+                    ? 'bg-indigo-500/25 text-indigo-200 ring-1 ring-indigo-400/30'
+                    : 'bg-white text-slate-800 shadow-sm ring-1 ring-black/[0.04]'
                   : dark
                     ? 'bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]'
-                    : 'bg-white text-slate-700 hover:bg-white shadow-sm'
+                    : 'bg-white/80 text-slate-700 shadow-sm'
               }`}
             >
               <Zap className="w-3.5 h-3.5" />
@@ -180,10 +182,8 @@ export default function ChatInput({
                   : speechSupported
                     ? dark
                       ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]'
-                      : 'bg-white text-slate-600 hover:bg-white shadow-sm'
-                    : dark
-                      ? 'text-slate-500 opacity-40'
-                      : 'text-slate-400 opacity-40'
+                      : 'bg-transparent text-slate-400 hover:text-slate-600'
+                    : 'text-slate-400 opacity-40'
               }`}
               aria-label={listening ? 'Stop voice input' : 'Voice input'}
               aria-pressed={listening}
@@ -196,7 +196,7 @@ export default function ChatInput({
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 onClick={onStop}
-                className={`h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
+                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-medium shrink-0 transition ${
                   dark
                     ? 'bg-white/15 text-white hover:bg-white/25 ring-1 ring-white/20'
                     : 'bg-slate-800 text-white hover:bg-slate-900'
@@ -206,18 +206,38 @@ export default function ChatInput({
                 <Square className="w-3 h-3 fill-current" />
                 Stop
               </motion.button>
-            ) : (
+            ) : hasText ? (
               <motion.button
                 type="button"
                 initial={false}
                 animate={{ scale: 1, opacity: 1 }}
                 onClick={onSend}
-                disabled={!value.trim()}
-                className="h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 text-white bg-slate-900 hover:bg-black disabled:opacity-40 transition dark:bg-white dark:text-slate-900"
+                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-medium shrink-0 transition ${
+                  dark
+                    ? 'bg-white text-slate-900 hover:bg-slate-100'
+                    : 'bg-slate-900 text-white hover:bg-black'
+                }`}
                 aria-label="Send"
               >
                 <Send className="w-3.5 h-3.5" />
                 Send
+              </motion.button>
+            ) : (
+              <motion.button
+                type="button"
+                initial={false}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={toggleListen}
+                disabled={!speechSupported}
+                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-medium shrink-0 transition disabled:opacity-40 ${
+                  dark
+                    ? 'bg-white text-slate-900 hover:bg-slate-100'
+                    : 'bg-slate-900 text-white hover:bg-black'
+                }`}
+                aria-label="Speak"
+              >
+                <AudioLines className="w-4 h-4" />
+                Speak
               </motion.button>
             )}
           </div>
