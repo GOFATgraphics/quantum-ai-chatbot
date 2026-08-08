@@ -28,6 +28,7 @@ export default function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [listening, setListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
+  const [focused, setFocused] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const baseValueRef = useRef('')
 
@@ -112,22 +113,35 @@ export default function ChatInput({
   const hasText = !!value.trim()
 
   const softBtn = dark
-    ? 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white/[0.08] text-slate-200 hover:bg-white/[0.14] disabled:opacity-40'
-    : 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white/90 text-slate-600 shadow-sm hover:bg-white disabled:opacity-40'
+    ? 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white/[0.07] text-slate-200 hover:bg-white/[0.12] disabled:opacity-40'
+    : 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white text-slate-600 shadow-sm ring-1 ring-black/[0.03] hover:bg-white disabled:opacity-40'
 
   return (
-    <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.55rem,env(safe-area-inset-bottom))]">
       <div className="max-w-2xl mx-auto">
         {errorHint && (
-          <p className={`text-xs text-center mb-1.5 ${dark ? 'text-amber-400/90' : 'text-amber-700'}`} role="status">
+          <p
+            className={`text-xs text-center mb-2 px-3 py-1.5 rounded-full mx-auto w-fit ${
+              dark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-800'
+            }`}
+            role="status"
+          >
             {errorHint}
           </p>
         )}
         <div
-          className={`glass-surface rounded-[28px] px-3 pt-3 pb-2.5 transition-shadow ${
+          className={`glass-surface rounded-[28px] px-3.5 pt-3.5 pb-2.5 transition-all duration-200 ${
             dark
-              ? 'bg-[#1a1a22]/90 border border-white/[0.08] shadow-lg shadow-black/30'
-              : 'bg-white/75 border border-white/60 shadow-[0_8px_32px_rgba(99,102,241,0.08)]'
+              ? `bg-[#16161f]/92 border shadow-xl shadow-black/40 ${
+                  focused || listening
+                    ? 'border-indigo-400/30 shadow-indigo-500/10'
+                    : 'border-white/[0.08]'
+                }`
+              : `bg-white/80 border shadow-[0_12px_40px_rgba(79,70,229,0.08)] ${
+                  focused || listening
+                    ? 'border-indigo-300/50 shadow-[0_12px_40px_rgba(99,102,241,0.12)]'
+                    : 'border-white/70'
+                }`
           }`}
         >
           <textarea
@@ -135,14 +149,24 @@ export default function ChatInput({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={onKeyDown}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             rows={1}
             placeholder={listening ? 'Listening…' : 'Ask Anything'}
-            className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1.5 ${
-              dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
+            className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${
+              dark
+                ? 'text-slate-50 placeholder:text-slate-500'
+                : 'text-slate-900 placeholder:text-slate-400'
             }`}
           />
-          <div className="flex items-center gap-1.5 mt-2">
-            <button type="button" disabled title="Attachments coming soon" className={softBtn} aria-label="Add attachment">
+          <div className="flex items-center gap-1.5 mt-2.5">
+            <button
+              type="button"
+              disabled
+              title="Attachments coming soon"
+              className={softBtn}
+              aria-label="Add attachment"
+            >
               <Plus className="w-[18px] h-[18px]" />
             </button>
             <button
@@ -152,14 +176,14 @@ export default function ChatInput({
               className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
                 fastActive
                   ? dark
-                    ? 'bg-indigo-500/25 text-indigo-200 ring-1 ring-indigo-400/30'
-                    : 'bg-white text-slate-800 shadow-sm ring-1 ring-black/[0.04]'
+                    ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/35'
+                    : 'bg-white text-slate-800 shadow-sm ring-1 ring-black/[0.05]'
                   : dark
-                    ? 'bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]'
-                    : 'bg-white/80 text-slate-700 shadow-sm'
+                    ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.11]'
+                    : 'bg-white/90 text-slate-700 shadow-sm ring-1 ring-black/[0.03]'
               }`}
             >
-              <Zap className="w-3.5 h-3.5" />
+              <Zap className={`w-3.5 h-3.5 ${fastActive ? (dark ? 'text-indigo-300' : 'text-indigo-500') : ''}`} />
               Fast
             </button>
             <div className="flex-1" />
@@ -181,8 +205,8 @@ export default function ChatInput({
                     : 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
                   : speechSupported
                     ? dark
-                      ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]'
-                      : 'bg-transparent text-slate-400 hover:text-slate-600'
+                      ? 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.08]'
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-black/[0.04]'
                     : 'text-slate-400 opacity-40'
               }`}
               aria-label={listening ? 'Stop voice input' : 'Voice input'}
@@ -193,13 +217,13 @@ export default function ChatInput({
             {isLoading ? (
               <motion.button
                 type="button"
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={{ scale: 0.92, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 onClick={onStop}
-                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-medium shrink-0 transition ${
+                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition ${
                   dark
-                    ? 'bg-white/15 text-white hover:bg-white/25 ring-1 ring-white/20'
-                    : 'bg-slate-800 text-white hover:bg-slate-900'
+                    ? 'bg-white/15 text-white hover:bg-white/25 ring-1 ring-white/15'
+                    : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/15'
                 }`}
                 aria-label="Stop generating"
               >
@@ -211,11 +235,12 @@ export default function ChatInput({
                 type="button"
                 initial={false}
                 animate={{ scale: 1, opacity: 1 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={onSend}
-                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-medium shrink-0 transition ${
+                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition ${
                   dark
                     ? 'bg-white text-slate-900 hover:bg-slate-100'
-                    : 'bg-slate-900 text-white hover:bg-black'
+                    : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
                 }`}
                 aria-label="Send"
               >
@@ -227,12 +252,13 @@ export default function ChatInput({
                 type="button"
                 initial={false}
                 animate={{ scale: 1, opacity: 1 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={toggleListen}
                 disabled={!speechSupported}
-                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-medium shrink-0 transition disabled:opacity-40 ${
+                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition disabled:opacity-40 ${
                   dark
                     ? 'bg-white text-slate-900 hover:bg-slate-100'
-                    : 'bg-slate-900 text-white hover:bg-black'
+                    : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
                 }`}
                 aria-label="Speak"
               >
