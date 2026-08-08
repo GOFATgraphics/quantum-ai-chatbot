@@ -1,11 +1,13 @@
-/** Lightweight markdown → HTML for chat bubbles */
+/** Lightweight markdown → HTML for chat bubbles (sanitized) */
 export function formatMarkdown(text: string): string {
   if (!text) return ''
 
+  // Escape HTML first so raw tags/scripts cannot be injected
   const escaped = text
     .replace(/&/g, '&')
     .replace(/</g, '<')
     .replace(/>/g, '>')
+    .replace(/"/g, '"')
 
   const lines = escaped.split('\n')
   const out: string[] = []
@@ -55,6 +57,15 @@ export function formatMarkdown(text: string): string {
     tableRows = []
   }
 
+  const isSafeUrl = (url: string) => {
+    try {
+      const u = new URL(url.replace(/&/g, '&'))
+      return u.protocol === 'https:' || u.protocol === 'http:'
+    } catch {
+      return false
+    }
+  }
+
   const shortenUrl = (url: string) => {
     try {
       const u = new URL(url.replace(/&/g, '&'))
@@ -77,16 +88,22 @@ export function formatMarkdown(text: string): string {
       .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
 
+    // Markdown links [label](url) — only http(s)
     t = t.replace(
       /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-      (_m, label, url) =>
-        `<a class="md-link" href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`
+      (_m, label, url) => {
+        if (!isSafeUrl(url)) return label
+        return `<a class="md-link" href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`
+      }
     )
 
+    // Bare URLs
     t = t.replace(
       /(?<!href="|">)(https?:\/\/[^\s<>"')\]]+)/g,
-      (url) =>
-        `<a class="md-link" href="${url}" target="_blank" rel="noopener noreferrer">${shortenUrl(url)}</a>`
+      (url) => {
+        if (!isSafeUrl(url)) return url
+        return `<a class="md-link" href="${url}" target="_blank" rel="noopener noreferrer">${shortenUrl(url)}</a>`
+      }
     )
 
     return t
