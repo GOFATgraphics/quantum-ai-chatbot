@@ -11,7 +11,6 @@ import {
   MessageSquare,
   Loader2,
   Trash2,
-  Brain,
   GraduationCap,
   Cpu,
   PenLine,
@@ -368,7 +367,6 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gradient-to-b from-[#eef2ff] via-[#f8fafc] to-[#f1f5f9]">
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-[280px] flex-col border-r border-white/60 bg-white/70 backdrop-blur-xl">
         <div className="h-16 flex items-center gap-2.5 px-5">
           <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center shadow-sm">
@@ -436,7 +434,6 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Mobile Sidebar */}
       <AnimatePresence>
         {mobileSidebar && (
           <>
@@ -509,9 +506,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
         <header className="h-14 lg:h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
           <div className="flex items-center gap-2">
             {!isEmpty ? (
@@ -530,7 +525,6 @@ export default function App() {
               </button>
             )}
 
-            {/* Model toggle */}
             <div className="flex items-center bg-white/80 backdrop-blur rounded-full p-1 shadow-sm border border-white">
               {MODELS.map((m) => (
                 <button
@@ -559,7 +553,6 @@ export default function App() {
           </button>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-4 lg:px-6 h-full">
             <AnimatePresence mode="wait">
@@ -649,7 +642,6 @@ export default function App() {
           </div>
         </main>
 
-        {/* Input */}
         <div className="px-4 lg:px-6 pb-5 pt-2 shrink-0">
           <div className="max-w-2xl mx-auto">
             <div className="flex items-end gap-2 bg-white/90 backdrop-blur-xl border border-white shadow-lg shadow-slate-200/50 rounded-2xl px-2 py-2 focus-within:shadow-xl transition-shadow">
@@ -693,7 +685,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Settings */}
       <AnimatePresence>
         {showSettings && (
           <>
