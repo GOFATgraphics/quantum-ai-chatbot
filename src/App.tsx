@@ -455,13 +455,28 @@ export default function App() {
 
       <AnimatePresence>
         {showConnectors && session?.access_token && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40" onClick={() => setShowConnectors(false)}>
-            <motion.div initial={{ y: 48 }} animate={{ y: 0 }} exit={{ y: 48 }} transition={{ type: 'spring', damping: 28, stiffness: 320 }} className={`w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto ${dark ? 'bg-[#12121a]' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className={`font-medium text-lg ${dark ? 'text-slate-100' : 'text-slate-900'}`}>Connectors</h2>
-                <button type="button" onClick={() => setShowConnectors(false)} className="p-2 rounded-full hover:bg-black/5 text-slate-500"><X className="w-5 h-5" /></button>
-              </div>
-              <Connectors dark={dark} accessToken={session.access_token} />
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-[2px]"
+            onClick={() => setShowConnectors(false)}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0.9 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className={`w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden shadow-2xl ${
+                dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Connectors
+                dark={dark}
+                accessToken={session.access_token}
+                onClose={() => setShowConnectors(false)}
+              />
             </motion.div>
           </motion.div>
         )}
