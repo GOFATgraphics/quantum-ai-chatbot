@@ -58,7 +58,7 @@ export default function Auth({ onSuccess }: Props) {
         <div className="flex flex-col items-center text-center mb-8">
           <div className="relative mb-5">
             <div className="absolute inset-0 rounded-full bg-indigo-500/30 blur-xl scale-125" />
-            <Logo size={72} className="relative drop-shadow-2xl" />
+            <Logo size={72} className="relative drop-shadow-2xl" dark />
           </div>
           <h1 className="text-2xl font-semibold text-white tracking-tight">Quantumy</h1>
           <p className="mt-1.5 text-sm text-slate-400 max-w-[280px]">
