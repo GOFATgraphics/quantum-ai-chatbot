@@ -58,12 +58,11 @@ export default function Connectors({ dark, accessToken }: Props) {
     setError(null)
     setBusy(provider)
     try {
-      if (provider === 'outlook' || provider === 'excel') {
-        setError('Outlook and Excel use Microsoft sign-in — finishing setup soon. Calendar is available via Google.')
-        setBusy(null)
-        return
-      }
-      const res = await fetch(`/api/connectors/google-start?provider=${provider}`, {
+      const isMs = provider === 'outlook' || provider === 'excel'
+      const startPath = isMs
+        ? `/api/connectors/microsoft-start?provider=${provider}`
+        : `/api/connectors/google-start?provider=${provider}`
+      const res = await fetch(startPath, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
       const data = await res.json()
@@ -100,7 +99,7 @@ export default function Connectors({ dark, accessToken }: Props) {
   return (
     <div className="space-y-3">
       <p className={`text-sm ${textMuted}`}>
-        Connect your work tools so Quantumy can search mail, files, and calendar on your behalf.
+        Connect your work tools so Quantumy can search mail, files, calendar, Outlook, and Excel.
       </p>
       {error && (
         <div className={`rounded-xl px-3 py-2 text-sm ${dark ? 'bg-amber-500/10 text-amber-200' : 'bg-amber-50 text-amber-800'}`}>
