@@ -1,22 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Menu, Mic, Send, X, Plus,
-  Loader2, PenLine,
-  ChevronDown, Zap,
-} from 'lucide-react'
+import { Menu, X, Loader2, PenLine, ChevronDown } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage, type Project, makeChatTitle } from './lib/supabase'
-import { formatMarkdown } from './lib/markdown'
 import Auth from './components/Auth'
 import Sidebar from './components/Sidebar'
 import Settings from './components/Settings'
 import Connectors from './components/Connectors'
-import ThinkingStatus from './components/ThinkingStatus'
 import Onboarding from './components/Onboarding'
 import Logo from './components/Logo'
-import MessageActions from './components/MessageActions'
-
-type Message = { id: string; role: 'user' | 'assistant'; content: string }
+import MessageList, { type ChatMessage } from './components/MessageList'
+import EmptyState from './components/EmptyState'
+import ChatInput from './components/ChatInput'
 
 const MODELS = [
   { id: 'quantum-3', name: 'Quantum 3', badge: null as string | null, anthropic: 'claude-sonnet-4-6' },
@@ -40,8 +34,7 @@ const GREETINGS = [
 
 function creativeGreeting(firstName: string) {
   const n = firstName || 'there'
-  const i = Math.floor(Math.random() * GREETINGS.length)
-  return GREETINGS[i](n)
+  return GREETINGS[Math.floor(Math.random() * GREETINGS.length)](n)
 }
 
 export default function App() {
@@ -52,7 +45,7 @@ export default function App() {
   const [session, setSession] = useState<any>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [mobileSidebar, setMobileSidebar] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -68,7 +61,7 @@ export default function App() {
   const [greetingLine, setGreetingLine] = useState('')
   const [errorHint, setErrorHint] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -167,29 +160,91 @@ export default function App() {
   const scrollToBottom = useCallback(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [])
   useEffect(() => { scrollToBottom() }, [messages, isLoading, scrollToBottom])
 
-  const callAI = async (userMessage: string, history: Message[]) => {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const streamAI = async (userMessage: string, history: ChatMessage[], assistantId: string) => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'text/event-stream' }
     if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`
+
+    abortRef.current?.abort()
+    const ac = new AbortController()
+    abortRef.current = ac
+
     const response = await fetch('/api/chat', {
-      method: 'POST', headers,
+      method: 'POST',
+      headers,
+      signal: ac.signal,
       body: JSON.stringify({
         messages: [...history.map((m) => ({ role: m.role, content: m.content })), { role: 'user', content: userMessage }],
         firstName,
         projectId: currentProjectId,
         model: selectedModel.anthropic,
         modelId: selectedModel.id,
+        stream: true,
       }),
     })
-    const data = await response.json().catch(() => ({}))
-    if (response.ok && data.content) return data.content as string
-    const msg = data.error || data.message || data.hint || 'Request failed'
-    throw new Error(typeof msg === 'string' ? msg : 'Request failed')
+
+    const ctype = response.headers.get('content-type') || ''
+
+    if (!ctype.includes('text/event-stream')) {
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || data.message || data.hint || 'Request failed')
+      if (!data.content) throw new Error(data.error || 'Empty response')
+      setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: data.content } : m)))
+      return data.content as string
+    }
+
+    if (!response.ok || !response.body) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || data.message || 'Request failed')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let full = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const parts = buffer.split('\n')
+      buffer = parts.pop() || ''
+      for (const line of parts) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) continue
+        const payload = trimmed.slice(5).trim()
+        if (payload === '[DONE]') continue
+        try {
+          const evt = JSON.parse(payload)
+          if (evt.error) throw new Error(evt.error)
+          if (evt.status === 'tool_use') {
+            full = ''
+            setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: '' } : m)))
+          } else if (typeof evt.delta === 'string') {
+            full += evt.delta
+            setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
+          } else if (typeof evt.content === 'string') {
+            full = evt.content
+            setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
+          }
+        } catch (e: any) {
+          if (e?.message && e.message !== 'Unexpected end of JSON input') {
+            if (String(e.message).includes('error') || !String(e.message).includes('JSON')) throw e
+          }
+        }
+      }
+    }
+
+    if (!full.trim()) throw new Error('Empty response')
+    return full
   }
 
   const handleSend = async (overrideText?: string) => {
     const trimmed = (overrideText ?? input).trim()
     if (!trimmed || isLoading || !user) return
-    setMessages((p) => [...p, { id: generateId(), role: 'user', content: trimmed }])
+    const history = messages
+    const userMsg: ChatMessage = { id: generateId(), role: 'user', content: trimmed }
+    const assistantId = generateId()
+    setMessages((p) => [...p, userMsg, { id: assistantId, role: 'assistant', content: '' }])
     setInput('')
     setLastUserPrompt(trimmed)
     setErrorHint(null)
@@ -197,27 +252,18 @@ export default function App() {
     try {
       const convId = await ensureConversation(trimmed)
       await saveMessage(convId, 'user', trimmed)
-      const reply = await callAI(trimmed, messages)
-      setMessages((p) => [...p, { id: generateId(), role: 'assistant', content: reply }])
+      const reply = await streamAI(trimmed, history, assistantId)
       await saveMessage(convId, 'assistant', reply)
       await loadConversations()
     } catch (err: any) {
+      if (err?.name === 'AbortError') return
       const hint = err?.message || 'Something went wrong. Please try again.'
       setErrorHint(hint)
-      setMessages((p) => [...p, { id: generateId(), role: 'assistant', content: hint }])
-    } finally { setIsLoading(false) }
+      setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: hint } : m)))
+    } finally {
+      setIsLoading(false)
+    }
   }
-
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
-  }
-
-  useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 140) + 'px'
-  }, [input])
 
   const isEmpty = messages.length === 0 && !isLoading
 
@@ -243,10 +289,6 @@ export default function App() {
     onOpenConnectors: () => { setShowConnectors(true); setMobileSidebar(false) },
     onSelectProject: setCurrentProjectId, onCreateProject: createProject, onDeleteProject: deleteProject,
   }
-
-  const iconBtn = dark
-    ? 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white/[0.08] text-slate-300 hover:bg-white/[0.12] disabled:opacity-40'
-    : 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white text-slate-600 hover:bg-white shadow-sm disabled:opacity-40'
 
   return (
     <div className={`flex h-dvh overflow-hidden ${dark ? 'bg-[#0a0a0f]' : 'bg-white'}`}>
@@ -299,92 +341,32 @@ export default function App() {
 
         <main className="relative z-10 flex-1 overflow-y-auto min-h-0">
           {isEmpty ? (
-            <div className="flex flex-col items-center justify-center h-full px-6 pb-2">
-              <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }} className="flex flex-col items-center text-center">
-                <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }} className="mb-6">
-                  <Logo size={56} dark={dark} />
-                </motion.div>
-                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'}`}>
-                  {greetingLine || creativeGreeting(firstName)}
-                </h1>
-              </motion.div>
-            </div>
+            <EmptyState
+              greeting={greetingLine || creativeGreeting(firstName)}
+              dark={dark}
+              onSuggestion={(text) => handleSend(text)}
+            />
           ) : (
-            <div className="max-w-2xl mx-auto px-4 py-3 pb-4 space-y-5">
-              <AnimatePresence initial={false}>
-                {messages.map((msg) => (
-                  <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className={msg.role === 'user' ? 'flex justify-end' : ''}>
-                    {msg.role === 'user' ? (
-                      <div className={`max-w-[85%] rounded-3xl px-4 py-2.5 text-[15px] leading-relaxed ${dark ? 'bg-[#2a2a35] text-slate-100' : 'bg-[#f0f1f5] text-slate-900'}`}>{msg.content}</div>
-                    ) : (
-                      <div className="max-w-[95%] flex gap-2.5">
-                        <div className="shrink-0 mt-0.5">
-                          <Logo size={28} dark={dark} className="rounded-full" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className={`text-[15px] leading-relaxed ${dark ? 'text-slate-100' : 'text-slate-900'}`}>
-                            <div className="ai-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} />
-                          </div>
-                          <MessageActions content={msg.content} dark={dark} />
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-              {isLoading && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2.5">
-                  <Logo size={28} dark={dark} />
-                  <ThinkingStatus prompt={lastUserPrompt} dark={dark} />
-                </motion.div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+            <MessageList
+              messages={messages}
+              isLoading={isLoading}
+              lastUserPrompt={lastUserPrompt}
+              dark={dark}
+              messagesEndRef={messagesEndRef}
+            />
           )}
         </main>
 
-        <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
-          <div className="max-w-2xl mx-auto">
-            {errorHint && (
-              <p className={`text-xs text-center mb-1.5 ${dark ? 'text-amber-400/90' : 'text-amber-700'}`} role="status">{errorHint}</p>
-            )}
-            <div className={`glass-surface rounded-[28px] px-3 pt-2.5 pb-2 transition-shadow ${dark ? 'bg-[#1a1a22] border border-white/[0.08] shadow-lg shadow-black/30' : 'bg-[#f3f4f6] border border-black/[0.04] shadow-[0_4px_24px_rgba(0,0,0,0.06)]'}`}>
-              <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} rows={1} placeholder="Ask Anything" className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'}`} />
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <button type="button" disabled title="Attachments coming soon" className={iconBtn} aria-label="Add attachment">
-                  <Plus className="w-[18px] h-[18px]" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedModel(MODELS[0])}
-                  title="Fast responses"
-                  className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
-                    selectedModel.id === 'quantum-3'
-                      ? (dark ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/30' : 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200')
-                      : (dark ? 'bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]' : 'bg-white text-slate-700 hover:bg-white shadow-sm')
-                  }`}
-                >
-                  <Zap className="w-3.5 h-3.5" />Fast
-                </button>
-                <div className="flex-1" />
-                <button type="button" disabled title="Voice input coming soon" className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition opacity-40 ${dark ? 'text-slate-400' : 'text-slate-500'}`} aria-label="Voice input">
-                  <Mic className="w-5 h-5" />
-                </button>
-                <motion.button
-                  type="button"
-                  initial={false}
-                  animate={{ scale: 1, opacity: 1 }}
-                  onClick={() => handleSend()}
-                  disabled={isLoading || !input.trim()}
-                  className="h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 text-white bg-slate-900 hover:bg-black disabled:opacity-40 transition dark:bg-white dark:text-slate-900"
-                  aria-label="Send"
-                >
-                  <Send className="w-3.5 h-3.5" />Send
-                </motion.button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ChatInput
+          value={input}
+          onChange={setInput}
+          onSend={() => handleSend()}
+          isLoading={isLoading}
+          dark={dark}
+          errorHint={errorHint}
+          fastActive={selectedModel.id === 'quantum-3'}
+          onToggleFast={() => setSelectedModel(MODELS[0])}
+        />
       </div>
 
       <AnimatePresence>
