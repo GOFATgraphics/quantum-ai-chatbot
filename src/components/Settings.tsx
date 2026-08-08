@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
   LogOut, Moon, Sun, Brain, Plus, Trash2, Loader2,
-  UserRound, Link2, Sparkles, Shield, Palette,
-  Layers, X, Check, Settings2, Database,
+  Link2, Sparkles, X, Check, ChevronRight, ChevronLeft,
+  Bell, Globe, LayoutGrid, Settings2, Search,
 } from 'lucide-react'
 import { supabase, type UserMemory } from '../lib/supabase'
 import type { User } from '@supabase/supabase-js'
@@ -19,6 +19,17 @@ type Props = {
   onProfileUpdated?: (name: string) => void
 }
 
+type Page =
+  | 'home'
+  | 'profile'
+  | 'appearance'
+  | 'notifications'
+  | 'widget'
+  | 'language'
+  | 'customize'
+  | 'memory'
+  | 'skills'
+
 const CATEGORY_LABEL: Record<string, string> = {
   general: 'General',
   preference: 'Preference',
@@ -27,17 +38,6 @@ const CATEGORY_LABEL: Record<string, string> = {
   people: 'People',
   project: 'Project',
 }
-
-type Section = 'account' | 'appearance' | 'behavior' | 'memory' | 'connectors' | 'about'
-
-const NAV: { id: Section; label: string; icon: typeof UserRound }[] = [
-  { id: 'account', label: 'Account', icon: UserRound },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'behavior', label: 'Behavior', icon: Settings2 },
-  { id: 'memory', label: 'Memory', icon: Brain },
-  { id: 'connectors', label: 'Connectors', icon: Link2 },
-  { id: 'about', label: 'About', icon: Shield },
-]
 
 function Toggle({
   on,
@@ -53,58 +53,96 @@ function Toggle({
       type="button"
       role="switch"
       aria-checked={on}
-      onClick={onChange}
-      className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${
-        on ? 'bg-white' : dark ? 'bg-white/15' : 'bg-slate-300'
+      onClick={(e) => {
+        e.stopPropagation()
+        onChange()
+      }}
+      className={`relative w-12 h-7 rounded-full shrink-0 transition-colors ${
+        on ? 'bg-blue-500' : dark ? 'bg-white/20' : 'bg-slate-300'
       }`}
     >
       <span
-        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full shadow transition-transform ${
-          on
-            ? 'translate-x-5 bg-black'
-            : dark
-              ? 'translate-x-0 bg-white/80'
-              : 'translate-x-0 bg-white'
+        className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+          on ? 'translate-x-5' : 'translate-x-0'
         }`}
       />
     </button>
   )
 }
 
-function Divider({ dark }: { dark: boolean }) {
-  return <div className={`h-px my-1 ${dark ? 'bg-white/[0.06]' : 'bg-black/[0.06]'}`} />
-}
-
-function Row({
-  title,
-  description,
-  right,
-  onClick,
+function GroupCard({
+  children,
   dark,
 }: {
-  title: string
-  description?: string
-  right?: React.ReactNode
-  onClick?: () => void
+  children: React.ReactNode
   dark: boolean
 }) {
-  const Comp = onClick ? 'button' : 'div'
   return (
-    <Comp
-      type={onClick ? 'button' : undefined}
-      onClick={onClick}
-      className={`w-full flex items-center gap-4 py-3.5 text-left ${onClick ? 'cursor-pointer' : ''}`}
+    <div
+      className={`rounded-2xl overflow-hidden ${
+        dark ? 'bg-[#1c1c1e]' : 'bg-white shadow-sm'
+      }`}
     >
-      <div className="flex-1 min-w-0">
-        <p className={`text-[15px] font-medium ${dark ? 'text-white' : 'text-slate-900'}`}>{title}</p>
-        {description && (
-          <p className={`text-[13px] mt-0.5 leading-snug ${dark ? 'text-white/45' : 'text-slate-500'}`}>
-            {description}
-          </p>
-        )}
-      </div>
-      {right && <div className="shrink-0">{right}</div>}
-    </Comp>
+      {children}
+    </div>
+  )
+}
+
+function ListRow({
+  icon,
+  label,
+  value,
+  onClick,
+  dark,
+  danger,
+  last,
+}: {
+  icon?: React.ReactNode
+  label: string
+  value?: string
+  onClick?: () => void
+  dark: boolean
+  danger?: boolean
+  last?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition ${
+        onClick ? (dark ? 'active:bg-white/5' : 'active:bg-black/[0.03]') : ''
+      } ${!last ? (dark ? 'border-b border-white/[0.06]' : 'border-b border-black/[0.06]') : ''}`}
+    >
+      {icon && (
+        <span className={`shrink-0 ${dark ? 'text-white/70' : 'text-slate-600'}`}>{icon}</span>
+      )}
+      <span
+        className={`flex-1 text-[16px] ${
+          danger
+            ? 'text-red-500'
+            : dark
+              ? 'text-white'
+              : 'text-slate-900'
+        }`}
+      >
+        {label}
+      </span>
+      {value && (
+        <span className={`text-[15px] ${dark ? 'text-white/40' : 'text-slate-400'}`}>{value}</span>
+      )}
+      {onClick && !danger && (
+        <ChevronRight className={`w-4 h-4 shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`} />
+      )}
+    </button>
+  )
+}
+
+function SectionLabel({ children, dark }: { children: React.ReactNode; dark: boolean }) {
+  return (
+    <p className={`text-[13px] font-medium px-1 mb-2 ${dark ? 'text-white/40' : 'text-slate-500'}`}>
+      {children}
+    </p>
   )
 }
 
@@ -120,7 +158,8 @@ export default function Settings({
   onProfileUpdated,
 }: Props) {
   const meta = user.user_metadata || {}
-  const [section, setSection] = useState<Section>('account')
+  const [page, setPage] = useState<Page>('home')
+  const [search, setSearch] = useState('')
   const [preferredName, setPreferredName] = useState(meta.preferred_name || meta.full_name || '')
   const [dob, setDob] = useState(meta.date_of_birth || '')
   const [role, setRole] = useState(meta.role || '')
@@ -134,28 +173,38 @@ export default function Settings({
   const [savingMem, setSavingMem] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [memoryOn, setMemoryOn] = useState(meta.memory_enabled !== false)
+  const [notifOn, setNotifOn] = useState(false)
 
+  const displayName =
+    preferredName ||
+    meta.full_name ||
+    meta.name ||
+    user.email?.split('@')[0] ||
+    'You'
+  const initial = (displayName[0] || 'Q').toUpperCase()
+
+  const bg = dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
   const textMain = dark ? 'text-white' : 'text-slate-900'
   const textMuted = dark ? 'text-white/45' : 'text-slate-500'
-  const inputCls = `w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition ${
+  const inputCls = `w-full rounded-xl px-3.5 py-3 text-[16px] outline-none ${
     dark
-      ? 'bg-white/[0.06] border border-white/[0.08] text-white placeholder:text-white/30 focus:border-white/20'
-      : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-slate-300'
+      ? 'bg-white/[0.08] border border-white/[0.08] text-white placeholder:text-white/30'
+      : 'bg-white border border-black/[0.06] text-slate-900 placeholder:text-slate-400'
   }`
 
-  const loadMemories = async () => {
-    setLoadingMem(true)
-    const { data, error } = await supabase
-      .from('user_memory')
-      .select('*')
-      .order('updated_at', { ascending: false })
-    if (!error && data) setMemories(data as UserMemory[])
-    setLoadingMem(false)
-  }
-
   useEffect(() => {
-    if (section === 'memory') loadMemories()
-  }, [section])
+    if (page === 'memory') {
+      setLoadingMem(true)
+      supabase
+        .from('user_memory')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (!error && data) setMemories(data as UserMemory[])
+          setLoadingMem(false)
+        })
+    }
+  }, [page])
 
   const saveProfile = async () => {
     setSavingProfile(true)
@@ -212,230 +261,434 @@ export default function Settings({
     }
   }
 
-  const sectionTitle =
-    NAV.find((n) => n.id === section)?.label || 'Settings'
+  const pageTitle: Record<Page, string> = {
+    home: 'Settings',
+    profile: 'Profile',
+    appearance: 'Appearance',
+    notifications: 'Notifications',
+    widget: 'Widget',
+    language: 'App Language',
+    customize: 'Customize',
+    memory: 'Memory',
+    skills: 'Skills',
+  }
+
+  const q = search.trim().toLowerCase()
+  const match = (s: string) => !q || s.toLowerCase().includes(q)
 
   return (
-    <div
-      className={`flex flex-col sm:flex-row h-full min-h-0 overflow-hidden rounded-[20px] ${
-        dark ? 'bg-[#111113] text-white' : 'bg-white text-slate-900'
-      }`}
-    >
-      {/* Left nav — Grok-style */}
-      <aside
-        className={`sm:w-[200px] shrink-0 flex flex-col border-b sm:border-b-0 sm:border-r ${
-          dark ? 'border-white/[0.06] bg-[#0c0c0e]' : 'border-black/[0.06] bg-slate-50/80'
-        }`}
-      >
-        <div className="flex items-center justify-between px-4 pt-4 pb-2 sm:pb-3">
-          <h2 className={`text-[15px] font-semibold tracking-tight ${textMain}`}>Settings</h2>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className={`sm:hidden p-1.5 rounded-lg ${dark ? 'hover:bg-white/10 text-white/50' : 'hover:bg-black/5 text-slate-400'}`}
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+    <div className={`flex flex-col h-full min-h-0 ${bg}`}>
+      <div className="relative flex items-center justify-center h-14 shrink-0 px-4">
+        {page === 'home' ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className={`absolute left-4 w-9 h-9 rounded-full flex items-center justify-center ${
+              dark ? 'bg-white/10 text-white' : 'bg-white text-slate-800 shadow-sm'
+            }`}
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setPage('home')}
+            className={`absolute left-3 w-9 h-9 rounded-full flex items-center justify-center ${
+              dark ? 'text-white' : 'text-slate-800'
+            }`}
+            aria-label="Back"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+        <h2 className={`text-[17px] font-semibold ${textMain}`}>{pageTitle[page]}</h2>
+      </div>
 
-        <nav className="flex sm:flex-col gap-0.5 px-2 pb-3 overflow-x-auto sm:overflow-visible">
-          {NAV.map((item) => {
-            const Icon = item.icon
-            const active = section === item.id
-            return (
+      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">
+        {page === 'home' && (
+          <>
+            {(match(displayName) || match(user.email || '')) && (
               <button
-                key={item.id}
                 type="button"
-                onClick={() => setSection(item.id)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium whitespace-nowrap transition ${
-                  active
-                    ? dark
-                      ? 'bg-white/[0.1] text-white'
-                      : 'bg-white text-slate-900 shadow-sm ring-1 ring-black/[0.04]'
-                    : dark
-                      ? 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-black/[0.03]'
+                onClick={() => setPage('profile')}
+                className={`w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition ${
+                  dark ? 'bg-[#1c1c1e] active:bg-white/5' : 'bg-white shadow-sm active:bg-black/[0.02]'
                 }`}
               >
-                <Icon className="w-4 h-4 shrink-0 opacity-80" />
-                {item.label}
+                <div className="w-12 h-12 rounded-full bg-violet-600 flex items-center justify-center text-white text-lg font-semibold shrink-0">
+                  {initial}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-[17px] font-semibold truncate ${textMain}`}>{displayName}</p>
+                  <p className={`text-[14px] truncate ${textMuted}`}>{user.email}</p>
+                </div>
+                <ChevronRight className={`w-4 h-4 shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`} />
               </button>
-            )
-          })}
-        </nav>
-      </aside>
+            )}
 
-      {/* Right content */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-0">
-        <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
-          <h3 className={`text-[15px] font-semibold ${textMain}`}>{sectionTitle}</h3>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className={`hidden sm:flex p-1.5 rounded-lg ${dark ? 'hover:bg-white/10 text-white/40' : 'hover:bg-black/5 text-slate-400'}`}
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 pb-5">
-          {section === 'account' && (
-            <div className="space-y-1 max-w-lg">
-              <div className="py-2">
-                <p className={`text-[13px] ${textMuted}`}>{user.email}</p>
+            {(match('appearance') ||
+              match('notifications') ||
+              match('widget') ||
+              match('language') ||
+              match('app')) && (
+              <div>
+                <SectionLabel dark={dark}>App</SectionLabel>
+                <GroupCard dark={dark}>
+                  {match('appearance') && (
+                    <ListRow
+                      icon={<Sun className="w-5 h-5" />}
+                      label="Appearance"
+                      value={dark ? 'Dark' : 'Light'}
+                      onClick={() => setPage('appearance')}
+                      dark={dark}
+                    />
+                  )}
+                  {match('notifications') && (
+                    <ListRow
+                      icon={<Bell className="w-5 h-5" />}
+                      label="Notifications"
+                      onClick={() => setPage('notifications')}
+                      dark={dark}
+                    />
+                  )}
+                  {match('widget') && (
+                    <ListRow
+                      icon={<LayoutGrid className="w-5 h-5" />}
+                      label="Widget"
+                      onClick={() => setPage('widget')}
+                      dark={dark}
+                    />
+                  )}
+                  {match('language') && (
+                    <ListRow
+                      icon={<Globe className="w-5 h-5" />}
+                      label="App Language"
+                      value="English"
+                      onClick={() => setPage('language')}
+                      dark={dark}
+                      last
+                    />
+                  )}
+                </GroupCard>
               </div>
-              <Divider dark={dark} />
-              <label className={`block text-[13px] font-medium pt-2 ${textMuted}`}>What we call you</label>
+            )}
+
+            {(match('customize') ||
+              match('skills') ||
+              match('memory') ||
+              match('connectors') ||
+              match('quantumy')) && (
+              <div>
+                <SectionLabel dark={dark}>Quantumy</SectionLabel>
+                <GroupCard dark={dark}>
+                  {match('customize') && (
+                    <ListRow
+                      icon={<Settings2 className="w-5 h-5" />}
+                      label="Customize"
+                      onClick={() => setPage('customize')}
+                      dark={dark}
+                    />
+                  )}
+                  {(match('skills') || match('connectors')) && (
+                    <ListRow
+                      icon={<Sparkles className="w-5 h-5" />}
+                      label="Skills"
+                      onClick={() => setPage('skills')}
+                      dark={dark}
+                    />
+                  )}
+                  {match('memory') && (
+                    <ListRow
+                      icon={<Brain className="w-5 h-5" />}
+                      label="Memory"
+                      onClick={() => setPage('memory')}
+                      dark={dark}
+                      last
+                    />
+                  )}
+                </GroupCard>
+              </div>
+            )}
+
+            <div
+              className={`flex items-center gap-2 rounded-2xl px-3.5 h-11 ${
+                dark ? 'bg-[#1c1c1e]' : 'bg-white shadow-sm'
+              }`}
+            >
+              <Search className={`w-4 h-4 shrink-0 ${textMuted}`} />
               <input
-                value={preferredName}
-                onChange={(e) => setPreferredName(e.target.value)}
-                className={`${inputCls} mt-1.5`}
-                placeholder="Your name"
-              />
-              <label className={`block text-[13px] font-medium pt-3 ${textMuted}`}>Date of birth</label>
-              <input
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                className={`${inputCls} mt-1.5`}
-              />
-              <label className={`block text-[13px] font-medium pt-3 ${textMuted}`}>Role / work</label>
-              <input
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className={`${inputCls} mt-1.5`}
-                placeholder="e.g. Designer at Acme"
-              />
-              <button
-                type="button"
-                onClick={saveProfile}
-                disabled={savingProfile}
-                className={`mt-5 h-10 px-5 rounded-full text-sm font-medium transition disabled:opacity-50 ${
-                  dark
-                    ? 'bg-white text-black hover:bg-white/90'
-                    : 'bg-slate-900 text-white hover:bg-black'
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search settings"
+                className={`flex-1 bg-transparent border-0 outline-none text-[15px] ${
+                  dark ? 'text-white placeholder:text-white/35' : 'text-slate-900 placeholder:text-slate-400'
                 }`}
-              >
-                {savingProfile ? (
-                  <Loader2 className="w-4 h-4 animate-spin inline" />
-                ) : profileMsg === 'Saved' ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Check className="w-4 h-4" /> Saved
-                  </span>
-                ) : (
-                  'Save'
-                )}
-              </button>
-              <Divider dark={dark} />
-              <Row
-                title="Sign out"
-                description="End this session on this device"
-                dark={dark}
-                onClick={onSignOut}
-                right={<LogOut className={`w-4 h-4 ${dark ? 'text-red-400' : 'text-red-500'}`} />}
               />
             </div>
-          )}
 
-          {section === 'appearance' && (
-            <div className="max-w-lg">
-              <Row
-                title="Theme"
-                description={dark ? 'Dark mode' : 'Light mode'}
-                dark={dark}
-                onClick={onToggleTheme}
-                right={
-                  dark ? (
-                    <Sun className="w-4 h-4 text-amber-400" />
+            <GroupCard dark={dark}>
+              <ListRow label="Sign out" onClick={onSignOut} dark={dark} danger last />
+            </GroupCard>
+          </>
+        )}
+
+        {page === 'profile' && (
+          <div className="space-y-4">
+            <div className="flex flex-col items-center py-4">
+              <div className="w-20 h-20 rounded-full bg-violet-600 flex items-center justify-center text-white text-3xl font-semibold">
+                {initial}
+              </div>
+              <p className={`mt-3 text-[18px] font-semibold ${textMain}`}>{displayName}</p>
+              <p className={`text-[14px] ${textMuted}`}>{user.email}</p>
+            </div>
+            <GroupCard dark={dark}>
+              <div className="px-4 py-3 space-y-3">
+                <div>
+                  <label className={`text-[13px] ${textMuted}`}>What we call you</label>
+                  <input
+                    value={preferredName}
+                    onChange={(e) => setPreferredName(e.target.value)}
+                    className={`${inputCls} mt-1`}
+                    placeholder="Your name"
+                  />
+                </div>
+                <div>
+                  <label className={`text-[13px] ${textMuted}`}>Date of birth</label>
+                  <input
+                    type="date"
+                    value={dob}
+                    onChange={(e) => setDob(e.target.value)}
+                    className={`${inputCls} mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className={`text-[13px] ${textMuted}`}>Role / work</label>
+                  <input
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className={`${inputCls} mt-1`}
+                    placeholder="e.g. Designer at Acme"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={saveProfile}
+                  disabled={savingProfile}
+                  className="w-full h-11 rounded-xl bg-blue-500 text-white text-[16px] font-medium disabled:opacity-50"
+                >
+                  {savingProfile ? (
+                    <Loader2 className="w-4 h-4 animate-spin inline" />
+                  ) : profileMsg === 'Saved' ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Check className="w-4 h-4" /> Saved
+                    </span>
                   ) : (
-                    <Moon className="w-4 h-4 text-slate-500" />
-                  )
-                }
-              />
-              <Divider dark={dark} />
-              {onToggleGlass && (
-                <>
-                  <Row
-                    title="Glass surfaces"
-                    description={glass ? 'Frosted glass effects on' : 'Solid surfaces'}
-                    dark={dark}
-                    right={
-                      <Toggle on={glass} onChange={onToggleGlass} dark={dark} />
-                    }
-                  />
-                  <Divider dark={dark} />
-                </>
-              )}
-              <div className="flex items-start gap-3 py-3.5">
-                <Layers className={`w-4 h-4 mt-0.5 shrink-0 ${textMuted}`} />
-                <p className={`text-[13px] leading-relaxed ${textMuted}`}>
-                  Theme applies across chat, sidebar, and settings. Glass softens panels on supported browsers.
-                </p>
+                    'Save'
+                  )}
+                </button>
               </div>
-            </div>
-          )}
+            </GroupCard>
+            <GroupCard dark={dark}>
+              <ListRow label="Sign out" onClick={onSignOut} dark={dark} danger last />
+            </GroupCard>
+          </div>
+        )}
 
-          {section === 'behavior' && (
-            <div className="max-w-lg space-y-1">
-              <label className={`block text-[13px] font-medium ${textMuted}`}>Custom instructions</label>
-              <p className={`text-[13px] mb-2 ${textMuted}`}>
-                How Quantumy should respond — tone, length, rules, and preferences.
-              </p>
-              <textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                rows={5}
-                placeholder="e.g. Prefer short answers. Use British English. Skip fluff."
-                className={`${inputCls} resize-none`}
-              />
-              <button
-                type="button"
-                onClick={saveProfile}
-                disabled={savingProfile}
-                className={`mt-4 h-10 px-5 rounded-full text-sm font-medium transition disabled:opacity-50 ${
-                  dark
-                    ? 'bg-white text-black hover:bg-white/90'
-                    : 'bg-slate-900 text-white hover:bg-black'
-                }`}
-              >
-                {savingProfile ? (
-                  <Loader2 className="w-4 h-4 animate-spin inline" />
-                ) : profileMsg === 'Saved' ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Check className="w-4 h-4" /> Saved
-                  </span>
-                ) : (
-                  'Save instructions'
-                )}
-              </button>
-            </div>
-          )}
-
-          {section === 'memory' && (
-            <div className="max-w-lg">
-              <Row
-                title="Personalize with memories"
-                description="Use facts across chats for better context"
+        {page === 'appearance' && (
+          <div className="space-y-4">
+            <GroupCard dark={dark}>
+              <ListRow
+                icon={dark ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                label="Dark Mode"
                 dark={dark}
-                right={
-                  <Toggle
-                    on={memoryOn}
-                    onChange={() => setMemoryOn((v) => !v)}
-                    dark={dark}
-                  />
-                }
+                last={!onToggleGlass}
+                onClick={onToggleTheme}
+                value={dark ? 'On' : 'Off'}
               />
-              <Divider dark={dark} />
-              <div className="py-3">
-                <p className={`text-[13px] mb-3 ${textMuted}`}>
-                  Facts Quantumy remembers. Add your own or delete anything.
+              {onToggleGlass && (
+                <div
+                  className={`flex items-center gap-3 px-4 py-3.5 ${
+                    dark ? 'border-t border-white/[0.06]' : 'border-t border-black/[0.06]'
+                  }`}
+                >
+                  <span className={dark ? 'text-white/70' : 'text-slate-600'}>
+                    <Sparkles className="w-5 h-5" />
+                  </span>
+                  <div className="flex-1">
+                    <p className={`text-[16px] ${textMain}`}>Glass surfaces</p>
+                    <p className={`text-[13px] ${textMuted}`}>
+                      {glass ? 'Frosted glass on' : 'Solid surfaces'}
+                    </p>
+                  </div>
+                  <Toggle on={glass} onChange={onToggleGlass!} dark={dark} />
+                </div>
+              )}
+            </GroupCard>
+            <p className={`text-[13px] px-1 ${textMuted}`}>
+              Theme applies across chat, sidebar, and settings.
+            </p>
+          </div>
+        )}
+
+        {page === 'notifications' && (
+          <div className="space-y-4">
+            <GroupCard dark={dark}>
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                <Bell className={`w-5 h-5 ${dark ? 'text-white/70' : 'text-slate-600'}`} />
+                <div className="flex-1">
+                  <p className={`text-[16px] ${textMain}`}>Push notifications</p>
+                  <p className={`text-[13px] ${textMuted}`}>Coming soon</p>
+                </div>
+                <Toggle on={notifOn} onChange={() => setNotifOn((v) => !v)} dark={dark} />
+              </div>
+            </GroupCard>
+            <p className={`text-[13px] px-1 ${textMuted}`}>
+              Notifications are not enabled yet. This toggle is a preview for a future release.
+            </p>
+          </div>
+        )}
+
+        {page === 'widget' && (
+          <div className="space-y-4">
+            <GroupCard dark={dark}>
+              <div className="px-4 py-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                      dark ? 'bg-white/10' : 'bg-slate-100'
+                    }`}
+                  >
+                    <LayoutGrid className={`w-6 h-6 ${dark ? 'text-white' : 'text-slate-700'}`} />
+                  </div>
+                  <div>
+                    <p className={`text-[17px] font-semibold ${textMain}`}>Home screen widget</p>
+                    <p className={`text-[13px] ${textMuted}`}>Quick access to Quantumy</p>
+                  </div>
+                </div>
+                <p className={`text-[15px] leading-relaxed ${textMuted}`}>
+                  Add Quantumy to your home screen for one-tap access. On iPhone: Share → Add to Home
+                  Screen. On Android: browser menu → Install app / Add to Home screen.
                 </p>
+                <div
+                  className={`rounded-xl px-3.5 py-3 text-[14px] ${
+                    dark ? 'bg-white/[0.06] text-white/70' : 'bg-slate-50 text-slate-600'
+                  }`}
+                >
+                  <p className="font-medium mb-1">Tips</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>Use the install banner when it appears in chat</li>
+                    <li>Open the app from your home screen for the full experience</li>
+                    <li>True lock-screen widgets are planned for a later update</li>
+                  </ul>
+                </div>
+              </div>
+            </GroupCard>
+          </div>
+        )}
+
+        {page === 'language' && (
+          <div className="space-y-4">
+            <GroupCard dark={dark}>
+              <ListRow label="English" value="Selected" dark={dark} last />
+            </GroupCard>
+            <p className={`text-[13px] px-1 ${textMuted}`}>
+              More languages will be available in a future update.
+            </p>
+          </div>
+        )}
+
+        {page === 'customize' && (
+          <div className="space-y-4">
+            <p className={`text-[13px] px-1 ${textMuted}`}>
+              How Quantumy should respond — tone, length, rules, and preferences.
+            </p>
+            <GroupCard dark={dark}>
+              <div className="p-4">
+                <textarea
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  rows={6}
+                  placeholder="e.g. Prefer short answers. Use British English. Skip fluff."
+                  className={`${inputCls} resize-none`}
+                />
+                <button
+                  type="button"
+                  onClick={saveProfile}
+                  disabled={savingProfile}
+                  className="mt-3 w-full h-11 rounded-xl bg-blue-500 text-white text-[16px] font-medium disabled:opacity-50"
+                >
+                  {savingProfile ? (
+                    <Loader2 className="w-4 h-4 animate-spin inline" />
+                  ) : profileMsg === 'Saved' ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Check className="w-4 h-4" /> Saved
+                    </span>
+                  ) : (
+                    'Save instructions'
+                  )}
+                </button>
+              </div>
+            </GroupCard>
+          </div>
+        )}
+
+        {page === 'skills' && (
+          <div className="space-y-4">
+            <p className={`text-[13px] px-1 ${textMuted}`}>
+              What Quantumy can do when apps are connected.
+            </p>
+            <GroupCard dark={dark}>
+              {[
+                { title: 'Email', desc: 'Search, draft, and send' },
+                { title: 'Drive & Docs', desc: 'Find files and read documents' },
+                { title: 'Calendar', desc: 'Check upcoming events' },
+                { title: 'Sheets & Excel', desc: 'Query spreadsheet data' },
+              ].map((c, i, arr) => (
+                <div
+                  key={c.title}
+                  className={`flex items-start gap-3 px-4 py-3.5 ${
+                    i < arr.length - 1
+                      ? dark
+                        ? 'border-b border-white/[0.06]'
+                        : 'border-b border-black/[0.06]'
+                      : ''
+                  }`}
+                >
+                  <Sparkles className={`w-5 h-5 mt-0.5 ${dark ? 'text-white/50' : 'text-slate-400'}`} />
+                  <div>
+                    <p className={`text-[16px] ${textMain}`}>{c.title}</p>
+                    <p className={`text-[13px] ${textMuted}`}>{c.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </GroupCard>
+            <button
+              type="button"
+              onClick={onOpenConnectors}
+              className="w-full h-11 rounded-xl bg-blue-500 text-white text-[16px] font-medium flex items-center justify-center gap-2"
+            >
+              <Link2 className="w-4 h-4" />
+              Manage connectors
+            </button>
+          </div>
+        )}
+
+        {page === 'memory' && (
+          <div className="space-y-4">
+            <GroupCard dark={dark}>
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                <Brain className={`w-5 h-5 ${dark ? 'text-white/70' : 'text-slate-600'}`} />
+                <div className="flex-1">
+                  <p className={`text-[16px] ${textMain}`}>Personalize with memories</p>
+                  <p className={`text-[13px] ${textMuted}`}>Use facts across chats</p>
+                </div>
+                <Toggle on={memoryOn} onChange={() => setMemoryOn((v) => !v)} dark={dark} />
+              </div>
+            </GroupCard>
+
+            <GroupCard dark={dark}>
+              <div className="p-4 space-y-2">
                 <textarea
                   value={newFact}
                   onChange={(e) => setNewFact(e.target.value)}
@@ -443,7 +696,7 @@ export default function Settings({
                   placeholder="e.g. Prefer short emails, work in WAT…"
                   className={`${inputCls} resize-none`}
                 />
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex gap-2">
                   <select
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value as any)}
@@ -457,155 +710,74 @@ export default function Settings({
                     type="button"
                     onClick={addMemory}
                     disabled={savingMem || !newFact.trim()}
-                    className={`h-10 px-4 rounded-full text-sm font-medium disabled:opacity-40 flex items-center gap-1.5 ${
-                      dark
-                        ? 'bg-white text-black'
-                        : 'bg-slate-900 text-white'
-                    }`}
+                    className="h-11 px-4 rounded-xl bg-blue-500 text-white text-[15px] font-medium disabled:opacity-40 flex items-center gap-1.5"
                   >
-                    {savingMem ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Plus className="w-3.5 h-3.5" />
-                    )}
+                    {savingMem ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                     Add
                   </button>
                 </div>
               </div>
-              <Divider dark={dark} />
-              {loadingMem ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className={`w-5 h-5 animate-spin ${textMuted}`} />
-                </div>
-              ) : memories.length === 0 ? (
-                <p className={`text-sm text-center py-8 ${textMuted}`}>No memories yet</p>
-              ) : (
-                <div className="space-y-0 max-h-56 overflow-y-auto">
-                  {memories.map((m, i) => (
-                    <div key={m.id}>
-                      {i > 0 && <Divider dark={dark} />}
-                      <div className="flex items-start gap-3 py-3">
-                        <Database className={`w-3.5 h-3.5 mt-1 shrink-0 ${textMuted}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-[14px] ${textMain}`}>{m.fact}</p>
-                          <p className={`text-[11px] mt-0.5 ${textMuted}`}>
-                            {CATEGORY_LABEL[m.category || 'general'] || m.category}
-                            {' · '}
-                            {m.source === 'user' ? 'You' : 'From chat'}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => deleteMemory(m.id)}
-                          disabled={deletingId === m.id}
-                          className={`p-1.5 rounded-lg ${
-                            dark
-                              ? 'hover:bg-red-500/10 text-white/30 hover:text-red-400'
-                              : 'hover:bg-red-50 text-slate-400 hover:text-red-500'
-                          }`}
-                        >
-                          {deletingId === m.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={saveProfile}
-                className={`mt-3 h-9 px-4 rounded-full text-[13px] font-medium ${
-                  dark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-slate-100 text-slate-800'
-                }`}
-              >
-                Save memory preference
-              </button>
-            </div>
-          )}
+            </GroupCard>
 
-          {section === 'connectors' && (
-            <div className="max-w-lg">
-              <Row
-                title="Connected apps"
-                description="Gmail, Drive, Docs, Sheets, Calendar, Outlook, Excel"
-                dark={dark}
-                onClick={onOpenConnectors}
-                right={
-                  <span
-                    className={`text-[13px] font-medium ${dark ? 'text-white/70' : 'text-slate-600'}`}
+            {loadingMem ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className={`w-5 h-5 animate-spin ${textMuted}`} />
+              </div>
+            ) : memories.length === 0 ? (
+              <p className={`text-sm text-center py-6 ${textMuted}`}>No memories yet</p>
+            ) : (
+              <GroupCard dark={dark}>
+                {memories.map((m, i) => (
+                  <div
+                    key={m.id}
+                    className={`flex items-start gap-3 px-4 py-3.5 ${
+                      i < memories.length - 1
+                        ? dark
+                          ? 'border-b border-white/[0.06]'
+                          : 'border-b border-black/[0.06]'
+                        : ''
+                    }`}
                   >
-                    Manage
-                  </span>
-                }
-              />
-              <Divider dark={dark} />
-              <div className="py-3 space-y-3">
-                {[
-                  { title: 'Email', desc: 'Search inbox, draft and send' },
-                  { title: 'Drive & Docs', desc: 'Find files and read documents' },
-                  { title: 'Calendar', desc: 'Check upcoming events' },
-                  { title: 'Sheets & Excel', desc: 'Query spreadsheet data' },
-                ].map((c) => (
-                  <div key={c.title} className="flex items-start gap-3">
-                    <Sparkles className={`w-4 h-4 mt-0.5 shrink-0 ${dark ? 'text-white/35' : 'text-slate-400'}`} />
-                    <div>
-                      <p className={`text-[14px] font-medium ${textMain}`}>{c.title}</p>
-                      <p className={`text-[13px] ${textMuted}`}>{c.desc}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[15px] ${textMain}`}>{m.fact}</p>
+                      <p className={`text-[12px] mt-0.5 ${textMuted}`}>
+                        {CATEGORY_LABEL[m.category || 'general'] || m.category}
+                        {' · '}
+                        {m.source === 'user' ? 'You' : 'From chat'}
+                      </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteMemory(m.id)}
+                      disabled={deletingId === m.id}
+                      className={`p-1.5 rounded-lg ${
+                        dark
+                          ? 'text-white/30 hover:text-red-400'
+                          : 'text-slate-400 hover:text-red-500'
+                      }`}
+                    >
+                      {deletingId === m.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                    </button>
                   </div>
                 ))}
-              </div>
-              <button
-                type="button"
-                onClick={onOpenConnectors}
-                className={`mt-2 h-10 px-5 rounded-full text-sm font-medium border ${
-                  dark
-                    ? 'border-white/15 text-white hover:bg-white/5'
-                    : 'border-slate-200 text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                Open connectors
-              </button>
-            </div>
-          )}
+              </GroupCard>
+            )}
 
-          {section === 'about' && (
-            <div className="max-w-lg">
-              <div className="py-6 text-center">
-                <p className={`text-lg font-semibold ${textMain}`}>Quantumy</p>
-                <p className={`text-[13px] mt-1 ${textMuted}`}>Personal AI for your work</p>
-              </div>
-              <Divider dark={dark} />
-              <Row
-                title="Privacy"
-                description="How we handle your data"
-                dark={dark}
-                onClick={() => window.open('/privacy.html', '_blank')}
-                right={<span className={`text-[13px] ${textMuted}`}>View</span>}
-              />
-              <Divider dark={dark} />
-              <Row
-                title="Terms"
-                description="Terms of use"
-                dark={dark}
-                onClick={() => window.open('/terms.html', '_blank')}
-                right={<span className={`text-[13px] ${textMuted}`}>View</span>}
-              />
-              <Divider dark={dark} />
-              <Row
-                title="Sign out"
-                description="End this session"
-                dark={dark}
-                onClick={onSignOut}
-                right={<LogOut className={`w-4 h-4 ${dark ? 'text-red-400' : 'text-red-500'}`} />}
-              />
-            </div>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={saveProfile}
+              className={`w-full h-11 rounded-xl text-[15px] font-medium ${
+                dark ? 'bg-white/10 text-white' : 'bg-white text-slate-800 shadow-sm'
+              }`}
+            >
+              Save memory preference
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
