@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Menu, Plus, Mic, Send, X, LogOut,
+  Menu, Plus, Mic, Send, X,
   Loader2, PenLine, ArrowLeft,
   Moon, Sun, ChevronDown,
 } from 'lucide-react'
@@ -10,6 +10,7 @@ import { formatMarkdown } from './lib/markdown'
 import { getFirstName, getTimeGreeting } from './lib/names'
 import Auth from './components/Auth'
 import Connectors from './components/Connectors'
+import Settings from './components/Settings'
 import Sidebar from './components/Sidebar'
 import Logo from './components/Logo'
 import MessageActions from './components/MessageActions'
@@ -54,7 +55,7 @@ function ModalShell({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 24 }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className={`fixed z-50 left-4 right-4 top-[max(1rem,env(safe-area-inset-top))] bottom-[max(1rem,env(safe-area-inset-bottom))] sm:left-1/2 sm:right-auto sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md sm:h-auto sm:max-h-[min(85dvh,640px)] flex flex-col rounded-3xl overflow-hidden glass-modal ${dark ? 'glass-modal-dark' : 'glass-modal-light'}`}
+        className={`fixed z-50 left-3 right-3 top-[max(0.75rem,env(safe-area-inset-top))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] sm:left-1/2 sm:right-auto sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md sm:h-auto sm:max-h-[min(88dvh,720px)] flex flex-col rounded-3xl overflow-hidden glass-modal ${dark ? 'glass-modal-dark' : 'glass-modal-light'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
@@ -298,7 +299,11 @@ export default function App() {
   const startNewChat = () => { setCurrentConversationId(null); setMessages([]); setMobileSidebar(false) }
   const handleSignOut = async () => { await supabase.auth.signOut(); setShowSettings(false) }
   const openSettings = () => { setShowSettings(true); setMobileSidebar(false) }
-  const openConnectors = () => { setShowConnectors(true); setMobileSidebar(false) }
+  const openConnectors = () => {
+    setShowSettings(false)
+    setShowConnectors(true)
+    setMobileSidebar(false)
+  }
   const isEmpty = messages.length === 0 && !isLoading
 
   if (authLoading) {
@@ -460,10 +465,19 @@ export default function App() {
           </div>
         </main>
 
-        <div className="px-3 lg:px-6 pt-1 shrink-0 z-10 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
+        {/* Input — larger bubble, more space above keyboard (Gemini-style) */}
+        <div className="px-3 lg:px-6 pt-2 shrink-0 z-10 pb-[max(1.35rem,calc(env(safe-area-inset-bottom)+0.5rem))]">
           <div className="max-w-2xl mx-auto">
-            <div className={`flex items-end gap-1.5 rounded-full pl-2 pr-1.5 py-1.5 transition-all glass-input ${dark ? 'glass-input-dark' : 'glass-input-light'}`}>
-              <button className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-white/50'}`}>
+            <div
+              className={`flex items-end gap-1.5 rounded-[28px] pl-2.5 pr-2 py-2 transition-all glass-input ${
+                dark ? 'glass-input-dark' : 'glass-input-light'
+              }`}
+            >
+              <button
+                className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition ${
+                  dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-white/50'
+                }`}
+              >
                 <Plus className="w-5 h-5" />
               </button>
               <textarea
@@ -473,19 +487,25 @@ export default function App() {
                 onKeyDown={handleKeyDown}
                 placeholder="Ask Quantumy"
                 rows={1}
-                className={`flex-1 resize-none bg-transparent py-2.5 text-[15px] leading-relaxed max-h-32 outline-none placeholder:text-slate-400 ${textMain}`}
-                style={{ minHeight: '40px' }}
+                className={`flex-1 resize-none bg-transparent py-3 text-[16px] leading-relaxed max-h-36 outline-none placeholder:text-slate-400 ${textMain}`}
+                style={{ minHeight: '44px' }}
               />
               <button
                 onClick={toggleListening}
-                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${isListening ? 'bg-red-500/15 text-red-400' : dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-white/50'}`}
+                className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition ${
+                  isListening
+                    ? 'bg-red-500/15 text-red-400'
+                    : dark
+                      ? 'text-slate-400 hover:bg-white/5'
+                      : 'text-slate-500 hover:bg-white/50'
+                }`}
               >
                 <Mic className="w-5 h-5" />
               </button>
               <button
                 onClick={() => handleSend()}
                 disabled={!input.trim() || isLoading}
-                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${
+                className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition ${
                   input.trim() && !isLoading
                     ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-500/25'
                     : dark
@@ -496,9 +516,6 @@ export default function App() {
                 <Send className="w-4 h-4" />
               </button>
             </div>
-            <p className={`text-center text-[11px] mt-2 ${textMuted}`}>
-              Quantumy is AI and can make mistakes.
-            </p>
           </div>
         </div>
       </div>
@@ -506,19 +523,13 @@ export default function App() {
       <AnimatePresence>
         {showSettings && (
           <ModalShell dark={dark} title="Settings" onClose={() => setShowSettings(false)}>
-            <div className="space-y-4">
-              <div className={`rounded-2xl p-4 glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`}>
-                <p className={`text-xs font-medium mb-1 ${textMuted}`}>Signed in as</p>
-                <p className={`text-sm truncate ${textMain}`}>{user.email}</p>
-              </div>
-              <button onClick={() => setDark(!dark)} className={`w-full h-11 rounded-2xl text-sm font-medium transition flex items-center justify-center gap-2 glass-card ${dark ? 'glass-card-dark text-slate-300' : 'glass-card-light text-slate-700'}`}>
-                {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                {dark ? 'Switch to light mode' : 'Switch to dark mode'}
-              </button>
-              <button onClick={handleSignOut} className={`w-full h-11 rounded-2xl text-sm font-medium transition flex items-center justify-center gap-2 glass-card ${dark ? 'glass-card-dark text-slate-300' : 'glass-card-light text-slate-700'}`}>
-                <LogOut className="w-4 h-4" /> Sign out
-              </button>
-            </div>
+            <Settings
+              dark={dark}
+              user={user}
+              onSignOut={handleSignOut}
+              onToggleTheme={() => setDark(!dark)}
+              onOpenConnectors={openConnectors}
+            />
           </ModalShell>
         )}
       </AnimatePresence>
