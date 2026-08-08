@@ -32,8 +32,13 @@ input, textarea, button, select {
   font-size: 16px;
 }
 
+/* Soft lavender / violet gradient — matches Grok-like empty state theme */
 html:not(.dark) body {
-  background: #ffffff;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% -15%, rgba(167, 139, 250, 0.28), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 100% 20%, rgba(196, 181, 253, 0.22), transparent 50%),
+    radial-gradient(ellipse 60% 50% at 0% 80%, rgba(221, 214, 254, 0.35), transparent 50%),
+    linear-gradient(180deg, #f5f3ff 0%, #eef2ff 40%, #f8fafc 100%);
   color: #1f1f1f;
 }
 
@@ -153,8 +158,8 @@ textarea {
 
 /* Glassmorphism toggle */
 html.glass-on .glass-surface {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 html:not(.glass-on) .glass-surface {
   backdrop-filter: none;
