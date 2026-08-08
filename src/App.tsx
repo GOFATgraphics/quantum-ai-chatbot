@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu, Mic, Send, X, Plus,
   Loader2, PenLine,
-  ChevronDown, Copy, Check, ThumbsUp, ThumbsDown, Volume2, Share,
+  ChevronDown, Copy, Check, ThumbsUp, ThumbsDown, Volume2, Share, Zap, AudioLines,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage, type Project, makeChatTitle } from './lib/supabase'
 import { formatMarkdown } from './lib/markdown'
@@ -270,7 +270,7 @@ export default function App() {
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative">
         {isEmpty && !dark && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] z-0" style={{ background: 'linear-gradient(to top, rgba(186,220,255,0.45) 0%, rgba(230,240,255,0.2) 40%, transparent 100%)' }} />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] z-0" style={{ background: 'linear-gradient(to top, rgba(186,220,255,0.35) 0%, rgba(230,240,255,0.15) 40%, transparent 100%)' }} />
         )}
 
         <header className="relative z-10 pt-[env(safe-area-inset-top)] shrink-0">
@@ -309,12 +309,21 @@ export default function App() {
 
         <main className="relative z-10 flex-1 overflow-y-auto min-h-0">
           {isEmpty ? (
-            <div className="flex flex-col items-center justify-center min-h-full px-6 pb-28">
-              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="flex flex-col items-center text-center">
-                <motion.div animate={{ scale: [1, 1.06, 1], rotate: [0, 2, -2, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} className="mb-5">
-                  <SparkleMark size={44} />
+            <div className="flex flex-col items-center justify-center min-h-full px-6 pb-36">
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-col items-center text-center"
+              >
+                <motion.div
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+                  className="mb-6"
+                >
+                  <SparkleMark size={48} />
                 </motion.div>
-                <h1 className={`text-[1.75rem] sm:text-[2rem] font-normal tracking-tight ${dark ? 'text-slate-100' : 'text-slate-900'}`}>
+                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'}`}>
                   {emptyLine(firstName)}
                 </h1>
               </motion.div>
@@ -349,22 +358,81 @@ export default function App() {
           )}
         </main>
 
-        <div className="relative z-10 shrink-0 px-3 sm:px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
+        <div className="relative z-10 shrink-0 px-3 sm:px-5 pb-[max(0.9rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
-            <div className={`flex items-end gap-1 rounded-[28px] pl-1.5 pr-1.5 py-1.5 ${dark ? 'bg-[#1c1c24] border border-white/[0.08]' : 'bg-white border border-black/[0.06] shadow-[0_2px_16px_rgba(0,0,0,0.08)]'}`}>
-              <button type="button" className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition ${dark ? 'text-slate-400 hover:bg-white/8' : 'text-slate-500 hover:bg-black/[0.04]'}`} aria-label="Add">
-                <Plus className="w-5 h-5" />
-              </button>
-              <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} rows={1} placeholder="Ask Quantumy" className={`flex-1 resize-none bg-transparent border-0 outline-none text-[16px] leading-6 py-2.5 max-h-[140px] ${dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'}`} />
-              {!input.trim() ? (
-                <button type="button" className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition ${dark ? 'text-slate-400 hover:bg-white/8' : 'text-slate-500 hover:bg-black/[0.04]'}`} aria-label="Voice">
+            <div
+              className={`rounded-[28px] px-3 pt-3 pb-2.5 transition-shadow ${
+                dark
+                  ? 'bg-[#1a1a22] border border-white/[0.08] shadow-lg shadow-black/30'
+                  : 'bg-[#f3f4f6] border border-black/[0.04] shadow-[0_4px_24px_rgba(0,0,0,0.06)]'
+              }`}
+            >
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={onKeyDown}
+                rows={1}
+                placeholder="Ask Anything"
+                className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${
+                  dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
+                }`}
+              />
+              <div className="flex items-center gap-1.5 mt-2">
+                <button
+                  type="button"
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${
+                    dark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-white text-slate-600 hover:bg-white shadow-sm'
+                  }`}
+                  aria-label="Add"
+                >
+                  <Plus className="w-[18px] h-[18px]" />
+                </button>
+                <button
+                  type="button"
+                  className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
+                    dark ? 'bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]' : 'bg-white text-slate-700 hover:bg-white shadow-sm'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  Fast
+                </button>
+                <div className="flex-1" />
+                <button
+                  type="button"
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${
+                    dark ? 'text-slate-400 hover:bg-white/8' : 'text-slate-500 hover:bg-black/[0.04]'
+                  }`}
+                  aria-label="Voice input"
+                >
                   <Mic className="w-5 h-5" />
                 </button>
-              ) : (
-                <motion.button type="button" initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={() => handleSend()} disabled={isLoading} className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white bg-[#1a73e8] hover:bg-[#1557b0] disabled:opacity-40 transition" aria-label="Send">
-                  <Send className="w-[18px] h-[18px]" />
-                </motion.button>
-              )}
+                {input.trim() ? (
+                  <motion.button
+                    type="button"
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    onClick={() => handleSend()}
+                    disabled={isLoading}
+                    className="h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 text-white bg-slate-900 hover:bg-black disabled:opacity-40 transition dark:bg-white dark:text-slate-900"
+                    aria-label="Send"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Send
+                  </motion.button>
+                ) : (
+                  <button
+                    type="button"
+                    className={`h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
+                      dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black'
+                    }`}
+                    aria-label="Speak"
+                  >
+                    <AudioLines className="w-4 h-4" />
+                    Speak
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
