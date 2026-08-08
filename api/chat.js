@@ -166,7 +166,7 @@ function buildSystemPrompt({ gmailReady, memory, project, firstName }) {
     memory?.length > 0
       ? `## What you know about this user\n${memory
           .map((m) => `- ${m.fact}${m.category ? ` (${m.category})` : ''}`)
-          .join('\n')}\nUse this context naturally. Do not recite the list unless asked.`
+          .join('\n')}\nUse this context naturally. Honor preferences and instructions. Do not recite the list unless asked.`
       : '## What you know about this user\nNo saved memories yet. When they share stable facts (job, preferences, people), use save_memory.';
 
   const projectBlock = project
@@ -193,6 +193,17 @@ Use clean Markdown only. The UI renders it — write for humans, not source code
 - Use **bold** for key labels (From, Subject, Priority).
 - Use horizontal rules (---) sparingly between major sections.
 - Do NOT dump raw JSON. Do NOT leave unformatted tool data on screen.
+
+## Drafting email (always available)
+When the user asks to draft, write, reply to, or polish an email:
+1. Output a ready-to-copy draft with:
+   - **To:** (if known)
+   - **Subject:**
+   - **Body:** (complete, professional, matching the tone they asked for)
+2. Match their preferences from memory (tone, length, language).
+3. Offer one shorter alternate only if useful.
+4. You cannot send email — only draft. Tell them to copy/paste into Gmail (or their client).
+5. If they reference a real inbox thread and Gmail is connected, use search_gmail first so the reply matches context.
 
 ## Email summaries (when Gmail data is available)
 Structure every email briefing like this:
@@ -224,7 +235,7 @@ ${projectBlock}
 
 ${gmailReady
     ? '## Tools\n- search_gmail: use whenever the user asks about mail.\n- save_memory: store lasting facts about the user.'
-    : '## Tools\n- Gmail is not connected. If they ask about email, tell them to open Connectors and connect Gmail.\n- save_memory: store lasting facts about the user.'}`;
+    : '## Tools\n- Gmail is not connected. If they ask about reading their inbox, tell them to open Connectors and connect Gmail. You can still draft emails without Gmail.\n- save_memory: store lasting facts about the user.'}`;
 }
 
 export default async function handler(req, res) {
