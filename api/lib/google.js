@@ -3,21 +3,31 @@
 export const PROVIDER_SCOPES = {
   gmail: [
     'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.compose',
+    'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
   ],
   google_drive: [
     'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
   ],
   google_docs: [
     'https://www.googleapis.com/auth/documents.readonly',
+    'https://www.googleapis.com/auth/documents',
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
   ],
   google_sheets: [
     'https://www.googleapis.com/auth/spreadsheets.readonly',
+    'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
   ],
 };
 
@@ -221,4 +231,64 @@ export async function readSheetRange(accessToken, spreadsheetId, range = 'A1:Z30
     range: data.range || range,
     values: (data.values || []).slice(0, 40),
   };
+}
+
+/** Build RFC 2822 raw message and base64url-encode for Gmail API. */
+function encodeRawMessage({ to, subject, body, cc, bcc, from }) {
+  const headers = [
+    from ? `From: ${from}` : null,
+    `To: ${to}`,
+    cc ? `Cc: ${cc}` : null,
+    bcc ? `Bcc: ${bcc}` : null,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset="UTF-8"',
+  ].filter(Boolean);
+
+  const raw = `${headers.join('\r\n')}\r\n\r\n${body || ''}`;
+  return Buffer.from(raw)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+/** Send an email via Gmail API (requires gmail.send). */
+export async function sendGmail(accessToken, { to, subject, body, cc, bcc }) {
+  if (!to || !subject) throw new Error('to and subject are required');
+  const raw = encodeRawMessage({ to, subject, body, cc, bcc });
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ raw }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Gmail send failed: ${res.status} ${t}`);
+  }
+  const data = await res.json();
+  return { id: data.id, threadId: data.threadId, labelIds: data.labelIds || [] };
+}
+
+/** Create a Gmail draft (requires gmail.compose). */
+export async function createGmailDraft(accessToken, { to, subject, body, cc, bcc }) {
+  if (!to || !subject) throw new Error('to and subject are required');
+  const raw = encodeRawMessage({ to, subject, body, cc, bcc });
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message: { raw } }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Gmail draft failed: ${res.status} ${t}`);
+  }
+  const data = await res.json();
+  return { id: data.id, messageId: data.message?.id };
 }
