@@ -10,7 +10,6 @@ import {
   X,
   Sparkles,
   Settings,
-  Key,
 } from 'lucide-react'
 
 type Message = {
@@ -56,7 +55,6 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState(MODELS[0])
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('quantum_api_key') || import.meta.env.VITE_XAI_API_KEY || '')
   const [userName] = useState('Mithila')
   const [isListening, setIsListening] = useState(false)
 
@@ -71,10 +69,6 @@ export default function App() {
   useEffect(() => {
     scrollToBottom()
   }, [messages, isLoading, scrollToBottom])
-
-  useEffect(() => {
-    if (apiKey) localStorage.setItem('quantum_api_key', apiKey)
-  }, [apiKey])
 
   // Web Speech API setup
   useEffect(() => {
@@ -113,41 +107,34 @@ export default function App() {
   }
 
   const callAI = async (userMessage: string, history: Message[]) => {
-    // Real API call if key present
-    if (apiKey) {
-      try {
-        const response = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'grok-3',
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'You are Quantum, a premium, helpful, and concise AI assistant. Respond in a clear, professional yet friendly tone. Use markdown when helpful. Keep answers focused and high-quality.',
-              },
-              ...history.map((m) => ({
-                role: m.role,
-                content: m.content,
-              })),
-              { role: 'user', content: userMessage },
-            ],
-            temperature: 0.7,
-            max_tokens: 1024,
-          }),
-        })
+    try {
+      // Call our secure serverless proxy (key stays on the server)
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'grok-3',
+          messages: [
+            ...history.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            { role: 'user', content: userMessage },
+          ],
+        }),
+      })
 
-        if (!response.ok) throw new Error('API error')
+      if (response.ok) {
         const data = await response.json()
-        return data.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
-      } catch (err) {
-        console.error(err)
-        // Fallback to demo
+        return data.content || 'Sorry, I could not generate a response.'
       }
+
+      // If the proxy fails (e.g. no key set yet), fall back to demo
+      console.warn('API proxy returned', response.status)
+    } catch (err) {
+      console.error('Proxy call failed:', err)
     }
 
     // Demo / fallback intelligent responses
@@ -484,20 +471,11 @@ export default function App() {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                    <Key className="w-4 h-4" />
-                    API Key (xAI / OpenAI compatible)
-                  </label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="xai-... or sk-..."
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-slate-400 focus:ring-2 focus:ring-slate-100 outline-none transition"
-                  />
-                  <p className="mt-1.5 text-xs text-slate-400">
-                    Stored locally. Leave empty for demo mode.
+                <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-600 leading-relaxed">
+                  <p className="font-medium text-slate-800 mb-1">API Key is secure</p>
+                  <p>
+                    Your xAI API key is stored only on the server (Vercel Environment Variables).
+                    It is never sent to the browser or exposed in the frontend code.
                   </p>
                 </div>
 
