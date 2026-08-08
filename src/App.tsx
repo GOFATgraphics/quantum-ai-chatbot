@@ -5,15 +5,18 @@ import {
   Plus,
   Mic,
   Send,
-  ChevronDown,
   X,
-  Sparkles,
   Settings,
   LogOut,
   MessageSquare,
   Loader2,
-  PanelLeftClose,
-  PanelLeft,
+  Trash2,
+  Brain,
+  GraduationCap,
+  Cpu,
+  PenLine,
+  ArrowLeft,
+  MoreHorizontal,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage } from './lib/supabase'
 import Auth from './components/Auth'
@@ -28,20 +31,47 @@ type Message = {
 type Model = {
   id: string
   name: string
-  description: string
+  badge?: string
 }
 
 const MODELS: Model[] = [
-  { id: 'quantum-3', name: 'Quantum 3', description: 'Most capable' },
-  { id: 'quantum-2', name: 'Quantum 2', description: 'Balanced' },
-  { id: 'quantum-fast', name: 'Quantum Fast', description: 'Speed focused' },
+  { id: 'quantum-2', name: 'Quantum 2' },
+  { id: 'quantum-3', name: 'Quantum 3', badge: 'Pro' },
 ]
 
-const DEMO_RESPONSES = [
-  "That's a great question! Based on current trends, I'd recommend focusing on LinkedIn for professional reach, Instagram Reels for engagement, and targeted email sequences for retention.",
-  "Here's a strong campaign concept: **\"Work Smarter, Not Longer\"**. It speaks directly to remote professionals dealing with burnout while positioning your app as the solution for reclaiming time.",
-  "For slogans, try:\n• \"Your time, optimized.\"\n• \"Less busy. More impact.\"\n• \"Reclaim your day.\"\n\nThe first one feels clean and premium.",
-  "I can help refine that further. Would you like channel-specific messaging, a content calendar outline, or ad creative ideas next?",
+const CATEGORIES = [
+  {
+    id: 'emails',
+    title: 'Emails',
+    desc: 'Find and summarize messages',
+    icon: MessageSquare,
+    color: 'bg-blue-50 text-blue-600',
+    prompt: 'Summarize my latest important emails',
+  },
+  {
+    id: 'docs',
+    title: 'Documents',
+    desc: 'Search files and reports',
+    icon: GraduationCap,
+    color: 'bg-amber-50 text-amber-600',
+    prompt: 'Help me find a document about recent orders',
+  },
+  {
+    id: 'data',
+    title: 'Data & Trades',
+    desc: 'Orders, invoices, status',
+    icon: Cpu,
+    color: 'bg-emerald-50 text-emerald-600',
+    prompt: 'Which trades or orders are still pending?',
+  },
+  {
+    id: 'writing',
+    title: 'Writing',
+    desc: 'Drafts, replies, notes',
+    icon: PenLine,
+    color: 'bg-rose-50 text-rose-600',
+    prompt: 'Help me draft a professional follow-up email',
+  },
 ]
 
 function getGreeting() {
@@ -55,33 +85,21 @@ function generateId() {
   return Math.random().toString(36).slice(2, 11)
 }
 
-/** Lightweight markdown → HTML for assistant messages */
 function formatMarkdown(text: string) {
   let html = text
-    // Escape HTML
     .replace(/&/g, '&')
     .replace(/</g, '<')
     .replace(/>/g, '>')
-
-    // Bold **text**
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic *text*
     .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
-    // Inline code `code`
-    .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-slate-100 text-[13px] font-mono">$1</code>')
-    // Unordered lists
+    .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded-md bg-slate-100 text-[13px] font-mono">$1</code>')
     .replace(/^[•\-]\s+(.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
-    // Numbered lists
     .replace(/^\d+\.\s+(.+)$/gm, '<li class="ml-4 list-decimal">$1</li>')
-    // Line breaks
     .replace(/\n\n/g, '</p><p class="mt-3">')
     .replace(/\n/g, '<br/>')
 
-  // Wrap consecutive <li> in <ul>
   html = html.replace(/(<li[^>]*>.*?<\/li>)/gs, (match) => {
-    if (match.includes('list-disc')) {
-      return `<ul class="my-2 space-y-1">${match}</ul>`
-    }
+    if (match.includes('list-disc')) return `<ul class="my-2 space-y-1">${match}</ul>`
     return `<ol class="my-2 space-y-1">${match}</ol>`
   })
 
@@ -96,14 +114,13 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedModel, setSelectedModel] = useState(MODELS[0])
-  const [showModelPicker, setShowModelPicker] = useState(false)
+  const [selectedModel, setSelectedModel] = useState(MODELS[1])
   const [showSettings, setShowSettings] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebar, setMobileSidebar] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -128,9 +145,8 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (user) {
-      loadConversations()
-    } else {
+    if (user) loadConversations()
+    else {
       setConversations([])
       setCurrentConversationId(null)
       setMessages([])
@@ -142,7 +158,6 @@ export default function App() {
       .from('conversations')
       .select('*')
       .order('updated_at', { ascending: false })
-
     if (!error && data) setConversations(data)
   }
 
@@ -168,9 +183,7 @@ export default function App() {
 
   const createNewConversation = async (firstMessage: string) => {
     if (!user) return null
-
     const title = firstMessage.slice(0, 60) + (firstMessage.length > 60 ? '…' : '')
-
     const { data, error } = await supabase
       .from('conversations')
       .insert({ user_id: user.id, title })
@@ -181,7 +194,6 @@ export default function App() {
       console.error('Failed to create conversation', error)
       return null
     }
-
     setConversations((prev) => [data, ...prev])
     setCurrentConversationId(data.id)
     return data.id
@@ -197,11 +209,27 @@ export default function App() {
       role,
       content,
     })
-
     await supabase
       .from('conversations')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', conversationId)
+  }
+
+  const deleteConversation = async (id: string) => {
+    setDeletingId(id)
+    try {
+      await supabase.from('messages').delete().eq('conversation_id', id)
+      await supabase.from('conversations').delete().eq('id', id)
+      setConversations((prev) => prev.filter((c) => c.id !== id))
+      if (currentConversationId === id) {
+        setCurrentConversationId(null)
+        setMessages([])
+      }
+    } catch (err) {
+      console.error('Delete failed', err)
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const scrollToBottom = useCallback(() => {
@@ -220,16 +248,13 @@ export default function App() {
       recognition.continuous = false
       recognition.interimResults = false
       recognition.lang = 'en-US'
-
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = event.results[0][0].transcript
         setInput((prev) => (prev ? prev + ' ' + transcript : transcript))
         setIsListening(false)
       }
-
       recognition.onerror = () => setIsListening(false)
       recognition.onend = () => setIsListening(false)
-
       recognitionRef.current = recognition
     }
   }, [])
@@ -261,59 +286,44 @@ export default function App() {
         }),
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        return data.content || 'Sorry, I could not generate a response.'
-      }
-    } catch (err) {
-      console.error('Proxy call failed:', err)
-    }
+      const data = await response.json()
+      if (response.ok && data.content) return data.content
 
-    await new Promise((r) => setTimeout(r, 900 + Math.random() * 800))
-    const lower = userMessage.toLowerCase()
-    if (lower.includes('slogan') || lower.includes('tagline')) return DEMO_RESPONSES[2]
-    if (lower.includes('channel') || lower.includes('platform') || lower.includes('focus'))
-      return DEMO_RESPONSES[0]
-    if (lower.includes('campaign') || lower.includes('marketing') || lower.includes('idea'))
-      return DEMO_RESPONSES[1]
-    return DEMO_RESPONSES[Math.floor(Math.random() * DEMO_RESPONSES.length)]
+      console.error('API error:', data)
+      return `⚠️ ${data?.error || 'AI error'}. Check ANTHROPIC_API_KEY in Vercel and redeploy.`
+    } catch (err: any) {
+      console.error('Proxy call failed:', err)
+      return `⚠️ Could not reach the AI service. ${err.message || ''}`
+    }
   }
 
-  const handleSend = async () => {
-    const trimmed = input.trim()
+  const handleSend = async (overrideText?: string) => {
+    const trimmed = (overrideText ?? input).trim()
     if (!trimmed || isLoading || !user) return
 
     const userMsg: Message = { id: generateId(), role: 'user', content: trimmed }
-
     setMessages((prev) => [...prev, userMsg])
     setInput('')
     setIsLoading(true)
 
     try {
       let convId = currentConversationId
-
       if (!convId) {
         convId = await createNewConversation(trimmed)
         if (!convId) throw new Error('Could not create conversation')
       }
 
       await saveMessage(convId, 'user', trimmed)
-
       const reply = await callAI(trimmed, messages)
       const assistantMsg: Message = { id: generateId(), role: 'assistant', content: reply }
       setMessages((prev) => [...prev, assistantMsg])
-
       await saveMessage(convId, 'assistant', reply)
       loadConversations()
     } catch (err) {
       console.error(err)
       setMessages((prev) => [
         ...prev,
-        {
-          id: generateId(),
-          role: 'assistant',
-          content: 'Something went wrong. Please try again.',
-        },
+        { id: generateId(), role: 'assistant', content: 'Something went wrong. Please try again.' },
       ])
     } finally {
       setIsLoading(false)
@@ -343,8 +353,8 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#0a0a0b]">
-        <Loader2 className="w-7 h-7 animate-spin text-slate-500" />
+      <div className="flex items-center justify-center h-screen bg-[#f0f4ff]">
+        <Loader2 className="w-7 h-7 animate-spin text-slate-400" />
       </div>
     )
   }
@@ -357,84 +367,76 @@ export default function App() {
     user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'
 
   return (
-    <div className="flex h-screen bg-[#fafafa] overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-b from-[#eef2ff] via-[#f8fafc] to-[#f1f5f9]">
       {/* Desktop Sidebar */}
-      <aside
-        className={`hidden lg:flex flex-col border-r border-slate-200/80 bg-white transition-all duration-300 ${
-          sidebarOpen ? 'w-[260px]' : 'w-[68px]'
-        }`}
-      >
-        <div className="h-14 flex items-center justify-between px-4 border-b border-slate-100">
-          {sidebarOpen && (
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center">
-                <svg width="14" height="14" viewBox="0 0 32 32" fill="none">
-                  <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fillOpacity="0.95" />
-                  <path d="M16 12L24 8V16L16 20V12Z" fill="white" fillOpacity="0.7" />
-                  <path d="M8 16L16 12V20L8 24V16Z" fill="white" fillOpacity="0.5" />
-                </svg>
-              </div>
-              <span className="font-semibold text-slate-900 text-[15px]">Quantum</span>
-            </div>
-          )}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 transition"
-          >
-            {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
-          </button>
+      <aside className="hidden lg:flex w-[280px] flex-col border-r border-white/60 bg-white/70 backdrop-blur-xl">
+        <div className="h-16 flex items-center gap-2.5 px-5">
+          <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center shadow-sm">
+            <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
+              <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fillOpacity="0.95" />
+              <path d="M16 12L24 8V16L16 20V12Z" fill="white" fillOpacity="0.7" />
+              <path d="M8 16L16 12V20L8 24V16Z" fill="white" fillOpacity="0.5" />
+            </svg>
+          </div>
+          <span className="font-semibold text-slate-900 text-[15px] tracking-tight">Quantum</span>
         </div>
 
-        <div className="p-3">
+        <div className="px-4 mb-3">
           <button
             onClick={startNewChat}
-            className={`w-full flex items-center gap-2 h-9 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition ${
-              sidebarOpen ? 'px-3 justify-start' : 'justify-center'
-            }`}
+            className="w-full flex items-center gap-2 h-10 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition shadow-sm px-4"
           >
             <Plus className="w-4 h-4" />
-            {sidebarOpen && 'New chat'}
+            New chat
           </button>
         </div>
 
-        {sidebarOpen && (
-          <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5">
-            {conversations.length === 0 && (
-              <p className="text-xs text-slate-400 text-center py-10 px-4">
-                No conversations yet
-              </p>
-            )}
-            {conversations.map((conv) => (
+        <div className="flex-1 overflow-y-auto px-3 space-y-0.5 pb-4">
+          {conversations.length === 0 && (
+            <p className="text-xs text-slate-400 text-center py-12">No chats yet</p>
+          )}
+          {conversations.map((conv) => (
+            <div
+              key={conv.id}
+              className={`group flex items-center gap-1 rounded-xl transition ${
+                currentConversationId === conv.id ? 'bg-white shadow-sm' : 'hover:bg-white/60'
+              }`}
+            >
               <button
-                key={conv.id}
                 onClick={() => loadMessages(conv.id)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-[13px] transition flex items-center gap-2.5 ${
-                  currentConversationId === conv.id
-                    ? 'bg-slate-100 text-slate-900 font-medium'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
+                className="flex-1 text-left px-3 py-2.5 text-[13px] flex items-center gap-2.5 min-w-0"
               >
-                <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
-                <span className="truncate">{conv.title || 'Untitled'}</span>
+                <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+                <span className="truncate text-slate-700">{conv.title || 'Untitled'}</span>
               </button>
-            ))}
-          </div>
-        )}
+              <button
+                onClick={() => deleteConversation(conv.id)}
+                disabled={deletingId === conv.id}
+                className="opacity-0 group-hover:opacity-100 p-2 mr-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition"
+                title="Delete chat"
+              >
+                {deletingId === conv.id ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
 
-        <div className="p-3 border-t border-slate-100">
+        <div className="p-3 border-t border-slate-100/80">
           <button
             onClick={() => setShowSettings(true)}
-            className={`w-full flex items-center gap-2.5 h-9 rounded-lg text-slate-600 hover:bg-slate-50 text-sm transition ${
-              sidebarOpen ? 'px-3' : 'justify-center'
-            }`}
+            className="w-full flex items-center gap-2.5 h-10 rounded-xl px-3 text-slate-600 hover:bg-white text-sm transition"
           >
             <Settings className="w-4 h-4" />
-            {sidebarOpen && <span className="truncate">{user.email}</span>}
+            <span className="truncate">{user.email}</span>
           </button>
         </div>
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Sidebar */}
       <AnimatePresence>
         {mobileSidebar && (
           <>
@@ -442,20 +444,20 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
               onClick={() => setMobileSidebar(false)}
             />
             <motion.aside
-              initial={{ x: -280 }}
+              initial={{ x: -300 }}
               animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className="fixed left-0 top-0 bottom-0 w-[280px] bg-white z-50 flex flex-col lg:hidden shadow-2xl"
+              exit={{ x: -300 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+              className="fixed left-0 top-0 bottom-0 w-[300px] bg-white z-50 flex flex-col lg:hidden shadow-2xl"
             >
-              <div className="h-14 flex items-center justify-between px-4 border-b border-slate-100">
+              <div className="h-16 flex items-center justify-between px-4">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 32 32" fill="none">
+                  <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
                       <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fillOpacity="0.95" />
                       <path d="M16 12L24 8V16L16 20V12Z" fill="white" fillOpacity="0.7" />
                       <path d="M8 16L16 12V20L8 24V16Z" fill="white" fillOpacity="0.5" />
@@ -463,38 +465,43 @@ export default function App() {
                   </div>
                   <span className="font-semibold text-slate-900">Quantum</span>
                 </div>
-                <button
-                  onClick={() => setMobileSidebar(false)}
-                  className="p-1.5 rounded-md hover:bg-slate-100"
-                >
+                <button onClick={() => setMobileSidebar(false)} className="p-2 rounded-full hover:bg-slate-100">
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
 
-              <div className="p-3">
+              <div className="px-4 mb-3">
                 <button
                   onClick={startNewChat}
-                  className="w-full flex items-center gap-2 px-3 h-9 rounded-lg bg-slate-900 text-white text-sm font-medium"
+                  className="w-full flex items-center gap-2 h-10 rounded-xl bg-slate-900 text-white text-sm font-medium px-4"
                 >
                   <Plus className="w-4 h-4" />
                   New chat
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+              <div className="flex-1 overflow-y-auto px-3 space-y-0.5">
                 {conversations.map((conv) => (
-                  <button
+                  <div
                     key={conv.id}
-                    onClick={() => loadMessages(conv.id)}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition flex items-center gap-2.5 ${
-                      currentConversationId === conv.id
-                        ? 'bg-slate-100 text-slate-900 font-medium'
-                        : 'text-slate-600 hover:bg-slate-50'
+                    className={`flex items-center rounded-xl ${
+                      currentConversationId === conv.id ? 'bg-slate-100' : ''
                     }`}
                   >
-                    <MessageSquare className="w-4 h-4 flex-shrink-0 opacity-60" />
-                    <span className="truncate">{conv.title || 'Untitled'}</span>
-                  </button>
+                    <button
+                      onClick={() => loadMessages(conv.id)}
+                      className="flex-1 text-left px-3 py-2.5 text-sm flex items-center gap-2.5 min-w-0"
+                    >
+                      <MessageSquare className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      <span className="truncate text-slate-700">{conv.title || 'Untitled'}</span>
+                    </button>
+                    <button
+                      onClick={() => deleteConversation(conv.id)}
+                      className="p-2 mr-1 text-slate-400 hover:text-red-500"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </motion.aside>
@@ -502,86 +509,115 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Main content */}
+      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 flex items-center justify-between px-4 lg:px-6 border-b border-slate-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-20">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setMobileSidebar(true)}
-              className="lg:hidden p-2 -ml-1 rounded-lg hover:bg-slate-100"
-            >
-              <Menu className="w-5 h-5 text-slate-700" />
-            </button>
-            <span className="text-sm font-medium text-slate-500 hidden sm:block">
-              {currentConversationId
-                ? conversations.find((c) => c.id === currentConversationId)?.title || 'Chat'
-                : 'New conversation'}
-            </span>
+        {/* Top bar */}
+        <header className="h-14 lg:h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
+          <div className="flex items-center gap-2">
+            {!isEmpty ? (
+              <button
+                onClick={startNewChat}
+                className="p-2 -ml-1 rounded-full hover:bg-white/80 transition lg:hidden"
+              >
+                <ArrowLeft className="w-5 h-5 text-slate-600" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setMobileSidebar(true)}
+                className="p-2 -ml-1 rounded-full hover:bg-white/80 transition lg:hidden"
+              >
+                <Menu className="w-5 h-5 text-slate-600" />
+              </button>
+            )}
+
+            {/* Model toggle */}
+            <div className="flex items-center bg-white/80 backdrop-blur rounded-full p-1 shadow-sm border border-white">
+              {MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedModel(m)}
+                  className={`relative px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    selectedModel.id === m.id
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {m.name}
+                  {m.badge && selectedModel.id === m.id && (
+                    <span className="ml-1 text-[10px] opacity-80">{m.badge}</span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowSettings(true)}
-              className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition"
-            >
-              <Settings className="w-4.5 h-4.5" />
-            </button>
-          </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-2 rounded-full hover:bg-white/80 transition text-slate-500"
+          >
+            <MoreHorizontal className="w-5 h-5" />
+          </button>
         </header>
 
+        {/* Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-4 lg:px-6">
+          <div className="max-w-2xl mx-auto px-4 lg:px-6 h-full">
             <AnimatePresence mode="wait">
               {isEmpty ? (
                 <motion.div
-                  key="empty"
-                  initial={{ opacity: 0, y: 16 }}
+                  key="welcome"
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.4 }}
-                  className="flex flex-col items-center justify-center min-h-[calc(100vh-14rem)] text-center"
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex flex-col items-center justify-center min-h-[calc(100%-2rem)] py-8 text-center"
                 >
-                  <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center mb-6 shadow-lg shadow-slate-900/10">
-                    <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
-                      <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" fillOpacity="0.95" />
-                      <path d="M16 12L24 8V16L16 20V12Z" fill="white" fillOpacity="0.7" />
-                      <path d="M8 16L16 12V20L8 24V16Z" fill="white" fillOpacity="0.5" />
-                    </svg>
-                  </div>
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="text-slate-500 text-sm mb-2"
+                  >
+                    {getGreeting()}, {displayName}!
+                  </motion.p>
 
-                  <h1 className="text-2xl font-semibold text-slate-900 tracking-tight mb-2">
-                    {getGreeting()}, {displayName}
-                  </h1>
-                  <p className="text-slate-500 text-[15px] max-w-sm">
-                    Ask me anything. I can help with your emails, documents, data, and more.
-                  </p>
+                  <motion.h1
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 }}
+                    className="text-[28px] sm:text-3xl font-semibold text-slate-900 tracking-tight leading-tight mb-10"
+                  >
+                    What are we going<br className="sm:hidden" /> to do today?
+                  </motion.h1>
 
-                  <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
-                    {[
-                      'What did I receive about the wheat order?',
-                      'Show me invoices from last month',
-                      'Summarize my latest emails',
-                      'Which trades are still pending?',
-                    ].map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        onClick={() => {
-                          setInput(suggestion)
-                          inputRef.current?.focus()
-                        }}
-                        className="text-left px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                    {CATEGORIES.map((cat, i) => {
+                      const Icon = cat.icon
+                      return (
+                        <motion.button
+                          key={cat.id}
+                          initial={{ opacity: 0, y: 16 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2 + i * 0.06 }}
+                          onClick={() => handleSend(cat.prompt)}
+                          className="text-left p-4 rounded-2xl bg-white/90 backdrop-blur border border-white shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                          <div className={`w-9 h-9 rounded-xl ${cat.color} flex items-center justify-center mb-3`}>
+                            <Icon className="w-4.5 h-4.5" />
+                          </div>
+                          <div className="text-sm font-semibold text-slate-900 mb-0.5">{cat.title}</div>
+                          <div className="text-xs text-slate-500 leading-snug">{cat.desc}</div>
+                        </motion.button>
+                      )
+                    })}
                   </div>
                 </motion.div>
               ) : (
                 <motion.div
-                  key="messages"
+                  key="chat"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="py-8 space-y-6"
+                  className="py-6 space-y-5 pb-4"
                 >
                   {messages.map((msg) => (
                     <MessageBubble key={msg.id} message={msg} />
@@ -593,12 +629,12 @@ export default function App() {
                       animate={{ opacity: 1, y: 0 }}
                       className="flex gap-3"
                     >
-                      <div className="w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <svg width="12" height="12" viewBox="0 0 32 32" fill="none">
+                      <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0">
+                        <svg width="14" height="14" viewBox="0 0 32 32" fill="none">
                           <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" />
                         </svg>
                       </div>
-                      <div className="flex gap-1.5 items-center h-7">
+                      <div className="flex gap-1.5 items-center h-8">
                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse-dot" style={{ animationDelay: '0ms' }} />
                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse-dot" style={{ animationDelay: '160ms' }} />
                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse-dot" style={{ animationDelay: '320ms' }} />
@@ -613,104 +649,51 @@ export default function App() {
           </div>
         </main>
 
-        <div className="border-t border-slate-200/80 bg-white/90 backdrop-blur-md">
-          <div className="max-w-3xl mx-auto px-4 lg:px-6 py-4">
-            <div className="relative">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm focus-within:border-slate-300 focus-within:shadow-md transition-all">
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask anything…"
-                  rows={1}
-                  className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-[15px] text-slate-900 placeholder:text-slate-400 leading-relaxed max-h-40 outline-none"
-                  style={{ minHeight: '48px' }}
-                />
+        {/* Input */}
+        <div className="px-4 lg:px-6 pb-5 pt-2 shrink-0">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-end gap-2 bg-white/90 backdrop-blur-xl border border-white shadow-lg shadow-slate-200/50 rounded-2xl px-2 py-2 focus-within:shadow-xl transition-shadow">
+              <button className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-50 transition">
+                <Plus className="w-5 h-5" />
+              </button>
 
-                <div className="flex items-center justify-between px-3 pb-3">
-                  <button
-                    onClick={() => setShowModelPicker(!showModelPicker)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 py-1.5 px-2 rounded-lg hover:bg-slate-50 transition"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {selectedModel.name}
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </button>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type prompt…"
+                rows={1}
+                className="flex-1 resize-none bg-transparent py-2.5 text-[15px] text-slate-900 placeholder:text-slate-400 leading-relaxed max-h-32 outline-none"
+                style={{ minHeight: '40px' }}
+              />
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={toggleListening}
-                      className={`p-2 rounded-lg transition ${
-                        isListening
-                          ? 'bg-red-50 text-red-600'
-                          : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
-                      }`}
-                    >
-                      <Mic className="w-4 h-4" />
-                    </button>
+              <button
+                onClick={toggleListening}
+                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${
+                  isListening ? 'bg-red-50 text-red-500' : 'text-slate-400 hover:bg-slate-50'
+                }`}
+              >
+                <Mic className="w-5 h-5" />
+              </button>
 
-                    <button
-                      onClick={handleSend}
-                      disabled={!input.trim() || isLoading}
-                      className={`p-2 rounded-lg transition ${
-                        input.trim() && !isLoading
-                          ? 'bg-slate-900 text-white hover:bg-slate-800'
-                          : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                      }`}
-                    >
-                      <Send className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <AnimatePresence>
-                {showModelPicker && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-30"
-                      onClick={() => setShowModelPicker(false)}
-                    />
-                    <motion.div
-                      initial={{ opacity: 0, y: 6, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                      className="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-40"
-                    >
-                      {MODELS.map((model) => (
-                        <button
-                          key={model.id}
-                          onClick={() => {
-                            setSelectedModel(model)
-                            setShowModelPicker(false)
-                          }}
-                          className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition flex items-center justify-between ${
-                            selectedModel.id === model.id ? 'bg-slate-50' : ''
-                          }`}
-                        >
-                          <div>
-                            <div className="text-sm font-medium text-slate-900">{model.name}</div>
-                            <div className="text-xs text-slate-500">{model.description}</div>
-                          </div>
-                          {selectedModel.id === model.id && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-slate-900" />
-                          )}
-                        </button>
-                      ))}
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
+              <button
+                onClick={() => handleSend()}
+                disabled={!input.trim() || isLoading}
+                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition ${
+                  input.trim() && !isLoading
+                    ? 'bg-slate-900 text-white shadow-md hover:bg-slate-800'
+                    : 'bg-slate-100 text-slate-300'
+                }`}
+              >
+                <Send className="w-4 h-4" />
+              </button>
             </div>
-
-            <p className="text-center text-[11px] text-slate-400 mt-3">
-              Quantum can make mistakes. Verify important information.
-            </p>
           </div>
         </div>
       </div>
 
+      {/* Settings */}
       <AnimatePresence>
         {showSettings && (
           <>
@@ -718,41 +701,31 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/40 z-50"
+              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50"
               onClick={() => setShowSettings(false)}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 10 }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl z-50 p-6 shadow-2xl"
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-white rounded-3xl z-50 p-6 shadow-2xl"
             >
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-semibold text-slate-900">Settings</h2>
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="p-1.5 rounded-lg hover:bg-slate-100"
-                >
+                <button onClick={() => setShowSettings(false)} className="p-1.5 rounded-full hover:bg-slate-100">
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-xs font-medium text-slate-500 mb-1">Signed in as</p>
+              <div className="space-y-3">
+                <div className="bg-slate-50 rounded-2xl p-4">
+                  <p className="text-xs font-medium text-slate-400 mb-1">Signed in as</p>
                   <p className="text-sm text-slate-900 truncate">{user.email}</p>
-                </div>
-
-                <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-600 leading-relaxed">
-                  <p className="font-medium text-slate-800 mb-1">API key is secure</p>
-                  <p className="text-[13px]">
-                    Your Anthropic key lives only on the server and is never exposed to the browser.
-                  </p>
                 </div>
 
                 <button
                   onClick={handleSignOut}
-                  className="w-full h-10 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition flex items-center justify-center gap-2"
+                  className="w-full h-11 rounded-2xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition flex items-center justify-center gap-2"
                 >
                   <LogOut className="w-4 h-4" />
                   Sign out
@@ -771,31 +744,31 @@ function MessageBubble({ message }: { message: Message }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
     >
       {!isUser && (
-        <div className="w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <svg width="12" height="12" viewBox="0 0 32 32" fill="none">
+        <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+          <svg width="14" height="14" viewBox="0 0 32 32" fill="none">
             <path d="M8 8L16 4L24 8V16L16 20L8 16V8Z" fill="white" />
           </svg>
         </div>
       )}
 
       <div
-        className={`max-w-[80%] px-4 py-2.5 text-[15px] leading-relaxed ${
+        className={`max-w-[85%] px-4 py-3 text-[15px] leading-relaxed ${
           isUser
-            ? 'bg-slate-900 text-white rounded-2xl rounded-br-md'
-            : 'bg-white border border-slate-200/80 text-slate-800 rounded-2xl rounded-bl-md shadow-sm'
+            ? 'bg-slate-900 text-white rounded-2xl rounded-br-md shadow-md'
+            : 'bg-white/90 backdrop-blur border border-white text-slate-800 rounded-2xl rounded-bl-md shadow-sm'
         }`}
       >
         {isUser ? (
           <div className="whitespace-pre-wrap break-words">{message.content}</div>
         ) : (
           <div
-            className="break-words prose-sm"
+            className="break-words"
             dangerouslySetInnerHTML={{ __html: formatMarkdown(message.content) }}
           />
         )}
