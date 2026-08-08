@@ -250,7 +250,6 @@ export default function App() {
       }
     } catch (err: any) {
       if (err?.name === 'AbortError') {
-        // Return whatever was streamed so far so caller can persist it
         return full
       }
       throw err
@@ -280,17 +279,14 @@ export default function App() {
       convId = await ensureConversation(trimmed)
       await saveMessage(convId, 'user', trimmed)
       const reply = await streamAI(trimmed, history, assistantId)
-      // reply may be partial if user stopped
       if (reply && reply.trim()) {
         await saveMessage(convId, 'assistant', reply)
       } else {
-        // empty after abort — remove the empty assistant bubble
         setMessages((p) => p.filter((m) => m.id !== assistantId))
       }
       await loadConversations()
     } catch (err: any) {
       if (err?.name === 'AbortError') {
-        // Capture partial from messagesRef (streamAI may have returned early)
         const partial = messagesRef.current.find((m) => m.id === assistantId)?.content || ''
         if (partial.trim() && convId) {
           try {
@@ -421,12 +417,28 @@ export default function App() {
 
       <AnimatePresence>
         {showSettings && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40" onClick={() => setShowSettings(false)}>
-            <motion.div initial={{ y: 48 }} animate={{ y: 0 }} exit={{ y: 48 }} transition={{ type: 'spring', damping: 28, stiffness: 320 }} className={`w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto ${dark ? 'bg-[#12121a]' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-[2px]"
+            onClick={() => setShowSettings(false)}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0.9, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className={`w-full sm:max-w-[720px] h-[min(640px,88vh)] sm:h-[min(560px,85vh)] rounded-t-[20px] sm:rounded-[20px] overflow-hidden shadow-2xl ring-1 ${
+                dark ? 'bg-[#111113] ring-white/[0.06]' : 'bg-white ring-black/[0.06]'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <Settings
                 dark={dark}
                 glass={glass}
                 user={user}
+                onClose={() => setShowSettings(false)}
                 onSignOut={async () => { await supabase.auth.signOut(); setShowSettings(false) }}
                 onToggleTheme={() => setDark((d) => !d)}
                 onToggleGlass={() => setGlass((g) => !g)}
