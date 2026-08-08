@@ -43,3 +43,35 @@ body {
 .animate-pulse-dot {
   animation: pulse-dot 1.4s infinite ease-in-out both;
 }
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+}
+
+/* AI response formatting */
+.ai-content p {
+  margin-bottom: 0.75rem;
+}
+.ai-content p:last-child {
+  margin-bottom: 0;
+}
+.ai-content ul,
+.ai-content ol {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.25rem;
+}
+.ai-content li {
+  margin-bottom: 0.25rem;
+}
+.ai-content strong {
+  font-weight: 600;
+  color: #0f172a;
+}
+.ai-content code {
+  font-size: 0.85em;
+}
