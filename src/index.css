@@ -207,3 +207,11 @@ html.dark .ai-content .md-table th,
 html.dark .ai-content .md-table td {
   border-color: rgba(255, 255, 255, 0.08);
 }
+
+/* Smoother interactive feedback */
+button, a {
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+}
+textarea {
+  transition: height 0.12s ease;
+}
