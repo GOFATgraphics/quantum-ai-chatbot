@@ -1,6 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-// NOTE: this file is google.js — ignore the accidental import above if present
+/** Shared Google OAuth + token helpers for serverless functions */
 
 export const PROVIDER_SCOPES = {
   gmail: [
