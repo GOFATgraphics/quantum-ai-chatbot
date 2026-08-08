@@ -33,12 +33,8 @@ input, textarea, button, select {
 }
 
 html:not(.dark) body {
-  background:
-    radial-gradient(ellipse 80% 60% at 10% -10%, rgba(99, 102, 241, 0.18), transparent 50%),
-    radial-gradient(ellipse 70% 50% at 90% 10%, rgba(167, 139, 250, 0.16), transparent 45%),
-    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(56, 189, 248, 0.1), transparent 50%),
-    #f8f9fc;
-  color: #0f172a;
+  background: #ffffff;
+  color: #1f1f1f;
 }
 
 html.dark body {
@@ -171,7 +167,7 @@ html.dark .ai-content .md-code { background: #1e293b; color: #e2e8f0; }
 html:not(.dark) .ai-content .md-code { background: #f1f5f9; color: #334155; }
 
 .ai-content .md-link {
-  color: #4f46e5;
+  color: #1a73e8;
   text-decoration: underline;
   text-underline-offset: 2px;
   word-break: break-word;
@@ -208,7 +204,6 @@ html.dark .ai-content .md-table td {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Smoother interactive feedback */
 button, a {
   transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
