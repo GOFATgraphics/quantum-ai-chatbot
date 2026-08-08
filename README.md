@@ -1,73 +1,121 @@
 # Quantum AI Chatbot
 
-A premium, smooth UI/UX AI chatbot mobile app inspired by modern design systems.
+Premium mobile-first AI chatbot with **Supabase Auth + conversation history**.
 
-## Features
+## Phase 1 Features (current)
 
-- ✨ Beautiful, clean mobile-first design
-- 💬 Smooth message animations with Framer Motion
-- 🤖 Real AI responses powered by xAI Grok
-- 📱 Fully responsive — feels native on mobile
-- 🎨 Premium typography, spacing & micro-interactions
-- 🔊 Voice input (Web Speech API)
-- 🎯 Model selector (Quantum 3)
-- ☀️ Dynamic time-of-day greeting
-- 🔒 **API key is never exposed to the browser**
+- Beautiful, smooth UI matching modern design systems
+- Supabase authentication (email + password)
+- Persistent conversation history per user
+- Sidebar with past chats
+- Secure xAI / Grok proxy (API key never exposed to browser)
+- Voice input
+- Model selector
 
-## Tech Stack
+## Setup
 
-- React 18 + TypeScript
-- Vite
-- Tailwind CSS
-- Framer Motion
-- Lucide React
-- Vercel Serverless Function (secure proxy)
+### 1. Supabase Database
 
-## Getting Started (Local)
+Go to your Supabase project → **SQL Editor** → New query and run this:
+
+```sql
+-- Conversations table
+create table public.conversations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  title text,
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+
+-- Messages table
+create table public.messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid references public.conversations(id) on delete cascade not null,
+  role text check (role in ('user', 'assistant')) not null,
+  content text not null,
+  created_at timestamptz default now() not null
+);
+
+-- Indexes
+create index conversations_user_id_idx on public.conversations(user_id);
+create index messages_conversation_id_idx on public.messages(conversation_id);
+
+-- Enable RLS
+alter table public.conversations enable row level security;
+alter table public.messages enable row level security;
+
+-- Policies: users can only see/edit their own data
+create policy "Users can view own conversations"
+  on public.conversations for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own conversations"
+  on public.conversations for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update own conversations"
+  on public.conversations for update
+  using (auth.uid() = user_id);
+
+create policy "Users can delete own conversations"
+  on public.conversations for delete
+  using (auth.uid() = user_id);
+
+create policy "Users can view messages of own conversations"
+  on public.messages for select
+  using (
+    exists (
+      select 1 from public.conversations
+      where conversations.id = messages.conversation_id
+      and conversations.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can insert messages into own conversations"
+  on public.messages for insert
+  with check (
+    exists (
+      select 1 from public.conversations
+      where conversations.id = messages.conversation_id
+      and conversations.user_id = auth.uid()
+    )
+  );
+```
+
+### 2. Environment Variables
+
+**Local (`.env` file):**
+
+```env
+VITE_SUPABASE_URL=https://ypzrczwyfvqlydeocbmm.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_public_key_here
+```
+
+**Vercel:**
+
+Add the same two variables + the existing `XAI_API_KEY` in Project Settings → Environment Variables.
+
+> Get the anon key from Supabase → Project Settings → API → `anon` `public`
+
+### 3. Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+### 4. Deploy
 
-> Note: Locally the `/api/chat` route only works after you deploy or use `vercel dev`.
-> Without the backend key the app falls back to intelligent demo responses.
+Push to GitHub. Vercel will redeploy automatically. Make sure the three env vars are set.
 
-## Deploy on Vercel (Recommended)
+## Next Phases
 
-1. Push this repo to GitHub (already done).
-2. Import the project in [Vercel](https://vercel.com).
-3. Go to **Project Settings → Environment Variables** and add:
+- **Phase 2**: Google OAuth + Gmail / Drive / Sheets search tools
+- **Phase 3**: Multi-source orchestration + more providers
 
-   | Name          | Value              |
-   |---------------|--------------------|
-   | `XAI_API_KEY` | your xAI API key   |
+## Security notes
 
-4. Redeploy.
-
-Your key now lives **only** on the server. The frontend calls `/api/chat` and the serverless function talks to xAI.
-
-## How the security works
-
-```
-Browser  →  /api/chat (Vercel Serverless)  →  xAI API
-                 ↑
-           XAI_API_KEY (env var)
-```
-
-- The secret never reaches the client.
-- No `VITE_` prefix = not bundled into the JS.
-- No localStorage storage of the key.
-
-## Design
-
-Faithfully recreates the provided mobile UI:
-- Soft rounded message bubbles
-- Clean white canvas
-- Top bar with Free plan · Upgrade
-- Bottom input with +, model picker, mic & send
-- Greeting screen with logo & personalized greeting
-
-Enjoy the premium experience ✨
+- API key stays on the server only (`XAI_API_KEY`)
+- All chat data is protected by Row Level Security
+- Users can only see their own conversations
