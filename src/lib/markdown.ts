@@ -3,9 +3,9 @@ export function formatMarkdown(text: string): string {
   if (!text) return ''
 
   const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
 
   const lines = escaped.split('\n')
   const out: string[] = []
@@ -57,11 +57,11 @@ export function formatMarkdown(text: string): string {
 
   const shortenUrl = (url: string) => {
     try {
-      const u = new URL(url.replace(/&amp;/g, '&'))
+      const u = new URL(url.replace(/&/g, '&'))
       if (u.hostname.includes('docs.google.com')) {
         if (u.pathname.includes('/document/')) return 'Open Google Doc'
         if (u.pathname.includes('/spreadsheets/')) return 'Open Spreadsheet'
-        if (u.pathname.includes('/presentation/')) return 'Open Spides'
+        if (u.pathname.includes('/presentation/')) return 'Open Slides'
         return 'Open in Drive'
       }
       if (u.hostname.includes('drive.google.com')) return 'Open in Drive'
