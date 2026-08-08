@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Link2, Unplug } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase, CONNECTOR_CATALOG, type Connector } from '../lib/supabase'
 import {
   GmailIcon, DriveIcon, SheetsIcon, DocsIcon, CalendarIcon, OutlookIcon, ExcelIcon,
@@ -8,26 +8,32 @@ import {
 type Props = {
   dark: boolean
   accessToken: string
+  onClose?: () => void
 }
 
 const BRAND: Record<string, React.ReactNode> = {
-  gmail: <GmailIcon size={26} />,
-  google_drive: <DriveIcon size={26} />,
-  google_sheets: <SheetsIcon size={26} />,
-  google_docs: <DocsIcon size={26} />,
-  google_calendar: <CalendarIcon size={26} />,
-  outlook: <OutlookIcon size={26} />,
-  excel: <ExcelIcon size={26} />,
+  gmail: <GmailIcon size={24} />,
+  google_drive: <DriveIcon size={24} />,
+  google_sheets: <SheetsIcon size={24} />,
+  google_docs: <DocsIcon size={24} />,
+  google_calendar: <CalendarIcon size={24} />,
+  outlook: <OutlookIcon size={24} />,
+  excel: <ExcelIcon size={24} />,
 }
 
-export default function Connectors({ dark, accessToken }: Props) {
+export default function Connectors({ dark, accessToken, onClose }: Props) {
   const [connectors, setConnectors] = useState<Connector[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
 
-  const textMuted = dark ? 'text-slate-400' : 'text-slate-500'
-  const textMain = dark ? 'text-slate-100' : 'text-slate-900'
+  const bg = dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
+  const textMain = dark ? 'text-white' : 'text-slate-900'
+  const textMuted = dark ? 'text-white/40' : 'text-slate-500'
+  const card = dark ? 'bg-[#1c1c1e]' : 'bg-white shadow-sm'
+  const rowBorder = dark ? 'border-white/[0.06]' : 'border-black/[0.06]'
+  const iconBg = dark ? 'bg-white/[0.08]' : 'bg-[#f0f0f5]'
 
   const load = async () => {
     setLoading(true)
@@ -89,6 +95,7 @@ export default function Connectors({ dark, accessToken }: Props) {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Disconnect failed')
       setConnectors((prev) => prev.filter((c) => c.provider !== provider))
+      setSelected(null)
     } catch (e: any) {
       setError(e.message || 'Failed to disconnect')
     } finally {
@@ -96,68 +103,159 @@ export default function Connectors({ dark, accessToken }: Props) {
     }
   }
 
+  const available = CONNECTOR_CATALOG.filter((c) => c.available)
+  const connectedList = available.filter((c) => getConnected(c.provider))
+  const suggestedList = available.filter((c) => !getConnected(c.provider))
+
+  const selectedItem = selected
+    ? available.find((c) => c.provider === selected)
+    : null
+  const selectedConn = selected ? getConnected(selected) : null
+
   return (
-    <div className="space-y-3">
-      <p className={`text-sm ${textMuted}`}>
-        Connect your work tools so Quantumy can search mail, files, calendar, Outlook, and Excel.
-      </p>
-      {error && (
-        <div className={`rounded-xl px-3 py-2 text-sm ${dark ? 'bg-amber-500/10 text-amber-200' : 'bg-amber-50 text-amber-800'}`}>
-          {error}
-        </div>
-      )}
-      {loading ? (
-        <div className="flex justify-center py-8"><Loader2 className={`w-5 h-5 animate-spin ${textMuted}`} /></div>
-      ) : (
-        <div className="space-y-2">
-          {CONNECTOR_CATALOG.map((item) => {
-            const connected = getConnected(item.provider)
-            const isBusy = busy === item.provider
-            return (
-              <div
-                key={item.provider}
-                className={`flex items-center gap-3 rounded-2xl p-3 ${dark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}
-              >
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-white shadow-sm">
-                  {BRAND[item.provider]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${textMain}`}>{item.name}</p>
-                  <p className={`text-xs truncate ${textMuted}`}>
-                    {connected?.account_email || item.description}
-                  </p>
-                  {!item.available && !connected && (
-                    <p className="text-[11px] text-slate-400 mt-0.5">Coming soon</p>
-                  )}
-                </div>
-                {item.available ? (
-                  connected ? (
-                    <button
-                      type="button"
-                      onClick={() => disconnect(item.provider)}
-                      disabled={isBusy}
-                      className="shrink-0 h-8 px-3 rounded-xl text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10 flex items-center gap-1.5"
-                    >
-                      {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unplug className="w-3.5 h-3.5" />}
-                      Disconnect
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => connect(item.provider)}
-                      disabled={isBusy}
-                      className="shrink-0 h-8 px-3 rounded-xl text-xs font-medium text-white bg-slate-900 hover:bg-black dark:bg-white dark:text-slate-900 flex items-center gap-1.5"
-                    >
-                      {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
-                      Connect
-                    </button>
-                  )
-                ) : null}
+    <div className={`flex flex-col h-full min-h-0 ${bg}`}>
+      {/* Header */}
+      <div className="relative flex items-center justify-center h-14 shrink-0 px-4">
+        <button
+          type="button"
+          onClick={() => (selected ? setSelected(null) : onClose?.())}
+          className={`absolute left-4 w-9 h-9 rounded-full flex items-center justify-center ${
+            dark ? 'bg-white/10 text-white' : 'bg-white text-slate-800 shadow-sm'
+          }`}
+          aria-label="Back"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <h2 className={`text-[17px] font-semibold ${textMain}`}>
+          {selectedItem ? selectedItem.name : 'Connectors'}
+        </h2>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">
+        {error && (
+          <div
+            className={`rounded-2xl px-4 py-3 text-[14px] ${
+              dark ? 'bg-amber-500/10 text-amber-200' : 'bg-amber-50 text-amber-800'
+            }`}
+          >
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className={`w-6 h-6 animate-spin ${textMuted}`} />
+          </div>
+        ) : selectedItem ? (
+          /* Detail for a connected app */
+          <div className="space-y-4">
+            <div className={`rounded-2xl ${card} px-4 py-5 flex flex-col items-center text-center`}>
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${iconBg}`}>
+                {BRAND[selectedItem.provider]}
               </div>
-            )
-          })}
-        </div>
-      )}
+              <p className={`mt-3 text-[18px] font-semibold ${textMain}`}>{selectedItem.name}</p>
+              <p className={`text-[14px] mt-1 ${textMuted}`}>
+                {selectedConn?.account_email || selectedItem.description}
+              </p>
+              <p className={`text-[13px] mt-3 ${textMuted}`}>{selectedItem.scopesLabel}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => disconnect(selectedItem.provider)}
+              disabled={busy === selectedItem.provider}
+              className="w-full h-12 rounded-2xl text-[16px] font-medium text-red-500 bg-red-500/10 active:bg-red-500/15 disabled:opacity-50"
+            >
+              {busy === selectedItem.provider ? (
+                <Loader2 className="w-4 h-4 animate-spin inline" />
+              ) : (
+                'Disconnect'
+              )}
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Connected */}
+            {connectedList.length > 0 && (
+              <div>
+                <p className={`text-[13px] font-medium px-1 mb-2 ${textMuted}`}>Connected</p>
+                <div className={`rounded-2xl overflow-hidden ${card}`}>
+                  {connectedList.map((item, i) => {
+                    const conn = getConnected(item.provider)
+                    return (
+                      <button
+                        key={item.provider}
+                        type="button"
+                        onClick={() => setSelected(item.provider)}
+                        className={`w-full flex items-center gap-3 px-3.5 py-3 text-left active:opacity-80 ${
+                          i < connectedList.length - 1 ? `border-b ${rowBorder}` : ''
+                        }`}
+                      >
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}
+                        >
+                          {BRAND[item.provider]}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[16px] font-medium ${textMain}`}>{item.name}</p>
+                          {conn?.account_email && (
+                            <p className={`text-[12px] truncate ${textMuted}`}>{conn.account_email}</p>
+                          )}
+                        </div>
+                        <ChevronRight
+                          className={`w-4 h-4 shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`}
+                        />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Suggested */}
+            {suggestedList.length > 0 && (
+              <div>
+                <p className={`text-[13px] font-medium px-1 mb-2 ${textMuted}`}>Suggested</p>
+                <div className={`rounded-2xl overflow-hidden ${card}`}>
+                  {suggestedList.map((item, i) => {
+                    const isBusy = busy === item.provider
+                    return (
+                      <div
+                        key={item.provider}
+                        className={`flex items-center gap-3 px-3.5 py-3 ${
+                          i < suggestedList.length - 1 ? `border-b ${rowBorder}` : ''
+                        }`}
+                      >
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}
+                        >
+                          {BRAND[item.provider]}
+                        </div>
+                        <p className={`flex-1 text-[16px] font-medium ${textMain}`}>{item.name}</p>
+                        <button
+                          type="button"
+                          onClick={() => connect(item.provider)}
+                          disabled={isBusy}
+                          className={`shrink-0 h-8 px-3.5 rounded-full text-[13px] font-medium transition disabled:opacity-50 ${
+                            dark
+                              ? 'bg-white/10 text-white active:bg-white/15'
+                              : 'bg-[#e8e8ed] text-slate-800 active:bg-[#dddde3]'
+                          }`}
+                        >
+                          {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Connect'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {connectedList.length === 0 && suggestedList.length === 0 && (
+              <p className={`text-center py-12 text-[15px] ${textMuted}`}>No connectors available</p>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
