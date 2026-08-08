@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Menu, Plus, Mic, Send, X,
+  Menu, Mic, Send, X,
   Loader2, PenLine, ArrowLeft,
   ChevronDown, Copy, Check, ThumbsUp, ThumbsDown, Volume2,
 } from 'lucide-react'
@@ -12,8 +12,6 @@ import Sidebar from './components/Sidebar'
 import Logo from './components/Logo'
 import Settings from './components/Settings'
 import Connectors from './components/Connectors'
-
-// NOTE: Full App restored for build - if Settings/Connectors imports fail, see repo
 
 type Message = { id: string; role: 'user' | 'assistant'; content: string }
 
@@ -299,7 +297,7 @@ export default function App() {
   }
 
   return (
-    <div className={`flex h-dvh overflow-hidden ${dark ? 'bg-[#07070c]' : 'bg-[#f0f2f8'}`}>
+    <div className={`flex h-dvh overflow-hidden ${dark ? 'bg-[#07070c]' : 'bg-[#f0f2f8]'}`}>
       <div className="hidden lg:flex">
         <Sidebar {...sidebarProps} />
       </div>
@@ -472,7 +470,13 @@ export default function App() {
       {showSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowSettings(false)}>
           <div className={`w-full max-w-md rounded-2xl p-4 ${dark ? 'bg-slate-900' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
-            <Settings dark={dark} onClose={() => setShowSettings(false)} onToggleDark={() => setDark((d) => !d)} />
+            <Settings
+              dark={dark}
+              user={user}
+              onSignOut={async () => { await supabase.auth.signOut(); setShowSettings(false) }}
+              onToggleTheme={() => setDark((d) => !d)}
+              onOpenConnectors={() => { setShowSettings(false); setShowConnectors(true) }}
+            />
           </div>
         </div>
       )}
