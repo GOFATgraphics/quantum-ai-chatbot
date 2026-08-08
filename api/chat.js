@@ -19,7 +19,7 @@ const GMAIL_TOOL = {
       },
       max_results: {
         type: 'number',
-        description: 'Max messages to return (1-15). Default 8.',
+        description: 'Max messages to return (1-15). Default 10.',
       },
     },
     required: ['query'],
@@ -72,7 +72,7 @@ async function getValidGmailToken(userId) {
 async function runClaude({ apiKey, system, messages, tools }) {
   const body = {
     model: 'claude-sonnet-4-6',
-    max_tokens: 2048,
+    max_tokens: 4096,
     system,
     messages,
   };
@@ -108,6 +108,52 @@ function extractText(contentBlocks) {
     .map((b) => b.text)
     .join('\n')
     .trim();
+}
+
+function buildSystemPrompt(gmailReady) {
+  return `You are Quantumy AI — a precise personal work assistant for professionals.
+
+## Core principles
+- Be accurate, structured, and easy to scan.
+- Lead with the answer or summary, then details.
+- Never invent email contents, dates, or senders. Only use tool results and user-provided facts.
+- Prefer clarity over fluff. No filler phrases.
+
+## Formatting rules (strict)
+Use clean Markdown only. The UI renders it — write for humans, not source code.
+- Use ## or ### for section titles (not emoji spam).
+- Use short paragraphs and bullet lists.
+- Use **bold** for key labels (From, Subject, Priority).
+- Use horizontal rules (---) sparingly between major sections.
+- Do NOT dump raw JSON. Do NOT leave unformatted tool data on screen.
+
+## Email summaries (when Gmail data is available)
+Structure every email briefing like this:
+
+1. One-line overview (how many messages, date range, what matters most).
+2. Group by priority or theme, e.g.:
+   - Action required
+   - Waiting / FYI
+   - Security / account alerts
+3. For each email, use a compact block:
+   - **Subject**
+   - From · Date
+   - 1–3 sentence summary of what it says and why it matters
+   - Optional: suggested next step if action is needed
+4. End with a short **Next steps** list if anything needs the user to act.
+
+When searching Gmail:
+- Choose a specific query (newer_than, is:unread, from:, subject:).
+- If results are empty, say so clearly and suggest a broader query.
+- If results are noisy, filter to the most relevant items and say you filtered.
+
+## General answers
+- For non-email tasks: structured steps, tables when useful, code in fenced blocks.
+- Ask one clarifying question only when critical information is missing.
+
+${gmailReady
+    ? '## Tools\nGmail is connected. Use search_gmail whenever the user asks about their mail, inbox, unread messages, or anything that requires looking at email. After the tool returns, rewrite the data into the structured briefing format above.'
+    : '## Tools\nGmail is not connected. If the user asks about their email, tell them to open **Connectors** in the sidebar and connect Gmail (read-only). Do not invent emails.'}`;
 }
 
 export default async function handler(req, res) {
@@ -149,20 +195,13 @@ export default async function handler(req, res) {
       }
     }
 
-    const systemPrompt = `You are Quantum — a sharp, reliable AI assistant built for professionals who work with email, documents, and data every day.
-
-Be clear, direct, and helpful. Use markdown for structure. Lead with the answer. Keep responses focused and high-signal.
-
-${gmailReady
-  ? 'The user has connected Gmail. When they ask about their email, use the search_gmail tool. Summarize results clearly and cite subject/from/date.'
-  : 'The user has not connected Gmail yet. If they ask about their email, tell them to open Settings → Connectors and connect Gmail.'}`;
+    const systemPrompt = buildSystemPrompt(gmailReady);
 
     let anthropicMessages = messages.map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: String(m.content),
     }));
 
-    // Tool-use loop (max 3 rounds)
     for (let round = 0; round < 3; round++) {
       const data = await runClaude({
         apiKey,
@@ -179,7 +218,6 @@ ${gmailReady
         return res.status(200).json({ content: text });
       }
 
-      // Append assistant tool_use turn
       anthropicMessages = [
         ...anthropicMessages,
         { role: 'assistant', content },
@@ -201,7 +239,7 @@ ${gmailReady
               });
             } else {
               const q = block.input?.query || 'in:inbox newer_than:14d';
-              const max = Math.min(15, Math.max(1, Number(block.input?.max_results) || 8));
+              const max = Math.min(15, Math.max(1, Number(block.input?.max_results) || 10));
               const results = await searchGmail(accessToken, q, max);
               toolResults.push({
                 type: 'tool_result',
