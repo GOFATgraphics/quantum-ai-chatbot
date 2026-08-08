@@ -1,15 +1,16 @@
 type Props = {
   size?: number
   className?: string
-  /** Kept for API compatibility; pearl mark is used for both themes */
+  /** When true, use pearl mark (for dark backgrounds). When false, use dark sphere (for light backgrounds). */
   dark?: boolean
 }
 
-/** Quantumy brand mark — pearl sphere, readable on light and dark backgrounds */
-export default function Logo({ size = 32, className = '' }: Props) {
+/** Quantumy brand mark — dark sphere on light UI, pearl on dark UI */
+export default function Logo({ size = 32, className = '', dark = false }: Props) {
+  const src = dark ? '/logo-dark.svg' : '/logo.svg'
   return (
     <img
-      src="/logo-dark.svg"
+      src={src}
       alt="Quantumy"
       width={size}
       height={size}
