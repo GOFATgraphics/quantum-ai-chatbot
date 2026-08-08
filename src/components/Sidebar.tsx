@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import type { Conversation, Project } from '../lib/supabase'
 import type { User } from '@supabase/supabase-js'
+import Logo from './Logo'
 
 type Props = {
   dark: boolean
@@ -86,8 +87,12 @@ export default function Sidebar({
 
   return (
     <div className={`flex flex-col h-full min-h-0 glass-panel ${dark ? 'glass-panel-dark' : 'glass-panel-light'}`}>
-      <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
-        <span className={`text-[17px] font-medium tracking-tight ${textMain}`}>Quantumy</span>
+      {/* Brand header */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-3 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Logo size={28} className="shrink-0" />
+          <span className={`text-[16px] font-semibold tracking-tight ${textMain}`}>Quantumy</span>
+        </div>
         {showClose && onClose && (
           <button
             onClick={onClose}
@@ -99,10 +104,10 @@ export default function Sidebar({
         )}
       </div>
 
-      <div className="px-3 space-y-1 shrink-0">
+      <div className="px-3 space-y-0.5 shrink-0">
         <button
           onClick={onNewChat}
-          className={`w-full flex items-center gap-3 h-11 rounded-full px-4 text-[15px] font-medium transition ${pill}`}
+          className={`w-full flex items-center gap-3 h-11 rounded-2xl px-3.5 text-[14px] font-medium transition ${pill}`}
         >
           <SquarePen className="w-[18px] h-[18px]" />
           New chat
@@ -110,7 +115,7 @@ export default function Sidebar({
 
         <button
           onClick={() => setShowSearch((v) => !v)}
-          className={`w-full flex items-center gap-3 h-11 rounded-full px-4 text-[15px] transition ${navItem}`}
+          className={`w-full flex items-center gap-3 h-10 rounded-2xl px-3.5 text-[14px] transition ${navItem}`}
         >
           <Search className="w-[18px] h-[18px]" />
           Search chats
@@ -118,7 +123,7 @@ export default function Sidebar({
 
         <button
           onClick={onOpenConnectors}
-          className={`w-full flex items-center gap-3 h-11 rounded-full px-4 text-[15px] transition ${navItem}`}
+          className={`w-full flex items-center gap-3 h-10 rounded-2xl px-3.5 text-[14px] transition ${navItem}`}
         >
           <Link2 className="w-[18px] h-[18px]" />
           Connectors
@@ -132,15 +137,15 @@ export default function Sidebar({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats…"
-            className={`w-full h-10 rounded-full px-4 text-sm outline-none ${dark ? 'bg-white/8 text-slate-100 placeholder:text-slate-500 border border-white/10' : 'bg-white/60 text-slate-900 placeholder:text-slate-400 border border-white/80'}`}
+            className={`w-full h-10 rounded-2xl px-4 text-sm outline-none ${dark ? 'bg-white/8 text-slate-100 placeholder:text-slate-500 border border-white/10' : 'bg-white/60 text-slate-900 placeholder:text-slate-400 border border-white/80'}`}
           />
         </div>
       )}
 
       {/* Projects */}
       <div className="px-3 mt-4 shrink-0">
-        <div className="flex items-center justify-between px-1 mb-1">
-          <p className={`text-[12px] font-medium ${textMuted}`}>Projects</p>
+        <div className="flex items-center justify-between px-1 mb-1.5">
+          <p className={`text-[11px] font-semibold uppercase tracking-wider ${textMuted}`}>Projects</p>
           <button
             onClick={() => setShowNewProject((v) => !v)}
             className={`p-1 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-white/60'}`}
@@ -171,17 +176,17 @@ export default function Sidebar({
 
         <button
           onClick={() => onSelectProject(null)}
-          className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-[13px] transition ${!currentProjectId ? activeRow : hoverRow}`}
+          className={`w-full flex items-center gap-2.5 rounded-2xl px-3 py-2 text-[13px] transition ${!currentProjectId ? activeRow : hoverRow}`}
         >
           <FolderKanban className={`w-4 h-4 ${textMuted}`} />
           <span className={textMain}>All chats</span>
         </button>
 
-        <div className="space-y-0.5 max-h-36 overflow-y-auto">
+        <div className="space-y-0.5 max-h-32 overflow-y-auto mt-0.5">
           {projects.map((p) => (
             <div
               key={p.id}
-              className={`group flex items-center rounded-full transition ${currentProjectId === p.id ? activeRow : hoverRow}`}
+              className={`group flex items-center rounded-2xl transition ${currentProjectId === p.id ? activeRow : hoverRow}`}
             >
               <button
                 onClick={() => onSelectProject(p.id)}
@@ -205,7 +210,7 @@ export default function Sidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0 mt-3 px-2 pb-3">
-        <p className={`px-3 mb-1 text-[12px] font-medium ${textMuted}`}>
+        <p className={`px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider ${textMuted}`}>
           {currentProjectId ? 'Project chats' : 'Recents'}
         </p>
 
@@ -221,7 +226,7 @@ export default function Sidebar({
             return (
               <div
                 key={conv.id}
-                className={`group flex items-center rounded-full transition ${
+                className={`group flex items-center rounded-2xl transition ${
                   active ? activeRow : hoverRow
                 }`}
               >
