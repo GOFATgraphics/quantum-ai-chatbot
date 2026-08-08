@@ -8,7 +8,7 @@ Premium mobile-first AI chatbot with **Supabase Auth + conversation history**.
 - Supabase authentication (email + password)
 - Persistent conversation history per user
 - Sidebar with past chats
-- Secure xAI / Grok proxy (API key never exposed to browser)
+- Secure Anthropic Claude proxy (API key never exposed to browser)
 - Voice input
 - Model selector
 
@@ -85,16 +85,22 @@ create policy "Users can insert messages into own conversations"
 
 ### 2. Environment Variables
 
-**Local (`.env` file):**
+**Local development**  
+Create a file named `.env` in the project root (copy from `.env.example`):
 
 ```env
 VITE_SUPABASE_URL=https://ypzrczwyfvqlydeocbmm.supabase.co
-VITE_SUPABASE_ANON_KEY=your_anon_public_key_here
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_public_key_here
 ```
 
-**Vercel:**
+**Vercel (Production)**  
+In Project Settings → Environment Variables add:
 
-Add the same two variables + the existing `XAI_API_KEY` in Project Settings → Environment Variables.
+| Name                    | Value                          |
+|-------------------------|--------------------------------|
+| `VITE_SUPABASE_URL`     | `https://ypzrczwyfvqlydeocbmm.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY`| your Supabase anon key         |
+| `ANTHROPIC_API_KEY`     | your Anthropic API key         |
 
 > Get the anon key from Supabase → Project Settings → API → `anon` `public`
 
@@ -107,7 +113,7 @@ npm run dev
 
 ### 4. Deploy
 
-Push to GitHub. Vercel will redeploy automatically. Make sure the three env vars are set.
+Push to GitHub. Vercel will redeploy automatically.
 
 ## Next Phases
 
@@ -116,6 +122,6 @@ Push to GitHub. Vercel will redeploy automatically. Make sure the three env vars
 
 ## Security notes
 
-- API key stays on the server only (`XAI_API_KEY`)
+- Anthropic API key stays on the server only (`ANTHROPIC_API_KEY`)
 - All chat data is protected by Row Level Security
 - Users can only see their own conversations
