@@ -288,7 +288,7 @@ export default function App() {
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative">
         {isEmpty && !dark && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] z-0" style={{ background: 'linear-gradient(to top, rgba(186,220,255,0.35) 0%, rgba(230,240,255,0.15) 40%, transparent 100%)' }} />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[40%] z-0" style={{ background: 'linear-gradient(to top, rgba(186,220,255,0.28) 0%, rgba(230,240,255,0.12) 45%, transparent 100%)' }} />
         )}
 
         <header className="relative z-10 pt-[env(safe-area-inset-top)] shrink-0">
@@ -327,18 +327,18 @@ export default function App() {
 
         <main className="relative z-10 flex-1 overflow-y-auto min-h-0">
           {isEmpty ? (
-            <div className="flex flex-col items-center justify-center min-h-full px-6 pb-36">
+            <div className="flex flex-col items-center justify-center h-full px-6 pb-2">
               <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }} className="flex flex-col items-center text-center">
                 <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }} className="mb-6">
                   <Logo size={56} dark={dark} />
                 </motion.div>
-                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'}`}>
+                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'`}>
                   {greetingLine || creativeGreeting(firstName)}
                 </h1>
               </motion.div>
             </div>
           ) : (
-            <div className="max-w-2xl mx-auto px-4 py-3 pb-6 space-y-5">
+            <div className="max-w-2xl mx-auto px-4 py-3 pb-4 space-y-5">
               <AnimatePresence initial={false}>
                 {messages.map((msg) => (
                   <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className={msg.role === 'user' ? 'flex justify-end' : ''}>
@@ -348,7 +348,7 @@ export default function App() {
                       </div>
                     ) : (
                       <div className="max-w-[95%]">
-                        <div className={`text-[15px] leading-relaxed ${dark ? 'text-slate-100' : 'text-slate-900'}`}>
+                        <div className={`text-[15px] leading-relaxed ${dark ? 'text-slate-100' : 'text-slate-900'`}>
                           <div className="ai-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} />
                         </div>
                         <MessageActions content={msg.content} />
@@ -367,11 +367,11 @@ export default function App() {
           )}
         </main>
 
-        <div className="relative z-10 shrink-0 px-3 sm:px-5 pb-[max(0.9rem,env(safe-area-inset-bottom))]">
+        <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
-            <div className={`rounded-[28px] px-3 pt-3 pb-2.5 transition-shadow ${dark ? 'bg-[#1a1a22] border border-white/[0.08] shadow-lg shadow-black/30' : 'bg-[#f3f4f6] border border-black/[0.04] shadow-[0_4px_24px_rgba(0,0,0,0.06)]'}`}>
+            <div className={`rounded-[28px] px-3 pt-2.5 pb-2 transition-shadow ${dark ? 'bg-[#1a1a22] border border-white/[0.08] shadow-lg shadow-black/30' : 'bg-[#f3f4f6] border border-black/[0.04] shadow-[0_4px_24px_rgba(0,0,0,0.06)]'}`}>
               <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} rows={1} placeholder="Ask Anything" className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'}`} />
-              <div className="flex items-center gap-1.5 mt-2">
+              <div className="flex items-center gap-1.5 mt-1.5">
                 <button type="button" className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${dark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-white text-slate-600 hover:bg-white shadow-sm'}`} aria-label="Add">
                   <Plus className="w-[18px] h-[18px]" />
                 </button>
