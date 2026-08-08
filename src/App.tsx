@@ -5,13 +5,15 @@ import {
   Loader2, PenLine, ArrowLeft,
   Moon, Sun, ChevronDown,
 } from 'lucide-react'
-import { supabase, type Conversation, type DbMessage } from './lib/supabase'
+import { supabase, type Conversation, type DbMessage, type Project } from './lib/supabase'
 import { formatMarkdown } from './lib/markdown'
+import { getFirstName, getTimeGreeting } from './lib/names'
 import Auth from './components/Auth'
 import Connectors from './components/Connectors'
 import Sidebar from './components/Sidebar'
 import Logo from './components/Logo'
 import MessageActions from './components/MessageActions'
+import ThinkingStatus from './components/ThinkingStatus'
 import type { User, Session } from '@supabase/supabase-js'
 
 type Message = { id: string; role: 'user' | 'assistant'; content: string }
@@ -21,13 +23,6 @@ const MODELS: Model[] = [
   { id: 'quantum-2', name: 'Quantum 2' },
   { id: 'quantum-3', name: 'Quantum 3', badge: 'Pro' },
 ]
-
-function getGreeting() {
-  const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
-}
 
 function generateId() {
   return Math.random().toString(36).slice(2, 11)
@@ -84,13 +79,16 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingPrompt, setLoadingPrompt] = useState('')
   const [selectedModel, setSelectedModel] = useState(MODELS[1])
   const [showModelMenu, setShowModelMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
   const [mobileSidebar, setMobileSidebar] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [dark, setDark] = useState(() => {
@@ -131,13 +129,26 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (user) loadConversations()
-    else { setConversations([]); setCurrentConversationId(null); setMessages([]) }
+    if (user) {
+      loadConversations()
+      loadProjects()
+    } else {
+      setConversations([])
+      setProjects([])
+      setCurrentConversationId(null)
+      setCurrentProjectId(null)
+      setMessages([])
+    }
   }, [user])
 
   const loadConversations = async () => {
     const { data, error } = await supabase.from('conversations').select('*').order('updated_at', { ascending: false })
     if (!error && data) setConversations(data)
+  }
+
+  const loadProjects = async () => {
+    const { data, error } = await supabase.from('projects').select('*').order('updated_at', { ascending: false })
+    if (!error && data) setProjects(data)
   }
 
   const loadMessages = async (conversationId: string) => {
@@ -152,11 +163,34 @@ export default function App() {
   const createNewConversation = async (firstMessage: string) => {
     if (!user) return null
     const title = firstMessage.slice(0, 60) + (firstMessage.length > 60 ? '…' : '')
-    const { data, error } = await supabase.from('conversations').insert({ user_id: user.id, title }).select().single()
+    const payload: Record<string, unknown> = { user_id: user.id, title }
+    if (currentProjectId) payload.project_id = currentProjectId
+    const { data, error } = await supabase.from('conversations').insert(payload).select().single()
     if (error || !data) { console.error(error); return null }
     setConversations((p) => [data, ...p])
     setCurrentConversationId(data.id)
     return data.id
+  }
+
+  const createProject = async (name: string) => {
+    if (!user) return
+    const colors = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+    const color = colors[projects.length % colors.length]
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({ user_id: user.id, name, color })
+      .select()
+      .single()
+    if (!error && data) {
+      setProjects((p) => [data, ...p])
+      setCurrentProjectId(data.id)
+    }
+  }
+
+  const deleteProject = async (id: string) => {
+    await supabase.from('projects').delete().eq('id', id)
+    setProjects((p) => p.filter((x) => x.id !== id))
+    if (currentProjectId === id) setCurrentProjectId(null)
   }
 
   const saveMessage = async (conversationId: string, role: 'user' | 'assistant', content: string) => {
@@ -204,6 +238,8 @@ export default function App() {
     else { recognitionRef.current.start(); setIsListening(true) }
   }
 
+  const firstName = getFirstName(user?.user_metadata?.full_name, user?.email)
+
   const callAI = async (userMessage: string, history: Message[]) => {
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -215,6 +251,8 @@ export default function App() {
         headers,
         body: JSON.stringify({
           messages: [...history.map((m) => ({ role: m.role, content: m.content })), { role: 'user', content: userMessage }],
+          firstName,
+          projectId: currentProjectId,
         }),
       })
       const data = await response.json()
@@ -231,6 +269,7 @@ export default function App() {
     const userMsg: Message = { id: generateId(), role: 'user', content: trimmed }
     setMessages((p) => [...p, userMsg])
     setInput('')
+    setLoadingPrompt(trimmed)
     setIsLoading(true)
     try {
       let convId = currentConversationId
@@ -247,6 +286,7 @@ export default function App() {
       setMessages((p) => [...p, { id: generateId(), role: 'assistant', content: 'Something went wrong. Please try again.' }])
     } finally {
       setIsLoading(false)
+      setLoadingPrompt('')
       inputRef.current?.focus()
     }
   }
@@ -271,22 +311,32 @@ export default function App() {
 
   if (!session || !user) return <Auth onSuccess={() => {}} />
 
-  const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'
-
   const textMuted = dark ? 'text-slate-400' : 'text-slate-500'
   const textMain = dark ? 'text-slate-100' : 'text-slate-900'
+
+  const activeProject = projects.find((p) => p.id === currentProjectId)
 
   const sidebarProps = {
     dark,
     user,
     conversations,
+    projects,
     currentConversationId,
+    currentProjectId,
     deletingId,
     onNewChat: startNewChat,
     onSelectChat: loadMessages,
     onDeleteChat: deleteConversation,
     onOpenSettings: openSettings,
     onOpenConnectors: openConnectors,
+    onSelectProject: (id: string | null) => {
+      setCurrentProjectId(id)
+      setCurrentConversationId(null)
+      setMessages([])
+      setMobileSidebar(false)
+    },
+    onCreateProject: createProject,
+    onDeleteProject: deleteProject,
   }
 
   return (
@@ -349,6 +399,13 @@ export default function App() {
                 </>
               )}
             </div>
+
+            {activeProject && (
+              <span className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full glass-card ${dark ? 'glass-card-dark' : 'glass-card-light'}`}>
+                <span className="w-2 h-2 rounded-full" style={{ background: activeProject.color || '#6366f1' }} />
+                <span className={textMuted}>{activeProject.name}</span>
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1">
@@ -378,8 +435,13 @@ export default function App() {
                     Any new ideas<br className="sm:hidden" /> to explore?
                   </h1>
                   <p className={`mt-3 text-sm ${textMuted}`}>
-                    {getGreeting()}, {displayName}
+                    {getTimeGreeting()}, {firstName}
                   </p>
+                  {activeProject && (
+                    <p className={`mt-2 text-xs ${textMuted}`}>
+                      Workspace · {activeProject.name}
+                    </p>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-4 space-y-6 pb-6">
@@ -387,13 +449,8 @@ export default function App() {
                     <MessageBubble key={msg.id} message={msg} dark={dark} />
                   ))}
                   {isLoading && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-3">
-                      <Logo size={28} />
-                      <div className="flex gap-1.5 items-center h-7">
-                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse-dot" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse-dot" style={{ animationDelay: '160ms' }} />
-                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse-dot" style={{ animationDelay: '320ms' }} />
-                      </div>
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                      <ThinkingStatus prompt={loadingPrompt} dark={dark} />
                     </motion.div>
                   )}
                   <div ref={messagesEndRef} />
