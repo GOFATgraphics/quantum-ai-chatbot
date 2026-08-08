@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, Loader2, PenLine, ChevronDown } from 'lucide-react'
+import { Menu, Loader2, PenLine, ChevronDown } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage, type Project, makeChatTitle } from './lib/supabase'
 import Auth from './components/Auth'
 import Sidebar from './components/Sidebar'
@@ -445,7 +445,7 @@ export default function App() {
                 onOpenConnectors={() => { setShowSettings(false); setShowConnectors(true) }}
                 onProfileUpdated={(name) => {
                   setGreetingLine(creativeGreeting(name))
-                  supabase.auth.getSession().then(({ data }) => setSession(data.session)}
+                  supabase.auth.getSession().then(({ data }) => setSession(data.session))
                 }}
               />
             </motion.div>
