@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   LogOut, Moon, Sun, Brain, Plus, Trash2, Loader2,
   UserRound, Link2, Sparkles, Shield, Bell, Palette,
-  ChevronRight, Check,
+  ChevronRight, Check, Layers,
 } from 'lucide-react'
 import { supabase, type UserMemory } from '../lib/supabase'
 import type { User } from '@supabase/supabase-js'
@@ -10,25 +10,25 @@ import Logo from './Logo'
 
 type Props = {
   dark: boolean
+  glass?: boolean
   user: User
   onSignOut: () => void
   onToggleTheme: () => void
+  onToggleGlass?: () => void
   onOpenConnectors: () => void
   onProfileUpdated?: (name: string) => void
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
-  general: 'General',
-  preference: 'Preference',
-  instruction: 'Instruction',
-  work: 'Work',
-  people: 'People',
-  project: 'Project',
+  general: 'General', preference: 'Preference', instruction: 'Instruction',
+  work: 'Work', people: 'People', project: 'Project',
 }
 
 const CAPABILITIES = [
-  { id: 'email', title: 'Email', desc: 'Search inbox, draft and send with Gmail' },
+  { id: 'email', title: 'Email', desc: 'Search inbox, draft and send with Gmail or Outlook' },
   { id: 'drive', title: 'Drive & Docs', desc: 'Find files and read Google Docs' },
+  { id: 'calendar', title: 'Calendar', desc: 'Check Google Calendar events' },
+  { id: 'excel', title: 'Sheets & Excel', desc: 'Query spreadsheet data' },
   { id: 'memory', title: 'Memory', desc: 'Remember facts you share across chats' },
   { id: 'projects', title: 'Projects', desc: 'Group chats by workstream' },
 ]
@@ -36,13 +36,14 @@ const CAPABILITIES = [
 type Tab = 'profile' | 'preferences' | 'memory' | 'capabilities' | 'about'
 
 export default function Settings({
-  dark, user, onSignOut, onToggleTheme, onOpenConnectors, onProfileUpdated,
+  dark, glass = true, user, onSignOut, onToggleTheme, onToggleGlass, onOpenConnectors, onProfileUpdated,
 }: Props) {
   const meta = user.user_metadata || {}
   const [tab, setTab] = useState<Tab>('profile')
   const [preferredName, setPreferredName] = useState(meta.preferred_name || meta.full_name || '')
   const [dob, setDob] = useState(meta.date_of_birth || '')
   const [role, setRole] = useState(meta.role || '')
+  const [instructions, setInstructions] = useState(meta.custom_instructions || '')
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileMsg, setProfileMsg] = useState<string | null>(null)
   const [memories, setMemories] = useState<UserMemory[]>([])
@@ -51,11 +52,21 @@ export default function Settings({
   const [newCategory, setNewCategory] = useState<'preference' | 'instruction' | 'general'>('preference')
   const [savingMem, setSavingMem] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [memoryOn, setMemoryOn] = useState(meta.memory_enabled !== false)
 
   const textMain = dark ? 'text-slate-100' : 'text-slate-900'
   const textMuted = dark ? 'text-slate-400' : 'text-slate-500'
-  const card = `rounded-2xl p-4 ${dark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`
+  const card = `rounded-2xl p-4 ${
+    glass
+      ? dark
+        ? 'bg-white/[0.05] border border-white/[0.08] backdrop-blur-xl'
+        : 'bg-white/70 border border-black/[0.05] backdrop-blur-xl shadow-sm'
+      : dark
+        ? 'bg-[#16161f] border border-white/[0.06]'
+        : 'bg-slate-50 border border-slate-100'
+  }`
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none ${dark ? 'bg-white/8 border border-white/10 text-slate-100 placeholder:text-slate-500' : 'bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400'}`
+  const row = `w-full ${card} flex items-center gap-3 text-left transition active:scale-[0.99]`
 
   const loadMemories = async () => {
     setLoadingMem(true)
@@ -64,9 +75,7 @@ export default function Settings({
     setLoadingMem(false)
   }
 
-  useEffect(() => {
-    if (tab === 'memory') loadMemories()
-  }, [tab])
+  useEffect(() => { if (tab === 'memory') loadMemories() }, [tab])
 
   const saveProfile = async () => {
     setSavingProfile(true)
@@ -74,17 +83,19 @@ export default function Settings({
     try {
       const name = preferredName.trim()
       const { error } = await supabase.auth.updateUser({
-        data: { preferred_name: name, full_name: name, date_of_birth: dob || null, role: role.trim() || null },
+        data: {
+          preferred_name: name, full_name: name,
+          date_of_birth: dob || null, role: role.trim() || null,
+          custom_instructions: instructions.trim() || null,
+          memory_enabled: memoryOn,
+        },
       })
       if (error) throw error
       setProfileMsg('Saved')
       onProfileUpdated?.(name)
       setTimeout(() => setProfileMsg(null), 2000)
-    } catch {
-      setProfileMsg('Could not save')
-    } finally {
-      setSavingProfile(false)
-    }
+    } catch { setProfileMsg('Could not save') }
+    finally { setSavingProfile(false) }
   }
 
   const addMemory = async () => {
@@ -147,6 +158,8 @@ export default function Settings({
             <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className={`${inputCls} mt-1.5`} />
             <label className={`text-xs font-medium ${textMuted} mt-3 block`}>Role / work</label>
             <input value={role} onChange={(e) => setRole(e.target.value)} className={`${inputCls} mt-1.5`} placeholder="e.g. Designer at Acme" />
+            <label className={`text-xs font-medium ${textMuted} mt-3 block`}>Custom instructions</label>
+            <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={3} placeholder="How Quantumy should respond — tone, length, rules…" className={`${inputCls} mt-1.5 resize-none`} />
             <button type="button" onClick={saveProfile} disabled={savingProfile} className="mt-4 w-full h-11 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-black disabled:opacity-50 flex items-center justify-center gap-2 dark:bg-white dark:text-slate-900">
               {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : profileMsg === 'Saved' ? <><Check className="w-4 h-4" /> Saved</> : 'Save profile'}
             </button>
@@ -155,32 +168,49 @@ export default function Settings({
       )}
 
       {tab === 'preferences' && (
-        <div className="space-y-3">
-          <button type="button" onClick={onToggleTheme} className={`w-full ${card} flex items-center gap-3 text-left`}>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-white/10' : 'bg-white'}`}>
+        <div className="space-y-2.5">
+          <button type="button" onClick={onToggleTheme} className={row}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-white/10' : 'bg-white shadow-sm'}`}>
               {dark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-600" />}
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className={`text-sm font-medium ${textMain}`}>Appearance</p>
               <p className={`text-xs ${textMuted}`}>{dark ? 'Dark' : 'Light'} mode</p>
             </div>
-            <ChevronRight className={`w-4 h-4 ${textMuted}`} />
+            <ChevronRight className={`w-4 h-4 shrink-0 ${textMuted}`} />
           </button>
-          <button type="button" onClick={onOpenConnectors} className={`w-full ${card} flex items-center gap-3 text-left`}>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-white/10' : 'bg-white'}`}>
+
+          {onToggleGlass && (
+            <button type="button" onClick={onToggleGlass} className={row}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-white/10' : 'bg-white shadow-sm'}`}>
+                <Layers className={`w-5 h-5 ${glass ? 'text-indigo-500' : 'text-slate-500'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium ${textMain}`}>Glassmorphism</p>
+                <p className={`text-xs ${textMuted}`}>{glass ? 'Frosted glass on' : 'Solid surfaces'}</p>
+              </div>
+              <div className={`w-11 h-6 rounded-full relative transition-colors ${glass ? 'bg-indigo-500' : dark ? 'bg-white/15' : 'bg-slate-200'}`}>
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${glass ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </div>
+            </button>
+          )}
+
+          <button type="button" onClick={onOpenConnectors} className={row}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-white/10' : 'bg-white shadow-sm'}`}>
               <Link2 className="w-5 h-5 text-indigo-500" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className={`text-sm font-medium ${textMain}`}>Connectors</p>
-              <p className={`text-xs ${textMuted}`}>Gmail, Drive, Docs, Calendar</p>
+              <p className={`text-xs ${textMuted}`}>Gmail, Drive, Calendar, Outlook, Excel</p>
             </div>
-            <ChevronRight className={`w-4 h-4 ${textMuted}`} />
+            <ChevronRight className={`w-4 h-4 shrink-0 ${textMuted}`} />
           </button>
-          <div className={`${card} flex items-center gap-3 opacity-60`}>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-white/10' : 'bg-white'}`}>
+
+          <div className={`${row} opacity-70`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-white/10' : 'bg-white shadow-sm'`}>
               <Bell className="w-5 h-5 text-slate-500" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className={`text-sm font-medium ${textMain}`}>Notifications</p>
               <p className={`text-xs ${textMuted}`}>Coming soon</p>
             </div>
@@ -190,9 +220,21 @@ export default function Settings({
 
       {tab === 'memory' && (
         <div className="space-y-3">
-          <p className={`text-xs ${textMuted}`}>Facts Quantumy remembers about you. Add your own or delete anything.</p>
+          <button type="button" onClick={() => setMemoryOn((v) => !v)} className={row}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-white/10' : 'bg-white shadow-sm'}`}>
+              <Brain className="w-5 h-5 text-violet-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-medium ${textMain}`}>Use memory</p>
+              <p className={`text-xs ${textMuted}`}>Personalize with facts across chats</p>
+            </div>
+            <div className={`w-11 h-6 rounded-full relative transition-colors ${memoryOn ? 'bg-indigo-500' : dark ? 'bg-white/15' : 'bg-slate-200'}`}>
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${memoryOn ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+          <p className={`text-xs px-1 ${textMuted}`}>Facts Quantumy remembers. Add your own or delete anything.</p>
           <div className={card}>
-            <textarea value={newFact} onChange={(e) => setNewFact(e.target.value)} rows={2} placeholder="e.g. Prefer short emails, work in WAT timezone…" className={inputCls} />
+            <textarea value={newFact} onChange={(e) => setNewFact(e.target.value)} rows={2} placeholder="e.g. Prefer short emails, work in WAT…" className={inputCls} />
             <div className="flex items-center gap-2 mt-2">
               <select value={newCategory} onChange={(e) => setNewCategory(e.target.value as any)} className={`${inputCls} w-auto`}>
                 <option value="preference">Preference</option>
@@ -210,7 +252,7 @@ export default function Settings({
           ) : memories.length === 0 ? (
             <p className={`text-sm text-center py-6 ${textMuted}`}>No memories yet</p>
           ) : (
-            <div className="space-y-2 max-h-56 overflow-y-auto">
+            <div className="space-y-2 max-h-52 overflow-y-auto">
               {memories.map((m) => (
                 <div key={m.id} className={`${card} flex items-start gap-2 py-3`}>
                   <div className="flex-1 min-w-0">
@@ -224,12 +266,13 @@ export default function Settings({
               ))}
             </div>
           )}
+          <button type="button" onClick={saveProfile} className={`w-full h-10 rounded-xl text-sm font-medium ${dark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-800'}`}>Save memory preference</button>
         </div>
       )}
 
       {tab === 'capabilities' && (
         <div className="space-y-2">
-          <p className={`text-xs ${textMuted} mb-2`}>What Quantumy can do when connected.</p>
+          <p className={`text-xs ${textMuted} mb-1`}>What Quantumy can do when connected.</p>
           {CAPABILITIES.map((c) => (
             <div key={c.id} className={`${card} flex items-start gap-3`}>
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-600'}`}>
@@ -241,9 +284,7 @@ export default function Settings({
               </div>
             </div>
           ))}
-          <button type="button" onClick={onOpenConnectors} className="w-full h-11 rounded-xl border border-dashed border-slate-300 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-white/15 dark:text-slate-300 dark:hover:bg-white/5">
-            Manage connectors
-          </button>
+          <button type="button" onClick={onOpenConnectors} className={`w-full h-11 rounded-xl border border-dashed text-sm font-medium ${dark ? 'border-white/15 text-slate-300 hover:bg-white/5' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>Manage connectors</button>
         </div>
       )}
 
