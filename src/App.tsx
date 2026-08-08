@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu, Plus, Mic, Send, X, LogOut, MessageSquare,
   Loader2, GraduationCap, Cpu, PenLine, ArrowLeft,
-  Moon, Sun,
+  Moon, Sun, ChevronDown,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage } from './lib/supabase'
 import { formatMarkdown } from './lib/markdown'
@@ -92,6 +92,7 @@ export default function App() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState(MODELS[1])
+  const [showModelMenu, setShowModelMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
   const [mobileSidebar, setMobileSidebar] = useState(false)
@@ -279,7 +280,6 @@ export default function App() {
 
   const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'
 
-  // Gemini-like neutral shell
   const shell = dark ? 'bg-[#0a0a0f] text-slate-100' : 'bg-[#f7f8fa] text-slate-900'
   const inputBar = dark
     ? 'bg-[#16161c] border border-white/10 shadow-lg focus-within:border-indigo-500/30'
@@ -330,15 +330,41 @@ export default function App() {
               </button>
             )}
 
-            <button className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${dark ? 'hover:bg-white/5' : 'hover:bg-white'}`}>
-              <span className={textMain}>{selectedModel.name}</span>
-              {selectedModel.badge && <span className={`text-[10px] ${textMuted}`}>{selectedModel.badge}</span>}
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowModelMenu((v) => !v)}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${dark ? 'hover:bg-white/5' : 'hover:bg-white'}`}
+              >
+                <span className={textMain}>{selectedModel.name}</span>
+                {selectedModel.badge && <span className={`text-[10px] ${textMuted}`}>{selectedModel.badge}</span>}
+                <ChevronDown className={`w-3.5 h-3.5 ${textMuted}`} />
+              </button>
+              {showModelMenu && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setShowModelMenu(false)} />
+                  <div className={`absolute left-0 top-full mt-1 z-30 min-w-[160px] rounded-xl border py-1 shadow-lg ${dark ? 'bg-[#16161c] border-white/10' : 'bg-white border-slate-200'}`}>
+                    {MODELS.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedModel(m)
+                          setShowModelMenu(false)
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between ${dark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} ${selectedModel.id === m.id ? (dark ? 'text-indigo-300' : 'text-indigo-600') : textMain}`}
+                      >
+                        <span>{m.name}</span>
+                        {m.badge && <span className={`text-[10px] ${textMuted}`}>{m.badge}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-1">
             <button onClick={startNewChat} className={`p-2 rounded-full transition ${dark ? 'hover:bg-white/10' : 'hover:bg-white shadow-sm bg-white/80'}`} title="New chat">
-              <PenLine className={`w-4.5 h-4.5 ${textMuted}`} />
+              <PenLine className={`w-4 h-4 ${textMuted}`} />
             </button>
             <button onClick={() => setDark(!dark)} className={`p-2 rounded-full transition ${dark ? 'hover:bg-white/10 text-amber-300' : 'hover:bg-white text-slate-500'}`}>
               {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -501,7 +527,6 @@ function MessageBubble({ message, dark }: { message: Message; dark: boolean }) {
     )
   }
 
-  // AI: no bubble — plain text like Gemini
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
