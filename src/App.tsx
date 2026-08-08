@@ -55,9 +55,7 @@ function MessageActions({ content }: { content: string }) {
   const btn = 'p-2 rounded-full text-slate-500 hover:bg-black/[0.05] transition'
   return (
     <div className="flex items-center gap-0.5 mt-1.5 -ml-1">
-      <button type="button" onClick={copy} className={btn} aria-label="Copy">
-        {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-      </button>
+      <button type="button" onClick={copy} className={btn} aria-label="Copy">{copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}</button>
       <button type="button" className={btn} aria-label="Share"><Share className="w-4 h-4" /></button>
       <button type="button" className={btn} aria-label="Read aloud"><Volume2 className="w-4 h-4" /></button>
       <button type="button" className={btn} aria-label="Good"><ThumbsUp className="w-4 h-4" /></button>
@@ -68,6 +66,9 @@ function MessageActions({ content }: { content: string }) {
 
 export default function App() {
   const [dark, setDark] = useState(false)
+  const [glass, setGlass] = useState(() => {
+    try { return localStorage.getItem('quantumy-glass') !== '0' } catch { return true }
+  })
   const [session, setSession] = useState<any>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [mobileSidebar, setMobileSidebar] = useState(false)
@@ -90,19 +91,15 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
+    document.documentElement.classList.toggle('glass-on', glass)
     const meta = document.querySelector('meta[name="theme-color"]')
     if (meta) meta.setAttribute('content', dark ? '#0a0a0f' : '#ffffff')
-  }, [dark])
+    try { localStorage.setItem('quantumy-glass', glass ? '1' : '0') } catch {}
+  }, [dark, glass])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setAuthLoading(false)
-    })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s)
-      setAuthLoading(false)
-    })
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setAuthLoading(false) })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => { setSession(s); setAuthLoading(false) })
     return () => subscription.unsubscribe()
   }, [])
 
@@ -113,7 +110,6 @@ export default function App() {
     user?.user_metadata?.name?.split(' ')?.[0] ||
     user?.email?.split('@')?.[0] ||
     'there'
-
   const needsOnboarding = !!user && user.user_metadata?.onboarding_complete !== true
 
   const loadConversations = useCallback(async () => {
@@ -128,9 +124,7 @@ export default function App() {
     if (data) setProjects(data as Project[])
   }, [user])
 
-  useEffect(() => {
-    if (user) { loadConversations(); loadProjects() }
-  }, [user, loadConversations, loadProjects])
+  useEffect(() => { if (user) { loadConversations(); loadProjects() } }, [user, loadConversations, loadProjects])
 
   const loadMessages = async (conversationId: string) => {
     setCurrentConversationId(conversationId)
@@ -147,9 +141,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (messages.length === 0) {
-      setGreetingLine((g) => g || creativeGreeting(firstName))
-    }
+    if (messages.length === 0) setGreetingLine((g) => g || creativeGreeting(firstName))
   }, [firstName, messages.length])
 
   const ensureConversation = async (firstUserText: string) => {
@@ -196,12 +188,10 @@ export default function App() {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`
     const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers,
+      method: 'POST', headers,
       body: JSON.stringify({
         messages: [...history.map((m) => ({ role: m.role, content: m.content })), { role: 'user', content: userMessage }],
-        firstName,
-        projectId: currentProjectId,
+        firstName, projectId: currentProjectId,
       }),
     })
     const data = await response.json().catch(() => ({}))
@@ -212,8 +202,7 @@ export default function App() {
   const handleSend = async (overrideText?: string) => {
     const trimmed = (overrideText ?? input).trim()
     if (!trimmed || isLoading || !user) return
-    const userMsg: Message = { id: generateId(), role: 'user', content: trimmed }
-    setMessages((p) => [...p, userMsg])
+    setMessages((p) => [...p, { id: generateId(), role: 'user', content: trimmed }])
     setInput('')
     setLastUserPrompt(trimmed)
     setIsLoading(true)
@@ -254,13 +243,7 @@ export default function App() {
   if (!session || !user) return <Auth onSuccess={() => {}} />
 
   if (needsOnboarding) {
-    return (
-      <Onboarding
-        onComplete={() => {
-          supabase.auth.getSession().then(({ data }) => setSession(data.session))
-        }}
-      />
-    )
+    return <Onboarding onComplete={() => { supabase.auth.getSession().then(({ data }) => setSession(data.session)) }} />
   }
 
   const sidebarProps = {
@@ -287,10 +270,6 @@ export default function App() {
       </AnimatePresence>
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative">
-        {isEmpty && !dark && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[40%] z-0" style={{ background: 'linear-gradient(to top, rgba(186,220,255,0.28) 0%, rgba(230,240,255,0.12) 45%, transparent 100%)' }} />
-        )}
-
         <header className="relative z-10 pt-[env(safe-area-inset-top)] shrink-0">
           <div className="h-14 flex items-center justify-between px-3">
             <div className="flex items-center gap-1 min-w-0">
@@ -309,8 +288,7 @@ export default function App() {
                       <motion.div initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.15 }} className={`absolute left-0 top-full mt-1 z-30 min-w-[180px] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}>
                         {MODELS.map((m) => (
                           <button key={m.id} onClick={() => { setSelectedModel(m); setShowModelMenu(false) }} className={`w-full text-left px-4 py-2.5 text-sm ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'}`}>
-                            {m.name}
-                            {m.badge && <span className="ml-2 text-[10px] text-slate-400">{m.badge}</span>}
+                            {m.name}{m.badge && <span className="ml-2 text-[10px] text-slate-400">{m.badge}</span>}
                           </button>
                         ))}
                       </motion.div>
@@ -332,7 +310,7 @@ export default function App() {
                 <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }} className="mb-6">
                   <Logo size={56} dark={dark} />
                 </motion.div>
-                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'`}>
+                <h1 className={`text-[1.85rem] sm:text-[2.1rem] font-normal tracking-tight ${dark ? 'text-slate-50' : 'text-slate-900'}`}>
                   {greetingLine || creativeGreeting(firstName)}
                 </h1>
               </motion.div>
@@ -343,12 +321,10 @@ export default function App() {
                 {messages.map((msg) => (
                   <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className={msg.role === 'user' ? 'flex justify-end' : ''}>
                     {msg.role === 'user' ? (
-                      <div className={`max-w-[85%] rounded-3xl px-4 py-2.5 text-[15px] leading-relaxed ${dark ? 'bg-[#2a2a35] text-slate-100' : 'bg-[#f0f1f5] text-slate-900'}`}>
-                        {msg.content}
-                      </div>
+                      <div className={`max-w-[85%] rounded-3xl px-4 py-2.5 text-[15px] leading-relaxed ${dark ? 'bg-[#2a2a35] text-slate-100' : 'bg-[#f0f1f5] text-slate-900'}`}>{msg.content}</div>
                     ) : (
                       <div className="max-w-[95%]">
-                        <div className={`text-[15px] leading-relaxed ${dark ? 'text-slate-100' : 'text-slate-900'`}>
+                        <div className={`text-[15px] leading-relaxed ${dark ? 'text-slate-100' : 'text-slate-900'}`}>
                           <div className="ai-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} />
                         </div>
                         <MessageActions content={msg.content} />
@@ -369,30 +345,17 @@ export default function App() {
 
         <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
           <div className="max-w-2xl mx-auto">
-            <div className={`rounded-[28px] px-3 pt-2.5 pb-2 transition-shadow ${dark ? 'bg-[#1a1a22] border border-white/[0.08] shadow-lg shadow-black/30' : 'bg-[#f3f4f6] border border-black/[0.04] shadow-[0_4px_24px_rgba(0,0,0,0.06)]'}`}>
+            <div className={`glass-surface rounded-[28px] px-3 pt-2.5 pb-2 transition-shadow ${dark ? 'bg-[#1a1a22] border border-white/[0.08] shadow-lg shadow-black/30' : 'bg-[#f3f4f6] border border-black/[0.04] shadow-[0_4px_24px_rgba(0,0,0,0.06)]'}`}>
               <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} rows={1} placeholder="Ask Anything" className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'}`} />
               <div className="flex items-center gap-1.5 mt-1.5">
-                <button type="button" className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${dark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-white text-slate-600 hover:bg-white shadow-sm'}`} aria-label="Add">
-                  <Plus className="w-[18px] h-[18px]" />
-                </button>
-                <button type="button" className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${dark ? 'bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]' : 'bg-white text-slate-700 hover:bg-white shadow-sm'}`}>
-                  <Zap className="w-3.5 h-3.5" />
-                  Fast
-                </button>
+                <button type="button" className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${dark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-white text-slate-600 hover:bg-white shadow-sm'}`} aria-label="Add"><Plus className="w-[18px] h-[18px]" /></button>
+                <button type="button" className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${dark ? 'bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]' : 'bg-white text-slate-700 hover:bg-white shadow-sm'}`}><Zap className="w-3.5 h-3.5" />Fast</button>
                 <div className="flex-1" />
-                <button type="button" className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${dark ? 'text-slate-400 hover:bg-white/8' : 'text-slate-500 hover:bg-black/[0.04]'}`} aria-label="Voice input">
-                  <Mic className="w-5 h-5" />
-                </button>
+                <button type="button" className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${dark ? 'text-slate-400 hover:bg-white/8' : 'text-slate-500 hover:bg-black/[0.04]'}`} aria-label="Voice input"><Mic className="w-5 h-5" /></button>
                 {input.trim() ? (
-                  <motion.button type="button" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={() => handleSend()} disabled={isLoading} className="h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 text-white bg-slate-900 hover:bg-black disabled:opacity-40 transition dark:bg-white dark:text-slate-900" aria-label="Send">
-                    <Send className="w-3.5 h-3.5" />
-                    Send
-                  </motion.button>
+                  <motion.button type="button" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={() => handleSend()} disabled={isLoading} className="h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 text-white bg-slate-900 hover:bg-black disabled:opacity-40 transition dark:bg-white dark:text-slate-900" aria-label="Send"><Send className="w-3.5 h-3.5" />Send</motion.button>
                 ) : (
-                  <button type="button" className={`h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black'}`} aria-label="Speak">
-                    <AudioLines className="w-4 h-4" />
-                    Speak
-                  </button>
+                  <button type="button" className={`h-9 px-4 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black'}`} aria-label="Speak"><AudioLines className="w-4 h-4" />Speak</button>
                 )}
               </div>
             </div>
@@ -406,9 +369,11 @@ export default function App() {
             <motion.div initial={{ y: 48 }} animate={{ y: 0 }} exit={{ y: 48 }} transition={{ type: 'spring', damping: 28, stiffness: 320 }} className={`w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-4 max-h-[85vh] overflow-y-auto ${dark ? 'bg-[#12121a]' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
               <Settings
                 dark={dark}
+                glass={glass}
                 user={user}
                 onSignOut={async () => { await supabase.auth.signOut(); setShowSettings(false) }}
                 onToggleTheme={() => setDark((d) => !d)}
+                onToggleGlass={() => setGlass((g) => !g)}
                 onOpenConnectors={() => { setShowSettings(false); setShowConnectors(true) }}
                 onProfileUpdated={(name) => {
                   setGreetingLine(creativeGreeting(name))
