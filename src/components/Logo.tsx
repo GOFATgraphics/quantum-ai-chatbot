@@ -3,6 +3,7 @@ type Props = {
   className?: string
 }
 
+/** Quantumy brand mark — always the current logo.svg */
 export default function Logo({ size = 32, className = '' }: Props) {
   return (
     <img
@@ -12,6 +13,8 @@ export default function Logo({ size = 32, className = '' }: Props) {
       height={size}
       className={className}
       draggable={false}
+      decoding="async"
+      fetchPriority={size >= 48 ? 'high' : 'auto'}
     />
   )
 }
