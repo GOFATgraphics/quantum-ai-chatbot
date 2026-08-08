@@ -78,7 +78,7 @@ export default function App() {
     document.documentElement.classList.toggle('dark', dark)
     document.documentElement.classList.toggle('glass-on', glass)
     const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', dark ? '#0a0a0f' : '#ffffff')
+    if (meta) meta.setAttribute('content', dark ? '#0a0a0f' : '#eef2ff')
     try { localStorage.setItem('quantumy-glass', glass ? '1' : '0') } catch {}
   }, [dark, glass])
 
@@ -334,7 +334,7 @@ export default function App() {
   }
 
   return (
-    <div className={`flex h-dvh overflow-hidden ${dark ? 'bg-[#0a0a0f]' : 'bg-white'}`}>
+    <div className={`flex h-dvh overflow-hidden ${dark ? 'bg-transparent' : 'bg-transparent'}`}>
       <div className="hidden lg:flex w-[300px] shrink-0"><Sidebar {...sidebarProps} /></div>
 
       <AnimatePresence>
@@ -351,13 +351,18 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative">
         <header className="relative z-10 pt-[env(safe-area-inset-top)] shrink-0">
           <div className="h-14 flex items-center justify-between px-3">
-            <div className="flex items-center gap-1 min-w-0">
-              <button onClick={() => setMobileSidebar(true)} className={`lg:hidden w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'hover:bg-white/10 text-slate-300' : 'hover:bg-black/[0.05] text-slate-700'}`} aria-label="Menu">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <button onClick={() => setMobileSidebar(true)} className={`lg:hidden w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-white/70 text-slate-700 shadow-sm hover:bg-white'}`} aria-label="Menu">
                 <Menu className="w-5 h-5" />
               </button>
               <div className="relative">
-                <button onClick={() => setShowModelMenu((v) => !v)} className={`flex items-center gap-1 px-2 py-1.5 rounded-full text-[15px] font-medium transition ${dark ? 'text-slate-100 hover:bg-white/8' : 'text-slate-800 hover:bg-black/[0.04]'}`}>
+                <button onClick={() => setShowModelMenu((v) => !v)} className={`flex items-center gap-1.5 px-3 h-10 rounded-full text-[14px] font-medium transition ${dark ? 'bg-white/10 text-slate-100 hover:bg-white/15' : 'bg-white/70 text-slate-800 shadow-sm hover:bg-white'}`}>
                   {selectedModel.name}
+                  {selectedModel.badge && (
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'}`}>
+                      {selectedModel.badge}
+                    </span>
+                  )}
                   <ChevronDown className="w-4 h-4 text-slate-400" />
                 </button>
                 <AnimatePresence>
@@ -376,9 +381,11 @@ export default function App() {
                 </AnimatePresence>
               </div>
             </div>
-            <button onClick={startNewChat} className={`w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'hover:bg-white/10 text-slate-300' : 'hover:bg-black/[0.05] text-slate-700'}`} aria-label="New chat">
-              <PenLine className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button onClick={startNewChat} className={`w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-white/70 text-slate-700 shadow-sm hover:bg-white'}`} aria-label="New chat">
+                <PenLine className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -387,7 +394,6 @@ export default function App() {
             <EmptyState
               greeting={greetingLine || creativeGreeting(firstName)}
               dark={dark}
-              onSuggestion={(text) => handleSend(text)}
             />
           ) : (
             <MessageList
