@@ -1,10 +1,8 @@
 export default async function handler(req, res) {
-  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Support both ANTHROPIC_API_KEY and the old XAI_API_KEY name
   const apiKey = process.env.ANTHROPIC_API_KEY || process.env.XAI_API_KEY;
 
   if (!apiKey) {
@@ -20,11 +18,27 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'messages array is required' });
     }
 
-    // Anthropic expects system message separately and only user/assistant in messages
-    const systemPrompt =
-      'You are Quantum, a premium, helpful, and concise AI assistant. Respond in a clear, professional yet friendly tone. Use markdown when helpful. Keep answers focused and high-quality.';
+    const systemPrompt = `You are Quantum — a sharp, reliable AI assistant built for professionals who work with email, documents, and data every day.
 
-    // Convert our simple {role, content} array into Anthropic format
+Your personality:
+- Clear, direct, and helpful
+- Professional but warm
+- Concise by default, detailed when needed
+- Never fluff or filler
+
+How you respond:
+- Use markdown for structure (bold, lists, short paragraphs)
+- Lead with the answer, then supporting details
+- When the user asks about emails, documents, orders, trades, invoices, or data — respond as if you are helping them find and understand that information
+- If you don't have access to their real data yet, be honest and still give the most useful possible guidance
+- Ask clarifying questions only when necessary
+
+Tone examples:
+- Good: "The wheat order confirmation from ABC Importers came in on Tuesday. Here's what it said…"
+- Bad: "Sure! I'd be happy to help you with that. Let me see what I can find…"
+
+Keep responses focused and high-signal.`;
+
     const anthropicMessages = messages.map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
@@ -38,8 +52,8 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514', // or claude-3-5-sonnet-20241022 / claude-3-haiku-20240307
-        max_tokens: 1024,
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2048,
         system: systemPrompt,
         messages: anthropicMessages,
       }),
@@ -55,8 +69,6 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-
-    // Anthropic returns content as an array of blocks
     const content =
       data.content?.[0]?.text ||
       'Sorry, I could not generate a response.';
