@@ -26,6 +26,26 @@ const GMAIL_TOOL = {
   },
 };
 
+const SAVE_MEMORY_TOOL = {
+  name: 'save_memory',
+  description:
+    'Save a lasting fact about the user for future conversations (preferences, job, people, companies, habits). Use when the user shares something personal or stable that should be remembered.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      fact: {
+        type: 'string',
+        description: 'A short, clear fact in third person. Example: "Works at SpaceX on production deployments."',
+      },
+      category: {
+        type: 'string',
+        description: 'Optional category: preference, work, people, project, general',
+      },
+    },
+    required: ['fact'],
+  },
+};
+
 async function getValidGmailToken(userId) {
   const admin = getAdminClient();
   const { data: connector } = await admin
@@ -69,6 +89,37 @@ async function getValidGmailToken(userId) {
   return refreshed.access_token;
 }
 
+async function loadUserMemory(userId) {
+  try {
+    const admin = getAdminClient();
+    const { data } = await admin
+      .from('user_memory')
+      .select('fact, category')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(40);
+    return data || [];
+  } catch {
+    return [];
+  }
+}
+
+async function loadProjectContext(userId, projectId) {
+  if (!projectId) return null;
+  try {
+    const admin = getAdminClient();
+    const { data } = await admin
+      .from('projects')
+      .select('name, description')
+      .eq('id', projectId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 async function runClaude({ apiKey, system, messages, tools }) {
   const body = {
     model: 'claude-sonnet-4-6',
@@ -110,14 +161,30 @@ function extractText(contentBlocks) {
     .trim();
 }
 
-function buildSystemPrompt(gmailReady) {
-  return `You are Quantumy AI — a precise personal work assistant for professionals.
+function buildSystemPrompt({ gmailReady, memory, project, firstName }) {
+  const memoryBlock =
+    memory?.length > 0
+      ? `## What you know about this user\n${memory
+          .map((m) => `- ${m.fact}${m.category ? ` (${m.category})` : ''}`)
+          .join('\n')}\nUse this context naturally. Do not recite the list unless asked.`
+      : '## What you know about this user\nNo saved memories yet. When they share stable facts (job, preferences, people), use save_memory.';
+
+  const projectBlock = project
+    ? `## Active project workspace\nName: ${project.name}\n${project.description ? `Description: ${project.description}\n` : ''}Stay focused on this project when relevant.`
+    : '';
+
+  const nameLine = firstName ? `The user's first name is ${firstName}. Address them by first name occasionally when it feels natural.` : '';
+
+  return `You are Quantumy AI — a precise personal work assistant that learns about the user over time.
+
+${nameLine}
 
 ## Core principles
 - Be accurate, structured, and easy to scan.
 - Lead with the answer or summary, then details.
 - Never invent email contents, dates, or senders. Only use tool results and user-provided facts.
 - Prefer clarity over fluff. No filler phrases.
+- Continuously learn: when the user shares lasting personal or work context, call save_memory.
 
 ## Formatting rules (strict)
 Use clean Markdown only. The UI renders it — write for humans, not source code.
@@ -151,9 +218,13 @@ When searching Gmail:
 - For non-email tasks: structured steps, tables when useful, code in fenced blocks.
 - Ask one clarifying question only when critical information is missing.
 
+${memoryBlock}
+
+${projectBlock}
+
 ${gmailReady
-    ? '## Tools\nGmail is connected. Use search_gmail whenever the user asks about their mail, inbox, unread messages, or anything that requires looking at email. After the tool returns, rewrite the data into the structured briefing format above.'
-    : '## Tools\nGmail is not connected. If the user asks about their email, tell them to open **Connectors** in the sidebar and connect Gmail (read-only). Do not invent emails.'}`;
+    ? '## Tools\n- search_gmail: use whenever the user asks about mail.\n- save_memory: store lasting facts about the user.'
+    : '## Tools\n- Gmail is not connected. If they ask about email, tell them to open Connectors and connect Gmail.\n- save_memory: store lasting facts about the user.'}`;
 }
 
 export default async function handler(req, res) {
@@ -180,22 +251,30 @@ export default async function handler(req, res) {
     }
 
     const user = await getUserFromAuthHeader(req);
-    let tools = [];
+    let tools = [SAVE_MEMORY_TOOL];
     let gmailReady = false;
+    let memory = [];
+    let project = null;
+    let firstName = body?.firstName || null;
 
     if (user) {
       try {
         const token = await getValidGmailToken(user.id);
         if (token) {
           gmailReady = true;
-          tools = [GMAIL_TOOL];
+          tools = [GMAIL_TOOL, SAVE_MEMORY_TOOL];
         }
       } catch (e) {
         console.warn('Could not load Gmail connector:', e.message);
       }
+
+      memory = await loadUserMemory(user.id);
+      if (body?.projectId) {
+        project = await loadProjectContext(user.id, body.projectId);
+      }
     }
 
-    const systemPrompt = buildSystemPrompt(gmailReady);
+    const systemPrompt = buildSystemPrompt({ gmailReady, memory, project, firstName });
 
     let anthropicMessages = messages.map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
@@ -252,6 +331,38 @@ export default async function handler(req, res) {
               type: 'tool_result',
               tool_use_id: block.id,
               content: `Gmail search error: ${e.message}`,
+              is_error: true,
+            });
+          }
+        } else if (block.name === 'save_memory' && user) {
+          try {
+            const fact = String(block.input?.fact || '').trim();
+            if (!fact) {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: 'Empty fact; nothing saved.',
+                is_error: true,
+              });
+            } else {
+              const admin = getAdminClient();
+              await admin.from('user_memory').insert({
+                user_id: user.id,
+                fact,
+                category: block.input?.category || 'general',
+                source: 'chat',
+              });
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: `Saved memory: ${fact}`,
+              });
+            }
+          } catch (e) {
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: `Could not save memory: ${e.message}`,
               is_error: true,
             });
           }
