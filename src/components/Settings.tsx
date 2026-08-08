@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  LogOut, Moon, Sun, Brain, Plus, Trash2, Loader2,
+  Moon, Sun, Brain, Plus, Trash2, Loader2,
   Link2, Sparkles, X, Check, ChevronRight, ChevronLeft,
   Bell, Globe, LayoutGrid, Settings2, Search,
 } from 'lucide-react'
