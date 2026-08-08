@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Logo from './Logo'
 
 const DEFAULT_STEPS = ['Thinking', 'Gathering context', 'Working on it']
 const EMAIL_STEPS = [
@@ -18,11 +19,17 @@ const DRIVE_STEPS = [
   'Looking through files',
   'Finding matches',
 ]
+const CAL_STEPS = [
+  'Opening Calendar',
+  'Checking your schedule',
+  'Pulling events',
+]
 
 function pickSteps(prompt: string): string[] {
   const p = prompt.toLowerCase()
-  if (/email|inbox|gmail|mail|message|send/.test(p)) return EMAIL_STEPS
-  if (/drive|doc|file|sheet|document/.test(p)) return DRIVE_STEPS
+  if (/email|inbox|gmail|mail|message|send|outlook/.test(p)) return EMAIL_STEPS
+  if (/calendar|schedule|meeting|event|appointment/.test(p)) return CAL_STEPS
+  if (/drive|doc|file|sheet|document|excel/.test(p)) return DRIVE_STEPS
   if (/search|find|look up/.test(p)) return SEARCH_STEPS
   return DEFAULT_STEPS
 }
@@ -39,15 +46,16 @@ export default function ThinkingStatus({ prompt = '', dark }: Props) {
     return () => clearInterval(t)
   }, [steps])
 
-  const isWorkspace = /Workspace|Drive/.test(steps[i] || '')
-
   return (
-    <div className="flex items-center gap-2.5 py-1">
-      <span className="relative flex h-2.5 w-2.5">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1a73e8] opacity-40" />
-        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#1a73e8]" />
-      </span>
-      <div className={`text-[15px] ${dark ? 'text-slate-200' : 'text-slate-800'}`}>
+    <div className="flex items-center gap-3 py-1.5">
+      <motion.div
+        animate={{ scale: [1, 1.08, 1], opacity: [0.85, 1, 0.85] }}
+        transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+        className="shrink-0"
+      >
+        <Logo size={28} dark={dark} />
+      </motion.div>
+      <div className={`text-[15px] font-medium ${dark ? 'text-slate-200' : 'text-slate-800'}`}>
         <AnimatePresence mode="wait">
           <motion.span
             key={steps[i]}
@@ -55,16 +63,10 @@ export default function ThinkingStatus({ prompt = '', dark }: Props) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.2 }}
-            className="inline-flex items-center gap-1.5"
+            className="inline-block"
           >
-            {isWorkspace && (
-              <span className="inline-flex gap-0.5 text-xs font-bold tracking-tight">
-                <span className="text-[#ea4335]">M</span>
-                <span className="text-[#4285f4]">D</span>
-                <span className="text-[#34a853]">G</span>
-              </span>
-            )}
-            {steps[i]}…
+            {steps[i]}
+            <span className={`inline-block w-4 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>…</span>
           </motion.span>
         </AnimatePresence>
       </div>

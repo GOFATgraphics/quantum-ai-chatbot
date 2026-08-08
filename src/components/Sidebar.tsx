@@ -5,6 +5,7 @@ import {
   FolderKanban, Plus,
 } from 'lucide-react'
 import type { Conversation, Project } from '../lib/supabase'
+import Logo from './Logo'
 import type { User } from '@supabase/supabase-js'
 
 type Props = {
@@ -37,7 +38,11 @@ export default function Sidebar({
   const [showNewProject, setShowNewProject] = useState(false)
   const [projectName, setProjectName] = useState('')
 
-  const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
+  const displayName =
+    user.user_metadata?.preferred_name ||
+    user.user_metadata?.full_name ||
+    user.email?.split('@')[0] ||
+    'User'
   const initial = displayName.charAt(0).toUpperCase()
 
   const filtered = useMemo(() => {
@@ -49,7 +54,6 @@ export default function Sidebar({
   }, [conversations, query, currentProjectId])
 
   const bg = dark ? 'bg-[#0e0e14] text-slate-100' : 'bg-white text-slate-900'
-  const muted = 'text-slate-500'
   const hover = dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'
   const active = dark ? 'bg-white/[0.08]' : 'bg-[#e8f0fe] text-[#1967d2]'
   const newChat = dark ? 'bg-white/[0.08] hover:bg-white/[0.12]' : 'bg-[#f0f4f8] hover:bg-[#e8edf3]'
@@ -64,8 +68,11 @@ export default function Sidebar({
 
   return (
     <div className={`flex flex-col h-full min-h-0 w-full ${bg}`}>
-      <div className="flex items-center justify-between px-5 pt-[max(1.1rem,env(safe-area-inset-top))] pb-2 shrink-0">
-        <span className="text-[22px] font-normal tracking-tight">Quantumy</span>
+      <div className="flex items-center justify-between px-4 pt-[max(1.1rem,env(safe-area-inset-top))] pb-2 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Logo size={32} dark={dark} className="shrink-0" />
+          <span className="text-[20px] font-semibold tracking-tight truncate">Quantumy</span>
+        </div>
         {showClose && onClose && (
           <button onClick={onClose} className={`w-9 h-9 rounded-full flex items-center justify-center ${hover}`} aria-label="Close">
             <X className="w-5 h-5 text-slate-600" />
@@ -96,68 +103,55 @@ export default function Sidebar({
         )}
       </AnimatePresence>
 
-      <div className="px-4 mt-6 shrink-0">
+      <div className="px-4 mt-5 shrink-0">
         <div className="flex items-center justify-between mb-1">
-          <span className={`text-[13px] ${muted}`}>Projects</span>
-          <button onClick={() => setShowNewProject((v) => !v)} className={`p-1 rounded-full ${hover}`} aria-label="New project">
-            <Plus className="w-4 h-4 text-slate-500" />
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Projects</span>
+          <button type="button" onClick={() => setShowNewProject((v) => !v)} className={`p-1.5 rounded-lg ${hover}`} aria-label="New project">
+            <Plus className="w-3.5 h-3.5 text-slate-500" />
           </button>
         </div>
-        <AnimatePresence>
-          {showNewProject && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-2">
-              <div className="flex gap-1.5">
-                <input autoFocus value={projectName} onChange={(e) => setProjectName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitProject()} placeholder="Project name" className={`flex-1 h-9 rounded-full px-3 text-sm outline-none border ${dark ? 'bg-white/5 border-white/10' : 'bg-[#f1f3f4] border-transparent'}`} />
-                <button onClick={submitProject} className="px-3 h-9 rounded-full text-sm font-medium text-white bg-[#1a73e8]">Add</button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <button onClick={() => onSelectProject(null)} className={`w-full flex items-center gap-3 h-10 rounded-full px-3 text-[14px] transition ${!currentProjectId ? active : hover}`}>
-          <FolderKanban className="w-4 h-4" />
-          All chats
-        </button>
-        {projects.map((p) => (
-          <div key={p.id} className={`group flex items-center rounded-full transition ${currentProjectId === p.id ? active : hover}`}>
-            <button onClick={() => onSelectProject(p.id)} className="flex-1 flex items-center gap-3 h-10 px-3 text-[14px] min-w-0">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color || '#1a73e8' }} />
-              <span className="truncate">{p.name}</span>
-            </button>
-            <button onClick={() => onDeleteProject(p.id)} className="p-2 mr-1 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+        {showNewProject && (
+          <div className="flex gap-1.5 mb-2">
+            <input value={projectName} onChange={(e) => setProjectName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitProject()} placeholder="Project name" className={`flex-1 h-9 rounded-xl px-3 text-sm outline-none border ${dark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`} />
+            <button type="button" onClick={submitProject} className="h-9 px-3 rounded-xl text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900">Add</button>
           </div>
-        ))}
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 mt-5 pb-2">
-        <p className={`text-[13px] px-3 mb-1 ${muted}`}>Recents</p>
-        {filtered.length === 0 && <p className={`px-3 py-6 text-sm text-center ${muted}`}>{query ? 'No matching chats' : 'No chats yet'}</p>}
-        <div className="space-y-0.5">
-          {filtered.map((conv) => {
-            const isActive = currentConversationId === conv.id
-            return (
-              <div key={conv.id} className={`group flex items-center rounded-full transition ${isActive ? active : hover}`}>
-                <button onClick={() => onSelectChat(conv.id)} className="flex-1 text-left px-4 py-2.5 text-[14px] min-w-0">
-                  <span className="block truncate">{conv.title || 'Untitled'}</span>
-                </button>
-                <button onClick={() => onDeleteChat(conv.id)} disabled={deletingId === conv.id} className="p-2 mr-1 rounded-full opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500">
-                  {deletingId === conv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            )
-          })}
+        )}
+        <div className="space-y-0.5 max-h-28 overflow-y-auto">
+          <button type="button" onClick={() => onSelectProject(null)} className={`w-full text-left px-3 py-2 rounded-xl text-sm flex items-center gap-2 ${!currentProjectId ? active : hover}`}>
+            <FolderKanban className="w-4 h-4 shrink-0 opacity-70" /> All chats
+          </button>
+          {projects.map((p) => (
+            <div key={p.id} className={`group flex items-center gap-1 rounded-xl ${currentProjectId === p.id ? active : hover}`}>
+              <button type="button" onClick={() => onSelectProject(p.id)} className="flex-1 text-left px-3 py-2 text-sm truncate">{p.name}</button>
+              <button type="button" onClick={() => onDeleteProject(p.id)} className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500" aria-label="Delete project"><Trash2 className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className={`shrink-0 px-3 py-3 border-t ${dark ? 'border-white/5' : 'border-black/[0.06]'}`}>
-        <button onClick={onOpenSettings} className={`w-full flex items-center gap-3 rounded-full px-2 py-2 transition ${hover}`}>
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#4285F4] via-[#9B72CB] to-[#D96570] flex items-center justify-center text-white text-sm font-medium shrink-0">{initial}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 mt-3 pb-2">
+        <p className="px-3 mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Chats</p>
+        <div className="space-y-0.5">
+          {filtered.map((c) => (
+            <div key={c.id} className={`group flex items-center gap-1 rounded-xl ${currentConversationId === c.id ? active : hover}`}>
+              <button type="button" onClick={() => onSelectChat(c.id)} className="flex-1 text-left px-3 py-2.5 text-[14px] truncate">{c.title || 'New chat'}</button>
+              <button type="button" onClick={() => onDeleteChat(c.id)} disabled={deletingId === c.id} className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500" aria-label="Delete chat">
+                {deletingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          ))}
+          {filtered.length === 0 && <p className="px-3 py-4 text-sm text-slate-500">No chats yet</p>}
+        </div>
+      </div>
+
+      <div className="shrink-0 border-t border-black/[0.06] dark:border-white/[0.06] p-3">
+        <button type="button" onClick={onOpenSettings} className={`w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 transition ${hover}`}>
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-sm font-semibold shrink-0">{initial}</div>
           <div className="flex-1 min-w-0 text-left">
             <p className="text-sm font-medium truncate">{displayName}</p>
-            <p className={`text-xs truncate ${muted}`}>Settings</p>
+            <p className="text-xs text-slate-500 truncate">{user.email}</p>
           </div>
-          <Settings className={`w-5 h-5 shrink-0 ${muted}`} />
+          <Settings className="w-4 h-4 text-slate-400 shrink-0" />
         </button>
       </div>
     </div>
