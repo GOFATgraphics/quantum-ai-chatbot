@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mic, MicOff, Send, Plus, Zap, Square, AudioLines } from 'lucide-react'
+import { Mic, MicOff, Send, Plus, Zap, Square, AudioLines, Brain, Globe } from 'lucide-react'
 
 type Props = {
   value: string
@@ -12,6 +12,10 @@ type Props = {
   errorHint?: string | null
   fastActive?: boolean
   onToggleFast?: () => void
+  thinkActive?: boolean
+  onToggleThink?: () => void
+  deepSearchActive?: boolean
+  onToggleDeepSearch?: () => void
 }
 
 export default function ChatInput({
@@ -24,6 +28,10 @@ export default function ChatInput({
   errorHint,
   fastActive,
   onToggleFast,
+  thinkActive,
+  onToggleThink,
+  deepSearchActive,
+  onToggleDeepSearch,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [listening, setListening] = useState(false)
@@ -185,6 +193,40 @@ export default function ChatInput({
             >
               <Zap className={`w-3.5 h-3.5 ${fastActive ? (dark ? 'text-indigo-300' : 'text-indigo-500') : ''}`} />
               Fast
+            </button>
+            <button
+              type="button"
+              onClick={onToggleThink}
+              title="Think — deeper step-by-step reasoning"
+              className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
+                thinkActive
+                  ? dark
+                    ? 'bg-violet-500/20 text-violet-200 ring-1 ring-violet-400/35'
+                    : 'bg-violet-50 text-violet-700 shadow-sm ring-1 ring-violet-200'
+                  : dark
+                    ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.11]'
+                    : 'bg-white/90 text-slate-700 shadow-sm ring-1 ring-black/[0.03]'
+              }`}
+            >
+              <Brain className={`w-3.5 h-3.5 ${thinkActive ? (dark ? 'text-violet-300' : 'text-violet-600') : ''}`} />
+              Think
+            </button>
+            <button
+              type="button"
+              onClick={onToggleDeepSearch}
+              title="DeepSearch — thorough research-style answers"
+              className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
+                deepSearchActive
+                  ? dark
+                    ? 'bg-sky-500/20 text-sky-200 ring-1 ring-sky-400/35'
+                    : 'bg-sky-50 text-sky-700 shadow-sm ring-1 ring-sky-200'
+                  : dark
+                    ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.11]'
+                    : 'bg-white/90 text-slate-700 shadow-sm ring-1 ring-black/[0.03]'
+              }`}
+            >
+              <Globe className={`w-3.5 h-3.5 ${deepSearchActive ? (dark ? 'text-sky-300' : 'text-sky-600') : ''}`} />
+              DeepSearch
             </button>
             <div className="flex-1" />
             <button
