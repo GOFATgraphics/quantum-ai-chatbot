@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Copy, Check, ThumbsUp, ThumbsDown, Volume2, Share2 } from 'lucide-react'
+import { Copy, Check, ThumbsUp, ThumbsDown, Volume2, Share2, RotateCcw } from 'lucide-react'
 
 type Props = {
   content: string
   dark: boolean
+  onRegenerate?: () => void
 }
 
-export default function MessageActions({ content, dark }: Props) {
+export default function MessageActions({ content, dark, onRegenerate }: Props) {
   const [copied, setCopied] = useState(false)
   const [liked, setLiked] = useState<'up' | 'down' | null>(null)
 
@@ -58,6 +59,11 @@ export default function MessageActions({ content, dark }: Props) {
       <button type="button" onClick={copy} className={`p-1.5 rounded-full transition ${muted}`} title="Copy">
         {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
       </button>
+      {onRegenerate && (
+        <button type="button" onClick={onRegenerate} className={`p-1.5 rounded-full transition ${muted}`} title="Regenerate">
+          <RotateCcw className="w-3.5 h-3.5" />
+        </button>
+      )}
       <button type="button" onClick={share} className={`p-1.5 rounded-full transition ${muted}`} title="Share">
         <Share2 className="w-3.5 h-3.5" />
       </button>
