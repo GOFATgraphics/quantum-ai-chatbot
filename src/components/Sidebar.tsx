@@ -62,7 +62,6 @@ export default function Sidebar({
 
   return (
     <div className={`flex flex-col h-full min-h-0 ${bg}`}>
-      {/* Top bar */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
         <span className={`text-[17px] font-medium tracking-tight ${textMain}`}>Quantumy</span>
         {showClose && onClose && (
@@ -77,7 +76,6 @@ export default function Sidebar({
       </div>
 
       <div className="px-3 space-y-1 shrink-0">
-        {/* New chat — Gemini-style pill */}
         <button
           onClick={onNewChat}
           className={`w-full flex items-center gap-3 h-11 rounded-full px-4 text-[15px] font-medium transition ${pill}`}
@@ -101,14 +99,6 @@ export default function Sidebar({
           <Link2 className="w-[18px] h-[18px]" />
           Connectors
         </button>
-
-        <button
-          onClick={onOpenSettings}
-          className={`w-full flex items-center gap-3 h-11 rounded-full px-4 text-[15px] transition ${navItem}`}
-        >
-          <Settings className="w-[18px] h-[18px]" />
-          Settings
-        </button>
       </div>
 
       {showSearch && (
@@ -123,7 +113,6 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* Recents */}
       <div className="flex-1 overflow-y-auto min-h-0 mt-4 px-2 pb-3">
         <p className={`px-3 mb-1 text-[12px] font-medium ${textMuted}`}>Recents</p>
 
@@ -170,7 +159,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Profile footer — Gemini style */}
+      {/* Only Settings entry — next to profile */}
       <div className={`shrink-0 px-3 py-3 border-t ${dark ? 'border-white/5' : 'border-slate-100'}`}>
         <button
           onClick={onOpenSettings}
@@ -181,7 +170,7 @@ export default function Sidebar({
           </div>
           <div className="flex-1 min-w-0 text-left">
             <p className={`text-sm font-medium truncate ${textMain}`}>{displayName}</p>
-            <p className={`text-xs truncate ${textMuted}`}>Free</p>
+            <p className={`text-xs truncate ${textMuted}`}>{user.email}</p>
           </div>
           <Settings className={`w-5 h-5 shrink-0 ${textMuted}`} />
         </button>

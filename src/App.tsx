@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu, Plus, Mic, Send, X, LogOut, MessageSquare,
   Loader2, GraduationCap, Cpu, PenLine, ArrowLeft,
-  MoreHorizontal, Moon, Sun,
+  Moon, Sun,
 } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage } from './lib/supabase'
 import Auth from './components/Auth'
@@ -55,6 +55,52 @@ function formatMarkdown(text: string) {
   return `<p>${html}</p>`
 }
 
+function ModalShell({
+  dark,
+  title,
+  onClose,
+  children,
+}: {
+  dark: boolean
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  const textMain = dark ? 'text-slate-100' : 'text-slate-900'
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 24 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+        className={`fixed z-50 left-4 right-4 top-[max(1rem,env(safe-area-inset-top))] bottom-[max(1rem,env(safe-area-inset-bottom))] sm:left-1/2 sm:right-auto sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md sm:h-auto sm:max-h-[min(85dvh,640px)] flex flex-col rounded-3xl shadow-2xl overflow-hidden ${dark ? 'bg-[#12121a] border border-white/10' : 'bg-white'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+          <h2 className={`text-lg font-semibold ${textMain}`}>{title}</h2>
+          <button
+            onClick={onClose}
+            className={`p-1.5 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+          >
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 pb-6 min-h-0">
+          {children}
+        </div>
+      </motion.div>
+    </>
+  )
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
@@ -64,6 +110,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState(MODELS[1])
   const [showSettings, setShowSettings] = useState(false)
+  const [showConnectors, setShowConnectors] = useState(false)
   const [mobileSidebar, setMobileSidebar] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
@@ -102,7 +149,7 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('connected') || params.get('connector_error')) {
-      setShowSettings(true)
+      setShowConnectors(true)
     }
   }, [])
 
@@ -234,6 +281,7 @@ export default function App() {
   const startNewChat = () => { setCurrentConversationId(null); setMessages([]); setMobileSidebar(false) }
   const handleSignOut = async () => { await supabase.auth.signOut(); setShowSettings(false) }
   const openSettings = () => { setShowSettings(true); setMobileSidebar(false) }
+  const openConnectors = () => { setShowConnectors(true); setMobileSidebar(false) }
   const isEmpty = messages.length === 0 && !isLoading
 
   if (authLoading) {
@@ -264,17 +312,15 @@ export default function App() {
     onSelectChat: loadMessages,
     onDeleteChat: deleteConversation,
     onOpenSettings: openSettings,
-    onOpenConnectors: openSettings,
+    onOpenConnectors: openConnectors,
   }
 
   return (
     <div className={`flex h-dvh max-h-dvh overflow-hidden transition-colors duration-300 ${shell}`}>
-      {/* Desktop sidebar */}
       <aside className={`hidden lg:flex w-[300px] flex-col border-r min-h-0 ${dark ? 'border-white/5' : 'border-slate-200/80'}`}>
         <Sidebar {...sidebarProps} />
       </aside>
 
-      {/* Mobile drawer */}
       <AnimatePresence>
         {mobileSidebar && (
           <>
@@ -292,11 +338,7 @@ export default function App() {
               transition={{ type: 'spring', damping: 32, stiffness: 340 }}
               className="fixed left-0 top-0 bottom-0 w-[min(100%,320px)] z-50 flex flex-col lg:hidden shadow-2xl"
             >
-              <Sidebar
-                {...sidebarProps}
-                showClose
-                onClose={() => setMobileSidebar(false)}
-              />
+              <Sidebar {...sidebarProps} showClose onClose={() => setMobileSidebar(false)} />
             </motion.aside>
           </>
         )}
@@ -325,14 +367,9 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button onClick={() => setDark(!dark)} className={`p-2 rounded-full transition ${dark ? 'hover:bg-white/10 text-amber-300' : 'hover:bg-white/80 text-slate-500'}`} title={dark ? 'Light mode' : 'Dark mode'}>
-              {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-            <button onClick={() => setShowSettings(true)} className={`p-2 rounded-full transition ${dark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-white/80 text-slate-500'}`}>
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
-          </div>
+          <button onClick={() => setDark(!dark)} className={`p-2 rounded-full transition ${dark ? 'hover:bg-white/10 text-amber-300' : 'hover:bg-white/80 text-slate-500'}`} title={dark ? 'Light mode' : 'Dark mode'}>
+            {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
         </header>
 
         <main className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
@@ -406,41 +443,33 @@ export default function App() {
         </div>
       </div>
 
+      {/* Settings only — account + theme + sign out */}
       <AnimatePresence>
         {showSettings && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowSettings(false)} />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 12 }}
-              className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-3xl z-50 p-6 shadow-2xl ${dark ? 'bg-[#12121a] border border-white/10' : 'bg-white'}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className={`text-lg font-semibold ${textMain}`}>Settings</h2>
-                <button onClick={() => setShowSettings(false)} className={`p-1.5 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}><X className="w-5 h-5 text-slate-400" /></button>
+          <ModalShell dark={dark} title="Settings" onClose={() => setShowSettings(false)}>
+            <div className="space-y-4">
+              <div className={`rounded-2xl p-4 ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <p className={`text-xs font-medium mb-1 ${textMuted}`}>Signed in as</p>
+                <p className={`text-sm truncate ${textMain}`}>{user.email}</p>
               </div>
-              <div className="space-y-5">
-                <div className={`rounded-2xl p-4 ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                  <p className={`text-xs font-medium mb-1 ${textMuted}`}>Signed in as</p>
-                  <p className={`text-sm truncate ${textMain}`}>{user.email}</p>
-                </div>
+              <button onClick={() => setDark(!dark)} className={`w-full h-11 rounded-2xl border text-sm font-medium transition flex items-center justify-center gap-2 ${dark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
+                {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                {dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              </button>
+              <button onClick={handleSignOut} className={`w-full h-11 rounded-2xl border text-sm font-medium transition flex items-center justify-center gap-2 ${dark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
+                <LogOut className="w-4 h-4" /> Sign out
+              </button>
+            </div>
+          </ModalShell>
+        )}
+      </AnimatePresence>
 
-                {session?.access_token && (
-                  <Connectors dark={dark} accessToken={session.access_token} />
-                )}
-
-                <button onClick={() => setDark(!dark)} className={`w-full h-11 rounded-2xl border text-sm font-medium transition flex items-center justify-center gap-2 ${dark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
-                  {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                  {dark ? 'Switch to light mode' : 'Switch to dark mode'}
-                </button>
-                <button onClick={handleSignOut} className={`w-full h-11 rounded-2xl border text-sm font-medium transition flex items-center justify-center gap-2 ${dark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
-                  <LogOut className="w-4 h-4" /> Sign out
-                </button>
-              </div>
-            </motion.div>
-          </>
+      {/* Connectors — separate panel */}
+      <AnimatePresence>
+        {showConnectors && session?.access_token && (
+          <ModalShell dark={dark} title="Connectors" onClose={() => setShowConnectors(false)}>
+            <Connectors dark={dark} accessToken={session.access_token} />
+          </ModalShell>
         )}
       </AnimatePresence>
     </div>
