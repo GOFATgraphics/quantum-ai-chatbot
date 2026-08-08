@@ -15,6 +15,7 @@ import Sidebar from './components/Sidebar'
 import Logo from './components/Logo'
 import MessageActions from './components/MessageActions'
 import ThinkingStatus from './components/ThinkingStatus'
+import InstallPWA from './components/InstallPWA'
 import type { User, Session } from '@supabase/supabase-js'
 
 type Message = { id: string; role: 'user' | 'assistant'; content: string }
@@ -23,6 +24,13 @@ type Model = { id: string; name: string; badge?: string }
 const MODELS: Model[] = [
   { id: 'quantum-2', name: 'Quantum 2' },
   { id: 'quantum-3', name: 'Quantum 3', badge: 'Pro' },
+]
+
+const SUGGESTIONS = [
+  'Draft a polite follow-up email',
+  'Summarize my unread emails',
+  'Help me plan my day',
+  'Remember that I prefer short answers',
 ]
 
 function generateId() {
@@ -106,6 +114,9 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
     localStorage.setItem('quantum-theme', dark ? 'dark' : 'light')
+    const meta = document.querySelector('meta[name="theme-color"]:not([media])')
+      || document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', dark ? '#07070c' : '#f0f2f8')
   }, [dark])
 
   useEffect(() => {
@@ -216,6 +227,13 @@ export default function App() {
   useEffect(() => { scrollToBottom() }, [messages, isLoading, scrollToBottom])
 
   useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 144)}px`
+  }, [input])
+
+  useEffect(() => {
     const SR = window.SpeechRecognition || (window as any).webkitSpeechRecognition
     if (SR) {
       const r = new SR()
@@ -308,8 +326,9 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center h-dvh">
-        <Loader2 className="w-7 h-7 animate-spin text-indigo-400" />
+      <div className="flex flex-col items-center justify-center h-dvh gap-4 bg-[#05050a]">
+        <Logo size={56} className="opacity-90" />
+        <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
       </div>
     )
   }
@@ -432,21 +451,30 @@ export default function App() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.4 }}
-                  className="flex flex-col items-center justify-center min-h-[calc(100%-2rem)] py-10 text-center"
+                  transition={{ duration: 0.35 }}
+                  className="flex flex-col items-center justify-center min-h-[calc(100%-2rem)] py-8 text-center"
                 >
-                  <Logo size={64} className="mb-6 drop-shadow-lg" />
-                  <h1 className={`text-[28px] sm:text-[34px] font-medium tracking-tight leading-tight ${textMain}`}>
-                    Any new ideas<br className="sm:hidden" /> to explore?
-                  </h1>
-                  <p className={`mt-3 text-sm ${textMuted}`}>
+                  <Logo size={64} className="mb-5 drop-shadow-lg" />
+                  <h1 className={`text-[26px] sm:text-[32px] font-medium tracking-tight leading-tight ${textMain}`}>
                     {getTimeGreeting()}, {firstName}
-                  </p>
+                  </h1>
+                  <p className={`mt-2 text-sm ${textMuted}`}>What can I help with?</p>
                   {activeProject && (
-                    <p className={`mt-2 text-xs ${textMuted}`}>
-                      Workspace · {activeProject.name}
-                    </p>
+                    <p className={`mt-1.5 text-xs ${textMuted}`}>Workspace · {activeProject.name}</p>
                   )}
+                  <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-md">
+                    {SUGGESTIONS.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => handleSend(s)}
+                        className={`text-left text-[13px] px-3.5 py-2 rounded-full transition glass-card ${
+                          dark ? 'glass-card-dark text-slate-300 hover:bg-white/10' : 'glass-card-light text-slate-700 hover:bg-white/80'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </motion.div>
               ) : (
                 <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-4 space-y-6 pb-6">
@@ -465,7 +493,6 @@ export default function App() {
           </div>
         </main>
 
-        {/* Input — larger bubble, more space above keyboard (Gemini-style) */}
         <div className="px-3 lg:px-6 pt-2 shrink-0 z-10 pb-[max(1.35rem,calc(env(safe-area-inset-bottom)+0.5rem))]">
           <div className="max-w-2xl mx-auto">
             <div
@@ -474,6 +501,7 @@ export default function App() {
               }`}
             >
               <button
+                type="button"
                 className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition ${
                   dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-white/50'
                 }`}
@@ -491,6 +519,7 @@ export default function App() {
                 style={{ minHeight: '44px' }}
               />
               <button
+                type="button"
                 onClick={toggleListening}
                 className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition ${
                   isListening
@@ -503,6 +532,7 @@ export default function App() {
                 <Mic className="w-5 h-5" />
               </button>
               <button
+                type="button"
                 onClick={() => handleSend()}
                 disabled={!input.trim() || isLoading}
                 className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition ${
@@ -519,6 +549,8 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      <InstallPWA dark={dark} />
 
       <AnimatePresence>
         {showSettings && (
