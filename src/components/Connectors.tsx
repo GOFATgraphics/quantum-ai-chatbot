@@ -36,11 +36,9 @@ export default function Connectors({ dark, accessToken }: Props) {
 
   useEffect(() => {
     load()
-    // After OAuth redirect back with ?connected=
     const params = new URLSearchParams(window.location.search)
     if (params.get('connected') || params.get('connector_error')) {
       load()
-      // Clean URL without reload
       const url = new URL(window.location.href)
       url.searchParams.delete('connected')
       url.searchParams.delete('connector_error')
@@ -93,12 +91,8 @@ export default function Connectors({ dark, accessToken }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 mb-1">
-        <Link2 className={`w-4 h-4 ${textMuted}`} />
-        <h3 className={`text-sm font-semibold ${textMain}`}>Connectors</h3>
-      </div>
       <p className={`text-xs leading-relaxed ${textMuted}`}>
-        Connect sources one at a time. Quantum only accesses what you explicitly connect.
+        Connect sources one at a time. Quantumy only accesses what you explicitly connect.
       </p>
 
       {error && (
