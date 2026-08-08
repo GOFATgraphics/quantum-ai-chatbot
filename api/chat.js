@@ -227,9 +227,12 @@ async function loadProjectContext(userId, projectId) {
   }
 }
 
-async function runClaude({ apiKey, system, messages, tools }) {
+const ALLOWED_MODELS = new Set(['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001']);
+
+async function runClaude({ apiKey, system, messages, tools, model }) {
+  const chosen = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
   const body = {
-    model: 'claude-sonnet-4-6',
+    model: chosen,
     max_tokens: 4096,
     system,
     messages,
@@ -434,6 +437,7 @@ export default async function handler(req, res) {
         system: systemPrompt,
         messages: anthropicMessages,
         tools: tools.length ? tools : undefined,
+        model: body?.model,
       });
 
       const stop = data.stop_reason;
