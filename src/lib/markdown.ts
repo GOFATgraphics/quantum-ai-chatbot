@@ -11,6 +11,8 @@ export function formatMarkdown(text: string): string {
   const out: string[] = []
   let inUl = false
   let inOl = false
+  let inTable = false
+  let tableRows: string[][] = []
 
   const closeLists = () => {
     if (inUl) {
@@ -23,15 +25,95 @@ export function formatMarkdown(text: string): string {
     }
   }
 
-  const inline = (s: string) =>
-    s
+  const flushTable = () => {
+    if (!inTable || tableRows.length === 0) {
+      inTable = false
+      tableRows = []
+      return
+    }
+    const isSep = (cells: string[]) =>
+      cells.every((c) => /^:?-{2,}:?$/.test(c.trim()) || c.trim() === '')
+
+    const rows = tableRows.filter((r) => !isSep(r))
+    if (rows.length === 0) {
+      inTable = false
+      tableRows = []
+      return
+    }
+
+    out.push('<div class="md-table-wrap"><table class="md-table">')
+    rows.forEach((cells, idx) => {
+      const tag = idx === 0 ? 'th' : 'td'
+      out.push('<tr>')
+      cells.forEach((c) => {
+        out.push(`<${tag}>${inline(c.trim())}</${tag}>`)
+      })
+      out.push('</tr>')
+    })
+    out.push('</table></div>')
+    inTable = false
+    tableRows = []
+  }
+
+  const shortenUrl = (url: string) => {
+    try {
+      const u = new URL(url.replace(/&amp;/g, '&'))
+      if (u.hostname.includes('docs.google.com')) {
+        if (u.pathname.includes('/document/')) return 'Open Google Doc'
+        if (u.pathname.includes('/spreadsheets/')) return 'Open Spreadsheet'
+        if (u.pathname.includes('/presentation/')) return 'Open Spides'
+        return 'Open in Drive'
+      }
+      if (u.hostname.includes('drive.google.com')) return 'Open in Drive'
+      return u.hostname + (u.pathname.length > 24 ? u.pathname.slice(0, 20) + '…' : u.pathname)
+    } catch {
+      return url.length > 48 ? url.slice(0, 45) + '…' : url
+    }
+  }
+
+  const inline = (s: string) => {
+    let t = s
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
 
+    t = t.replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      (_m, label, url) =>
+        `<a class="md-link" href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`
+    )
+
+    t = t.replace(
+      /(?<!href="|">)(https?:\/\/[^\s<>"')\]]+)/g,
+      (url) =>
+        `<a class="md-link" href="${url}" target="_blank" rel="noopener noreferrer">${shortenUrl(url)}</a>`
+    )
+
+    return t
+  }
+
   for (const raw of lines) {
     const line = raw.trimEnd()
     const trimmed = line.trim()
+
+    if (trimmed.includes('|') && /^\|?.+\|.+\|?$/.test(trimmed)) {
+      closeLists()
+      const cells = trimmed
+        .replace(/^\|/, '')
+        .replace(/\|$/, '')
+        .split('|')
+        .map((c) => c.trim())
+      if (cells.length >= 2) {
+        if (!inTable) {
+          inTable = true
+          tableRows = []
+        }
+        tableRows.push(cells)
+        continue
+      }
+    } else if (inTable) {
+      flushTable()
+    }
 
     if (/^---+$/.test(trimmed) || /^\*\*\*+$/.test(trimmed)) {
       closeLists()
@@ -96,6 +178,7 @@ export function formatMarkdown(text: string): string {
     out.push(`<p class="md-p">${inline(trimmed)}</p>`)
   }
 
+  flushTable()
   closeLists()
   return out.join('')
 }
