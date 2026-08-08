@@ -398,6 +398,14 @@ export default function Settings({
                       dark={dark}
                     />
                   )}
+                  {(match('connectors') || match('connect')) && (
+                    <ListRow
+                      icon={<Link2 className="w-5 h-5" />}
+                      label="Connectors"
+                      onClick={onOpenConnectors}
+                      dark={dark}
+                    />
+                  )}
                   {match('memory') && (
                     <ListRow
                       icon={<Brain className="w-5 h-5" />}

@@ -12,13 +12,13 @@ type Props = {
 }
 
 const BRAND: Record<string, React.ReactNode> = {
-  gmail: <GmailIcon size={24} />,
-  google_drive: <DriveIcon size={24} />,
-  google_sheets: <SheetsIcon size={24} />,
-  google_docs: <DocsIcon size={24} />,
-  google_calendar: <CalendarIcon size={24} />,
-  outlook: <OutlookIcon size={24} />,
-  excel: <ExcelIcon size={24} />,
+  gmail: <GmailIcon size={22} />,
+  google_drive: <DriveIcon size={22} />,
+  google_sheets: <SheetsIcon size={22} />,
+  google_docs: <DocsIcon size={22} />,
+  google_calendar: <CalendarIcon size={22} />,
+  outlook: <OutlookIcon size={22} />,
+  excel: <ExcelIcon size={22} />,
 }
 
 export default function Connectors({ dark, accessToken, onClose }: Props) {
@@ -114,8 +114,8 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
 
   return (
     <div className={`flex flex-col h-full min-h-0 ${bg}`}>
-      {/* Header */}
-      <div className="relative flex items-center justify-center h-14 shrink-0 px-4">
+      {/* Header — matches Grok sheet */}
+      <div className="relative flex items-center justify-center h-[52px] shrink-0 px-4">
         <button
           type="button"
           onClick={() => (selected ? setSelected(null) : onClose?.())}
@@ -124,14 +124,14 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
           }`}
           aria-label="Back"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-5 h-5" strokeWidth={2.25} />
         </button>
-        <h2 className={`text-[17px] font-semibold ${textMain}`}>
+        <h2 className={`text-[17px] font-semibold tracking-tight ${textMain}`}>
           {selectedItem ? selectedItem.name : 'Connectors'}
         </h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">
+      <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-6">
         {error && (
           <div
             className={`rounded-2xl px-4 py-3 text-[14px] ${
@@ -149,7 +149,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
         ) : selectedItem ? (
           /* Detail for a connected app */
           <div className="space-y-4">
-            <div className={`rounded-2xl ${card} px-4 py-5 flex flex-col items-center text-center`}>
+            <div className={`rounded-2xl ${card} px-4 py-6 flex flex-col items-center text-center`}>
               <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${iconBg}`}>
                 {BRAND[selectedItem.provider]}
               </div>
@@ -174,59 +174,51 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
           </div>
         ) : (
           <>
-            {/* Connected */}
+            {/* Connected — Grok style: icon + name + chevron */}
             {connectedList.length > 0 && (
               <div>
                 <p className={`text-[13px] font-medium px-1 mb-2 ${textMuted}`}>Connected</p>
-                <div className={`rounded-2xl overflow-hidden ${card}`}>
-                  {connectedList.map((item, i) => {
-                    const conn = getConnected(item.provider)
-                    return (
-                      <button
-                        key={item.provider}
-                        type="button"
-                        onClick={() => setSelected(item.provider)}
-                        className={`w-full flex items-center gap-3 px-3.5 py-3 text-left active:opacity-80 ${
-                          i < connectedList.length - 1 ? `border-b ${rowBorder}` : ''
-                        }`}
+                <div className={`rounded-[20px] overflow-hidden ${card}`}>
+                  {connectedList.map((item, i) => (
+                    <button
+                      key={item.provider}
+                      type="button"
+                      onClick={() => setSelected(item.provider)}
+                      className={`w-full flex items-center gap-3.5 px-3.5 py-[14px] text-left active:opacity-80 ${
+                        i < connectedList.length - 1 ? `border-b ${rowBorder}` : ''
+                      }`}
+                    >
+                      <div
+                        className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${iconBg}`}
                       >
-                        <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}
-                        >
-                          {BRAND[item.provider]}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-[16px] font-medium ${textMain}`}>{item.name}</p>
-                          {conn?.account_email && (
-                            <p className={`text-[12px] truncate ${textMuted}`}>{conn.account_email}</p>
-                          )}
-                        </div>
-                        <ChevronRight
-                          className={`w-4 h-4 shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`}
-                        />
-                      </button>
-                    )
-                  })}
+                        {BRAND[item.provider]}
+                      </div>
+                      <p className={`flex-1 text-[16px] font-medium ${textMain}`}>{item.name}</p>
+                      <ChevronRight
+                        className={`w-[18px] h-[18px] shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`}
+                      />
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Suggested */}
+            {/* Suggested — Grok style: icon + name + Connect pill */}
             {suggestedList.length > 0 && (
               <div>
                 <p className={`text-[13px] font-medium px-1 mb-2 ${textMuted}`}>Suggested</p>
-                <div className={`rounded-2xl overflow-hidden ${card}`}>
+                <div className={`rounded-[20px] overflow-hidden ${card}`}>
                   {suggestedList.map((item, i) => {
                     const isBusy = busy === item.provider
                     return (
                       <div
                         key={item.provider}
-                        className={`flex items-center gap-3 px-3.5 py-3 ${
+                        className={`flex items-center gap-3.5 px-3.5 py-[14px] ${
                           i < suggestedList.length - 1 ? `border-b ${rowBorder}` : ''
                         }`}
                       >
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}
+                          className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${iconBg}`}
                         >
                           {BRAND[item.provider]}
                         </div>
@@ -235,13 +227,17 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                           type="button"
                           onClick={() => connect(item.provider)}
                           disabled={isBusy}
-                          className={`shrink-0 h-8 px-3.5 rounded-full text-[13px] font-medium transition disabled:opacity-50 ${
+                          className={`shrink-0 h-[30px] px-3.5 rounded-full text-[13px] font-medium transition disabled:opacity-50 ${
                             dark
                               ? 'bg-white/10 text-white active:bg-white/15'
                               : 'bg-[#e8e8ed] text-slate-800 active:bg-[#dddde3]'
                           }`}
                         >
-                          {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Connect'}
+                          {isBusy ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            'Connect'
+                          )}
                         </button>
                       </div>
                     )
