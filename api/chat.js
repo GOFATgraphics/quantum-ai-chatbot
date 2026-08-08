@@ -4,52 +4,62 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.XAI_API_KEY;
+  // Support both ANTHROPIC_API_KEY and the old XAI_API_KEY name
+  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.XAI_API_KEY;
 
   if (!apiKey) {
     return res.status(500).json({
-      error: 'Server is missing XAI_API_KEY environment variable',
+      error: 'Server is missing ANTHROPIC_API_KEY environment variable',
     });
   }
 
   try {
-    const { messages, model } = req.body;
+    const { messages } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array is required' });
     }
 
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+    // Anthropic expects system message separately and only user/assistant in messages
+    const systemPrompt =
+      'You are Quantum, a premium, helpful, and concise AI assistant. Respond in a clear, professional yet friendly tone. Use markdown when helpful. Keep answers focused and high-quality.';
+
+    // Convert our simple {role, content} array into Anthropic format
+    const anthropicMessages = messages.map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+    }));
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: model || 'grok-3',
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You are Quantum, a premium, helpful, and concise AI assistant. Respond in a clear, professional yet friendly tone. Use markdown when helpful. Keep answers focused and high-quality.',
-          },
-          ...messages,
-        ],
-        temperature: 0.7,
+        model: 'claude-sonnet-4-20250514', // or claude-3-5-sonnet-20241022 / claude-3-haiku-20240307
         max_tokens: 1024,
+        system: systemPrompt,
+        messages: anthropicMessages,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('xAI API error:', response.status, errorText);
+      console.error('Anthropic API error:', response.status, errorText);
       return res.status(response.status).json({
         error: 'Failed to get response from AI provider',
+        details: errorText,
       });
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
+
+    // Anthropic returns content as an array of blocks
+    const content =
+      data.content?.[0]?.text ||
+      'Sorry, I could not generate a response.';
 
     return res.status(200).json({ content });
   } catch (err) {
