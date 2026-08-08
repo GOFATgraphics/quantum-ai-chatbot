@@ -266,6 +266,24 @@ function extractText(contentBlocks) {
     .trim();
 }
 
+/** Detect explicit Send this email messages with To/Subject/Body blocks. */
+function parseExplicitSend(text) {
+  if (!text || typeof text !== 'string') return null;
+  const lower = text.toLowerCase();
+  if (!lower.includes('send') || !lower.includes('to:')) return null;
+  const toMatch = text.match(/^\s*To:\s*(.+)$/im);
+  const subjectMatch = text.match(/^\s*Subject:\s*(.+)$/im);
+  const bodyMatch = text.match(/^\s*Body:\s*([\s\S]+)/im);
+  if (!toMatch || !subjectMatch || !bodyMatch) return null;
+  const to = toMatch[1].trim();
+  const subject = subjectMatch[1].trim();
+  let body = bodyMatch[1].trim();
+  body = body.replace(/\n-{3,}[\s\S]*$/, '').trim();
+  if (!to || !subject || !body) return null;
+  if (!to.includes('@')) return null;
+  return { to, subject, body };
+}
+
 function buildSystemPrompt({ connected, memory, project, firstName }) {
   const memoryBlock =
     memory?.length > 0
@@ -368,6 +386,39 @@ export default async function handler(req, res) {
       memory = await loadUserMemory(user.id);
       if (body?.projectId) {
         project = await loadProjectContext(user.id, body.projectId);
+      }
+    }
+
+    // Direct send path: user pasted To/Subject/Body with "send"
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    const explicit = lastUser ? parseExplicitSend(String(lastUser.content || '')) : null;
+    if (explicit && user) {
+      const accessToken = await getValidToken(user.id, 'gmail');
+      if (accessToken) {
+        try {
+          const result = await sendGmail(accessToken, explicit);
+          return res.status(200).json({
+            content:
+              `✅ **Email sent**\n\n` +
+              `**To:** ${explicit.to}\n` +
+              `**Subject:** ${explicit.subject}\n\n` +
+              `**Body:**\n${explicit.body}\n\n` +
+              `_Message id: ${result.id}_`,
+          });
+        } catch (e) {
+          return res.status(200).json({
+            content:
+              `⚠️ I tried to send the email but Gmail returned an error:\n\n` +
+              '`' + e.message + '`\n\n' +
+              `If this mentions insufficient authentication scopes, disconnect and reconnect Gmail in Connectors.`,
+          });
+        }
+      } else {
+        return res.status(200).json({
+          content:
+            'Gmail is not connected. Open **Connectors**, connect Gmail (allow send), then try again.\n\n' +
+            `**To:** ${explicit.to}\n**Subject:** ${explicit.subject}\n\n**Body:**\n${explicit.body}`,
+        });
       }
     }
 
