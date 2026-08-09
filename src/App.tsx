@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, Loader2, PenLine, ChevronDown } from 'lucide-react'
+import { Menu, Loader2, PenLine, ChevronDown, Check } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage, type Project, makeChatTitle } from './lib/supabase'
 import Auth from './components/Auth'
 import Sidebar from './components/Sidebar'
@@ -72,7 +72,14 @@ export default function App() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
-  const [selectedModel, setSelectedModel] = useState(MODELS[1]) // Quantum Lite
+  const [selectedModel, setSelectedModel] = useState(() => {
+    try {
+      const saved = localStorage.getItem('quantumy-model')
+      const found = MODELS.find((m) => m.id === saved)
+      if (found) return found
+    } catch { /* ignore */ }
+    return MODELS[1] // Quantum Lite
+  })
   const [thinkActive, setThinkActive] = useState(false)
   const [deepSearchActive, setDeepSearchActive] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<{ name: string; type: string; text?: string }[]>([])
@@ -285,6 +292,13 @@ export default function App() {
     return full
   }
 
+  const selectModel = (m: (typeof MODELS)[number]) => {
+    setSelectedModel(m)
+    try { localStorage.setItem('quantumy-model', m.id) } catch { /* ignore */ }
+    if (m.id === 'quantum-flash') setThinkActive(false)
+    setShowModelMenu(false)
+  }
+
   const handleStop = useCallback(() => {
     abortRef.current?.abort()
   }, [])
@@ -397,43 +411,61 @@ export default function App() {
                 <Menu className="w-5 h-5" />
               </button>
               <div className="relative">
-                <button onClick={() => setShowModelMenu((v) => !v)} className={`flex items-center gap-1.5 px-3 h-10 rounded-full text-[14px] font-medium transition ${dark ? 'bg-white/10 text-slate-100 hover:bg-white/15' : 'bg-white/70 text-slate-800 shadow-sm hover:bg-white'}`}>
-                  {selectedModel.name}
+                <button
+                  type="button"
+                  onClick={() => setShowModelMenu((v) => !v)}
+                  aria-haspopup="listbox"
+                  aria-expanded={showModelMenu}
+                  className={`flex items-center gap-1.5 px-3 h-10 rounded-full text-[14px] font-medium transition ${dark ? 'bg-white/10 text-slate-100 hover:bg-white/15' : 'bg-white/70 text-slate-800 shadow-sm hover:bg-white'}`}
+                >
+                  <span className="truncate max-w-[140px] sm:max-w-none">{selectedModel.name}</span>
                   {selectedModel.badge && (
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'}`}>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'}`}>
                       {selectedModel.badge}
                     </span>
                   )}
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition ${showModelMenu ? 'rotate-180' : ''}`} />
                 </button>
                 <AnimatePresence>
                   {showModelMenu && (
                     <>
                       <div className="fixed inset-0 z-20" onClick={() => setShowModelMenu(false)} />
                       <motion.div initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.15 }} className={`absolute left-0 top-full mt-1 z-30 min-w-[220px] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}>
-                        {MODELS.map((m) => (
-                          <button
-                            key={m.id}
-                            onClick={() => { setSelectedModel(m); setShowModelMenu(false) }}
-                            className={`w-full text-left px-4 py-2.5 ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'} ${selectedModel.id === m.id ? (dark ? 'bg-white/8' : 'bg-black/[0.04]') : ''}`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">{m.name}</span>
-                              {m.badge && (
-                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
-                                  m.id === 'quantum-pro'
-                                    ? dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700'
-                                    : dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'
-                                }`}>
-                                  {m.badge}
-                                </span>
+                        <div className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          Model
+                        </div>
+                        {MODELS.map((m) => {
+                          const active = selectedModel.id === m.id
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => selectModel(m)}
+                              className={`w-full text-left px-4 py-2.5 flex items-start gap-2 ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'} ${active ? (dark ? 'bg-white/8' : 'bg-black/[0.04]') : ''}`}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium">{m.name}</span>
+                                  {m.badge && (
+                                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
+                                      m.id === 'quantum-pro'
+                                        ? dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700'
+                                        : dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'
+                                    }`}>
+                                      {m.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {m.blurb}
+                                </div>
+                              </div>
+                              {active && (
+                                <Check className={`w-4 h-4 mt-0.5 shrink-0 ${dark ? 'text-indigo-300' : 'text-indigo-600'}`} />
                               )}
-                            </div>
-                            <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
-                              {m.blurb}
-                            </div>
-                          </button>
-                        ))}
+                            </button>
+                          )
+                        })}
                       </motion.div>
                     </>
                   )}
@@ -483,13 +515,13 @@ export default function App() {
           fastActive={selectedModel.id === 'quantum-flash' && !thinkActive}
           onToggleFast={() => {
             setThinkActive(false)
-            setSelectedModel(MODELS[0]) // Flash
+            selectModel(MODELS[0]) // Flash
           }}
           thinkActive={thinkActive}
           onToggleThink={() => {
             setThinkActive((v) => {
               const next = !v
-              if (next) setSelectedModel(MODELS[2]) // Pro for deep reasoning
+              if (next) selectModel(MODELS[2]) // Pro for deep reasoning
               return next
             })
           }}
