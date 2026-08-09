@@ -167,6 +167,19 @@ export default function ChatInput({
     dark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-500 hover:bg-black/[0.04]'
   }`
 
+  /*
+   * Use filter: drop-shadow instead of box-shadow.
+   * iOS Safari draws a 1px hairline around elements that combine
+   * border-radius + opaque background + box-shadow. drop-shadow avoids it.
+   */
+  const pillShadow = focused || listening
+    ? dark
+      ? 'drop-shadow(0 6px 18px rgba(0,0,0,0.55))'
+      : 'drop-shadow(0 6px 18px rgba(15,23,42,0.14))'
+    : dark
+      ? 'drop-shadow(0 3px 12px rgba(0,0,0,0.4))'
+      : 'drop-shadow(0 3px 12px rgba(15,23,42,0.1))'
+
   return (
     <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="max-w-2xl mx-auto">
@@ -181,161 +194,167 @@ export default function ChatInput({
           </p>
         )}
 
-        {/* Gemini-style borderless pill */}
-        <div
-          className={`composer-surface rounded-full px-2.5 py-1.5 flex items-end gap-1 transition-shadow duration-200 ${
-            dark ? 'bg-[#1c1c24]' : 'bg-white'
-          } ${
-            focused || listening
-              ? dark
-                ? 'shadow-[0_4px_24px_-4px_rgba(0,0,0,0.55)]'
-                : 'shadow-[0_4px_24px_-4px_rgba(15,23,42,0.12)]'
-              : dark
-                ? 'shadow-[0_2px_16px_-4px_rgba(0,0,0,0.4)]'
-                : 'shadow-[0_2px_16px_-4px_rgba(15,23,42,0.08)]'
-          }`}
-        >
-          {pendingFiles.length > 0 && (
-            <div className="absolute left-3 right-3 bottom-full mb-2 flex flex-wrap gap-2">
-              {pendingFiles.map((f, idx) => (
-                <div
-                  key={`${f.name}-${idx}`}
-                  className={`relative group rounded-xl overflow-hidden ${
-                    dark ? 'bg-white/10' : 'bg-slate-100'
-                  } ${f.dataUrl ? 'w-[64px] h-[64px]' : ''}`}
-                >
-                  {f.dataUrl ? (
-                    <img src={f.dataUrl} alt={f.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 ${
-                        dark ? 'text-slate-200' : 'text-slate-700'
-                      }`}
-                    >
-                      {f.type.startsWith('image/') ? (
-                        <ImageIcon className="w-3.5 h-3.5 shrink-0" />
-                      ) : (
-                        <FileText className="w-3.5 h-3.5 shrink-0" />
-                      )}
-                      <span className="max-w-[120px] truncate">{f.name}</span>
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeFile(idx)}
-                    className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center bg-black/50 text-white"
-                    aria-label={`Remove ${f.name}`}
+        {/* Outer wrapper carries the drop-shadow so the pill itself has no box-shadow */}
+        <div style={{ filter: pillShadow, WebkitFilter: pillShadow }}>
+          <div
+            className={`composer-surface rounded-full px-2.5 py-1.5 flex items-end gap-1 ${
+              dark ? 'bg-[#1c1c24]' : 'bg-white'
+            }`}
+            style={{
+              border: 'none',
+              outline: 'none',
+              boxShadow: 'none',
+              WebkitBoxShadow: 'none',
+              // Force own compositing layer — kills iOS subpixel fringe
+              transform: 'translateZ(0)',
+              WebkitTransform: 'translateZ(0)',
+              isolation: 'isolate',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
+            }}
+          >
+            {pendingFiles.length > 0 && (
+              <div className="absolute left-3 right-3 bottom-full mb-2 flex flex-wrap gap-2">
+                {pendingFiles.map((f, idx) => (
+                  <div
+                    key={`${f.name}-${idx}`}
+                    className={`relative group rounded-xl overflow-hidden ${
+                      dark ? 'bg-white/10' : 'bg-slate-100'
+                    } ${f.dataUrl ? 'w-[64px] h-[64px]' : ''}`}
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*"
-            className="hidden"
-            onChange={onFileSelected}
-          />
-
-          <button
-            type="button"
-            onClick={onPickFiles}
-            disabled={isLoading}
-            title="Attach files"
-            className={iconBtn}
-            aria-label="Add attachment"
-          >
-            <Plus className="w-[18px] h-[18px]" />
-          </button>
-
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={onKeyDown}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            rows={1}
-            placeholder={listening ? 'Listening…' : 'Ask anything'}
-            className={`flex-1 min-w-0 resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[36px] max-h-[120px] py-2 px-1 ${
-              dark
-                ? 'text-slate-50 placeholder:text-slate-500'
-                : 'text-slate-900 placeholder:text-slate-400'
-            }`}
-          />
-
-          <button
-            type="button"
-            onClick={toggleListen}
-            disabled={!speechSupported || isLoading}
-            title={listening ? 'Stop dictation' : 'Dictate with mic'}
-            className={`${iconBtn} ${
-              listening
-                ? dark
-                  ? 'bg-rose-500/25 text-rose-200'
-                  : 'bg-rose-50 text-rose-600'
-                : ''
-            }`}
-            aria-label={listening ? 'Stop listening' : 'Speech to text'}
-            aria-pressed={listening}
-          >
-            {listening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
-          </button>
-
-          <div className="shrink-0 pl-0.5">
-            {isLoading ? (
-              <motion.button
-                type="button"
-                initial={{ scale: 0.92, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                onClick={onStop}
-                className={`h-9 w-9 rounded-full flex items-center justify-center transition ${
-                  dark
-                    ? 'bg-white/15 text-white'
-                    : 'bg-slate-900 text-white'
-                }`}
-                aria-label="Stop generating"
-              >
-                <Square className="w-3 h-3 fill-current" />
-              </motion.button>
-            ) : hasText ? (
-              <motion.button
-                type="button"
-                initial={false}
-                animate={{ scale: 1, opacity: 1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={onSend}
-                className={`h-9 w-9 rounded-full flex items-center justify-center transition ${
-                  dark
-                    ? 'bg-white text-slate-900'
-                    : 'bg-slate-900 text-white'
-                }`}
-                aria-label="Send"
-              >
-                <Send className="w-4 h-4" />
-              </motion.button>
-            ) : (
-              <motion.button
-                type="button"
-                initial={false}
-                animate={{ scale: 1, opacity: 1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={onSpeak}
-                className={`h-9 w-9 rounded-full flex items-center justify-center transition ${
-                  dark
-                    ? 'bg-indigo-500/30 text-indigo-200'
-                    : 'bg-indigo-50 text-indigo-600'
-                }`}
-                aria-label="Start live voice conversation"
-              >
-                <AudioLines className="w-4 h-4" />
-              </motion.button>
+                    {f.dataUrl ? (
+                      <img src={f.dataUrl} alt={f.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 ${
+                          dark ? 'text-slate-200' : 'text-slate-700'
+                        }`}
+                      >
+                        {f.type.startsWith('image/') ? (
+                          <ImageIcon className="w-3.5 h-3.5 shrink-0" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5 shrink-0" />
+                        )}
+                        <span className="max-w-[120px] truncate">{f.name}</span>
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center bg-black/50 text-white"
+                      aria-label={`Remove ${f.name}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*"
+              className="hidden"
+              onChange={onFileSelected}
+            />
+
+            <button
+              type="button"
+              onClick={onPickFiles}
+              disabled={isLoading}
+              title="Attach files"
+              className={iconBtn}
+              aria-label="Add attachment"
+            >
+              <Plus className="w-[18px] h-[18px]" />
+            </button>
+
+            <textarea
+              ref={textareaRef}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={onKeyDown}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              rows={1}
+              placeholder={listening ? 'Listening…' : 'Ask anything'}
+              className={`flex-1 min-w-0 resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[36px] max-h-[120px] py-2 px-1 ${
+                dark
+                  ? 'text-slate-50 placeholder:text-slate-500'
+                  : 'text-slate-900 placeholder:text-slate-400'
+              }`}
+            />
+
+            <button
+              type="button"
+              onClick={toggleListen}
+              disabled={!speechSupported || isLoading}
+              title={listening ? 'Stop dictation' : 'Dictate with mic'}
+              className={`${iconBtn} ${
+                listening
+                  ? dark
+                    ? 'bg-rose-500/25 text-rose-200'
+                    : 'bg-rose-50 text-rose-600'
+                  : ''
+              }`}
+              aria-label={listening ? 'Stop listening' : 'Speech to text'}
+              aria-pressed={listening}
+            >
+              {listening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
+            </button>
+
+            <div className="shrink-0 pl-0.5">
+              {isLoading ? (
+                <motion.button
+                  type="button"
+                  initial={{ scale: 0.92, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  onClick={onStop}
+                  className={`h-9 w-9 rounded-full flex items-center justify-center transition ${
+                    dark
+                      ? 'bg-white/15 text-white'
+                      : 'bg-slate-900 text-white'
+                  }`}
+                  aria-label="Stop generating"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                </motion.button>
+              ) : hasText ? (
+                <motion.button
+                  type="button"
+                  initial={false}
+                  animate={{ scale: 1, opacity: 1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={onSend}
+                  className={`h-9 w-9 rounded-full flex items-center justify-center transition ${
+                    dark
+                      ? 'bg-white text-slate-900'
+                      : 'bg-slate-900 text-white'
+                  }`}
+                  aria-label="Send"
+                >
+                  <Send className="w-4 h-4" />
+                </motion.button>
+              ) : (
+                <motion.button
+                  type="button"
+                  initial={false}
+                  animate={{ scale: 1, opacity: 1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={onSpeak}
+                  className={`h-9 w-9 rounded-full flex items-center justify-center transition ${
+                    dark
+                      ? 'bg-indigo-500/30 text-indigo-200'
+                      : 'bg-indigo-50 text-indigo-600'
+                  }`}
+                  aria-label="Start live voice conversation"
+                >
+                  <AudioLines className="w-4 h-4" />
+                </motion.button>
+              )}
+            </div>
           </div>
         </div>
       </div>
