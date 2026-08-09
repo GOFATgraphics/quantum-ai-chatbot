@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import Logo from './Logo'
 
 type Props = {
@@ -9,6 +9,8 @@ type Props = {
 }
 
 export default function EmptyState({ greeting, dark, composing = false }: Props) {
+  const reduceMotion = useReducedMotion()
+
   return (
     <div className="flex flex-col items-center justify-center w-full px-5 relative">
       <div className="quantum-particles absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
@@ -18,14 +20,13 @@ export default function EmptyState({ greeting, dark, composing = false }: Props)
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 20 }}
         animate={{
           opacity: 1,
-          /* Gentle nudge only — stay visible, do not leave the screen */
           y: composing ? -32 : 0,
           scale: composing ? 0.96 : 1,
         }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: reduceMotion ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 flex flex-col items-center text-center w-full max-w-lg"
       >
         <div className="relative mb-6">
@@ -39,10 +40,10 @@ export default function EmptyState({ greeting, dark, composing = false }: Props)
               scale: composing ? 1.08 : 1,
               opacity: composing ? 0.85 : 1,
             }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: reduceMotion ? 0 : 0.4 }}
             aria-hidden
           />
-          <motion.div
+          {!reduceMotion && (<><motion.div
             className="absolute pointer-events-none rounded-full border border-indigo-400/25"
             style={{ width: 96, height: 96, left: '50%', top: '50%', marginLeft: -48, marginTop: -48 }}
             animate={{ rotate: 360 }}
@@ -69,13 +70,21 @@ export default function EmptyState({ greeting, dark, composing = false }: Props)
                 dark ? 'bg-violet-300' : 'bg-violet-500'
               }`}
             />
-          </motion.div>
+          </motion.div></>)}
           <motion.div
-            animate={{ scale: composing ? [1, 1.02, 1] : [1, 1.04, 1] }}
-            transition={{ duration: composing ? 2.8 : 4.5, repeat: Infinity, ease: 'easeInOut' }}
+            animate={
+              reduceMotion
+                ? { scale: 1 }
+                : { scale: composing ? [1, 1.02, 1] : [1, 1.04, 1] }
+            }
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: composing ? 2.8 : 4.5, repeat: Infinity, ease: 'easeInOut' }
+            }
             className="relative"
           >
-            <Logo size={64} dark={dark} animated />
+            <Logo size={64} dark={dark} animated={!reduceMotion} />
           </motion.div>
         </div>
 
