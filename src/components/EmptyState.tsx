@@ -71,10 +71,8 @@ export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
                   transition={{ delay: 0.15 + i * 0.06, duration: 0.35 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => onSuggestion(s.text)}
-                  className={`chip ${
-                    dark
-                      ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200 hover:bg-white/[0.1] hover:border-indigo-400/30'
-                      : 'bg-white/80 border border-black/[0.05] text-slate-700 shadow-sm hover:bg-white hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-500/10'
+                  className={`chip glass-chip ${
+                    dark ? 'text-slate-200' : 'text-slate-700'
                   }`}
                 >
                   <Icon
