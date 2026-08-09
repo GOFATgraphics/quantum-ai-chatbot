@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="description" content="Quantumy AI — personal assistant that remembers you, drafts email, and connects to your work." />
     <meta name="theme-color" content="#111114" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -36,6 +36,9 @@
         margin: 0;
         padding: 0;
         height: 100%;
+        width: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
         background: #eef2ff;
       }
       html.dark, html.dark body, html.dark #root {
