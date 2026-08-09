@@ -15,6 +15,7 @@ html, body, #root {
   overscroll-behavior: none;
   touch-action: pan-x pan-y;
   -ms-touch-action: pan-x pan-y;
+  background: transparent;
 }
 
 body {
@@ -41,7 +42,7 @@ input, textarea, button, select {
   font-size: 16px;
 }
 
-/* ── Premium light canvas ── */
+/* Premium light canvas */
 html:not(.dark) body {
   background:
     radial-gradient(ellipse 100% 80% at 50% -20%, rgba(129, 140, 248, 0.32), transparent 55%),
@@ -52,11 +53,17 @@ html:not(.dark) body {
   color: #0f172a;
 }
 
-/* ── Clean dark canvas ── */
+/* Clean dark canvas — must cover html, body, AND #root */
+html.dark,
+html.dark body,
+html.dark #root {
+  background-color: #111114 !important;
+  color: #ececf1;
+}
 html.dark body {
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.09), transparent 55%),
-    #111114;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.09), transparent 55%);
+  background-color: #111114;
   color: #ececf1;
 }
 
@@ -256,7 +263,6 @@ html:not(.glass-on) .glass-surface {
     0 1px 0 rgba(255, 255, 255, 0.16) inset,
     0 6px 18px -2px rgba(79, 70, 229, 0.5);
 }
-/* Dark: same indigo family, not inverted light text on pastel */
 html.dark .btn-primary {
   background: linear-gradient(135deg, #6366f1 0%, #4f46e5 60%, #4338ca 100%);
   color: #fff;
@@ -283,7 +289,6 @@ html.dark .surface-card {
   box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.55);
 }
 
-/* Dark theme surfaces — shared tokens */
 html.dark {
   --q-bg: #111114;
   --q-surface: #1a1a1f;
