@@ -1,24 +1,14 @@
 import { motion } from 'framer-motion'
-import { Mail, FileSpreadsheet, Calendar, Sparkles } from 'lucide-react'
 import Logo from './Logo'
 
 type Props = {
   greeting: string
   dark: boolean
-  onSuggestion?: (text: string) => void
 }
 
-const SUGGESTIONS = [
-  { icon: Mail, text: 'Summarize my unread emails' },
-  { icon: FileSpreadsheet, text: 'Find last month\u2019s spreadsheet' },
-  { icon: Calendar, text: 'What\u2019s on my calendar today?' },
-  { icon: Sparkles, text: 'Draft a follow-up for a client' },
-]
-
-export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
+export default function EmptyState({ greeting, dark }: Props) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-5 pb-8 relative">
-      {/* Soft quantum particles (respect reduced-motion via CSS) */}
+    <div className="flex flex-col items-center justify-center w-full px-5 relative">
       <div className="quantum-particles absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <span key={i} className={`quantum-particle quantum-particle-${i}`} />
@@ -31,7 +21,7 @@ export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 flex flex-col items-center text-center w-full max-w-lg"
       >
-        <div className="relative mb-7">
+        <div className="relative mb-6">
           <div
             className={`absolute inset-0 -m-8 rounded-full blur-3xl ${
               dark
@@ -92,34 +82,6 @@ export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
         >
           Connect your tools and let Quantumy handle email, docs, and schedules.
         </p>
-
-        <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-md">
-          {SUGGESTIONS.map((s, i) => {
-            const Icon = s.icon
-            return (
-              <motion.button
-                key={s.text}
-                type="button"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 + i * 0.06, duration: 0.35 }}
-                whileHover={{ y: -2, scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => onSuggestion?.(s.text)}
-                className={`chip glass-chip ${
-                  dark ? 'text-slate-200' : 'text-slate-700'
-                }`}
-              >
-                <Icon
-                  className={`w-3.5 h-3.5 shrink-0 ${
-                    dark ? 'text-indigo-300' : 'text-indigo-500'
-                  }`}
-                />
-                {s.text}
-              </motion.button>
-            )
-          })}
-        </div>
       </motion.div>
     </div>
   )
