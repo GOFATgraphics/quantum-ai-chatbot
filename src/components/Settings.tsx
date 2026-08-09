@@ -492,7 +492,7 @@ export default function Settings({
         {page === 'appearance' && (
           <div className="space-y-4">
             <GroupCard>
-              <div className={`flex items-center gap-3 px-4 py-3.5 ${dark ? 'border-b border-white/[0.06]' : 'border-b border-black/[0.06]'`}>
+              <div className={`flex items-center gap-3 px-4 py-3.5 ${dark ? 'border-b border-white/[0.06]' : 'border-b border-black/[0.06]'}`}>
                 <span className={dark ? 'text-white/70' : 'text-slate-600'}>
                   {dark ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
                 </span>
