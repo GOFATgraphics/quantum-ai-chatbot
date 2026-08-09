@@ -645,7 +645,7 @@ export default function App() {
                   transition={{ duration: 0.15 }}
                   className={`glass-menu w-[min(260px,calc(100vw-24px))] rounded-2xl py-1 ${dark ? 'text-slate-100' : 'text-slate-800'}`}
                 >
-                  <div className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide ${dark ? 'text-slate-500' : 'text-slate-400'`}>
+                  <div className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
                     Model
                   </div>
                   {MODELS.map((m) => {
@@ -668,12 +668,13 @@ export default function App() {
                                 m.id === 'quantum-pro'
                                   ? dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700'
                                   : dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'
-                              }`}>
+                              }`}
+                              >
                                 {m.badge}
                               </span>
                             )}
                           </div>
-                          <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'`}>
+                          <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
                             {m.blurb}
                           </div>
                         </div>
