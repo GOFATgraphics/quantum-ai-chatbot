@@ -163,38 +163,46 @@ export default function ChatInput({
     onFilesChange(pendingFiles.filter((_, i) => i !== idx))
   }
 
-  const toolBtn = `glass-btn ${dark ? 'text-slate-200' : 'text-slate-600'}`
+  const iconBtn = `h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${
+    dark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-500 hover:bg-black/[0.04]'
+  }`
 
   return (
-    <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="max-w-2xl mx-auto">
         {errorHint && (
           <p
-            className={`glass-chip text-xs text-center mb-2 px-3 py-1.5 rounded-full mx-auto w-fit ${
-              dark ? 'text-amber-300' : 'text-amber-800'
+            className={`text-xs text-center mb-2 px-3 py-1.5 rounded-full mx-auto w-fit ${
+              dark ? 'bg-white/10 text-amber-300' : 'bg-amber-50 text-amber-800'
             }`}
             role="status"
           >
             {errorHint}
           </p>
         )}
+
+        {/* Gemini-style borderless pill */}
         <div
-          className={`glass-surface composer-surface rounded-[26px] px-3 pt-3 pb-2.5 transition-all duration-200 ${
+          className={`composer-surface rounded-full px-2.5 py-1.5 flex items-end gap-1 transition-shadow duration-200 ${
+            dark ? 'bg-[#1c1c24]' : 'bg-white'
+          } ${
             focused || listening
               ? dark
-                ? 'ring-1 ring-indigo-400/30'
-                : 'ring-1 ring-indigo-300/40'
-              : ''
+                ? 'shadow-[0_4px_24px_-4px_rgba(0,0,0,0.55)]'
+                : 'shadow-[0_4px_24px_-4px_rgba(15,23,42,0.12)]'
+              : dark
+                ? 'shadow-[0_2px_16px_-4px_rgba(0,0,0,0.4)]'
+                : 'shadow-[0_2px_16px_-4px_rgba(15,23,42,0.08)]'
           }`}
         >
           {pendingFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2 px-0.5">
+            <div className="absolute left-3 right-3 bottom-full mb-2 flex flex-wrap gap-2">
               {pendingFiles.map((f, idx) => (
                 <div
                   key={`${f.name}-${idx}`}
-                  className={`relative group rounded-xl overflow-hidden glass-panel ${
-                    f.dataUrl ? 'w-[72px] h-[72px]' : ''
-                  }`}
+                  className={`relative group rounded-xl overflow-hidden ${
+                    dark ? 'bg-white/10' : 'bg-slate-100'
+                  } ${f.dataUrl ? 'w-[64px] h-[64px]' : ''}`}
                 >
                   {f.dataUrl ? (
                     <img src={f.dataUrl} alt={f.name} className="w-full h-full object-cover" />
@@ -225,6 +233,26 @@ export default function ChatInput({
             </div>
           )}
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*"
+            className="hidden"
+            onChange={onFileSelected}
+          />
+
+          <button
+            type="button"
+            onClick={onPickFiles}
+            disabled={isLoading}
+            title="Attach files"
+            className={iconBtn}
+            aria-label="Add attachment"
+          >
+            <Plus className="w-[18px] h-[18px]" />
+          </button>
+
           <textarea
             ref={textareaRef}
             value={value}
@@ -234,107 +262,80 @@ export default function ChatInput({
             onBlur={() => setFocused(false)}
             rows={1}
             placeholder={listening ? 'Listening…' : 'Ask anything'}
-            className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${
+            className={`flex-1 min-w-0 resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[36px] max-h-[120px] py-2 px-1 ${
               dark
                 ? 'text-slate-50 placeholder:text-slate-500'
                 : 'text-slate-900 placeholder:text-slate-400'
             }`}
           />
 
-          <div className="mt-2.5 flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*"
-              className="hidden"
-              onChange={onFileSelected}
-            />
+          <button
+            type="button"
+            onClick={toggleListen}
+            disabled={!speechSupported || isLoading}
+            title={listening ? 'Stop dictation' : 'Dictate with mic'}
+            className={`${iconBtn} ${
+              listening
+                ? dark
+                  ? 'bg-rose-500/25 text-rose-200'
+                  : 'bg-rose-50 text-rose-600'
+                : ''
+            }`}
+            aria-label={listening ? 'Stop listening' : 'Speech to text'}
+            aria-pressed={listening}
+          >
+            {listening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
+          </button>
 
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              <button
+          <div className="shrink-0 pl-0.5">
+            {isLoading ? (
+              <motion.button
                 type="button"
-                onClick={onPickFiles}
-                disabled={isLoading}
-                title="Attach files"
-                className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${toolBtn}`}
-                aria-label="Add attachment"
-              >
-                <Plus className="w-[18px] h-[18px]" />
-              </button>
-
-              <button
-                type="button"
-                onClick={toggleListen}
-                disabled={!speechSupported || isLoading}
-                title={listening ? 'Stop dictation' : 'Dictate with mic'}
-                className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${
-                  listening
-                    ? dark
-                      ? 'bg-rose-500/25 text-rose-200 ring-1 ring-rose-400/40'
-                      : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
-                    : toolBtn
+                initial={{ scale: 0.92, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={onStop}
+                className={`h-9 w-9 rounded-full flex items-center justify-center transition ${
+                  dark
+                    ? 'bg-white/15 text-white'
+                    : 'bg-slate-900 text-white'
                 }`}
-                aria-label={listening ? 'Stop listening' : 'Speech to text'}
-                aria-pressed={listening}
+                aria-label="Stop generating"
               >
-                {listening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
-              </button>
-            </div>
-
-            <div className="shrink-0">
-              {isLoading ? (
-                <motion.button
-                  type="button"
-                  initial={{ scale: 0.92, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  onClick={onStop}
-                  className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition ${
-                    dark
-                      ? 'bg-white/15 text-white hover:bg-white/25 ring-1 ring-white/15'
-                      : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/15'
-                  }`}
-                  aria-label="Stop generating"
-                >
-                  <Square className="w-3 h-3 fill-current" />
-                  Stop
-                </motion.button>
-              ) : hasText ? (
-                <motion.button
-                  type="button"
-                  initial={false}
-                  animate={{ scale: 1, opacity: 1 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={onSend}
-                  className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition ${
-                    dark
-                      ? 'bg-white text-slate-900 hover:bg-slate-100'
-                      : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
-                  }`}
-                  aria-label="Send"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  Send
-                </motion.button>
-              ) : (
-                <motion.button
-                  type="button"
-                  initial={false}
-                  animate={{ scale: 1, opacity: 1 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={onSpeak}
-                  className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition ${
-                    dark
-                      ? 'bg-white text-slate-900 hover:bg-slate-100'
-                      : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
-                  }`}
-                  aria-label="Start live voice conversation"
-                >
-                  <AudioLines className="w-4 h-4" />
-                  Speak
-                </motion.button>
-              )}
-            </div>
+                <Square className="w-3 h-3 fill-current" />
+              </motion.button>
+            ) : hasText ? (
+              <motion.button
+                type="button"
+                initial={false}
+                animate={{ scale: 1, opacity: 1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onSend}
+                className={`h-9 w-9 rounded-full flex items-center justify-center transition ${
+                  dark
+                    ? 'bg-white text-slate-900'
+                    : 'bg-slate-900 text-white'
+                }`}
+                aria-label="Send"
+              >
+                <Send className="w-4 h-4" />
+              </motion.button>
+            ) : (
+              <motion.button
+                type="button"
+                initial={false}
+                animate={{ scale: 1, opacity: 1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onSpeak}
+                className={`h-9 w-9 rounded-full flex items-center justify-center transition ${
+                  dark
+                    ? 'bg-indigo-500/30 text-indigo-200'
+                    : 'bg-indigo-50 text-indigo-600'
+                }`}
+                aria-label="Start live voice conversation"
+              >
+                <AudioLines className="w-4 h-4" />
+              </motion.button>
+            )}
           </div>
         </div>
       </div>
