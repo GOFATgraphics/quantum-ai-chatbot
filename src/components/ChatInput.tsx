@@ -182,8 +182,8 @@ export default function ChatInput({
           className={`glass-surface composer-surface rounded-[26px] px-3 pt-3 pb-2.5 transition-all duration-200 ${
             focused || listening
               ? dark
-                ? 'ring-1 ring-indigo-400/30'
-                : 'ring-1 ring-indigo-300/40'
+                ? 'ring-1 ring-indigo-400/40'
+                : 'ring-1 ring-indigo-300/50'
               : ''
           }`}
         >
