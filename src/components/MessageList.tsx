@@ -12,7 +12,6 @@ const USER_SNIPPET_LEN = 220
 /** Split user content into text segments and image attachments */
 function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] {
   const parts: { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] = []
-  // Match markdown images: ![alt](src) including data URLs
   const imgRe = /!\[([^\]]*)\]\(([^)]+)\)/g
   let last = 0
   let m: RegExpExecArray | null
@@ -26,7 +25,6 @@ function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; v
   }
   const rest = content.slice(last).trim()
   if (rest) {
-    // Detect file-style attachments that aren't images
     if (/^📎\s*\*\*/.test(rest) || /^---\s*File:/.test(rest) || /^\[File attached:/.test(rest) || /^\[Image attached:/.test(rest)) {
       parts.push({ type: 'file', value: rest })
     } else {
@@ -52,10 +50,8 @@ function UserBubble({ content, dark }: { content: string; dark: boolean }) {
 
   return (
     <div
-      className={`max-w-[85%] rounded-[22px] px-4 py-2.5 text-[15px] leading-[1.55] shadow-sm ${
-        dark
-          ? 'bg-gradient-to-br from-[#2c2c38] to-[#242430] text-slate-50 border border-white/[0.06]'
-          : 'bg-white/90 text-slate-900 border border-black/[0.04] shadow-[0_2px_12px_rgba(15,23,42,0.04)]'
+      className={`glass-bubble max-w-[85%] rounded-[22px] px-4 py-2.5 text-[15px] leading-[1.55] ${
+        dark ? 'text-slate-50' : 'text-slate-900'
       }`}
     >
       <div className="space-y-2">
@@ -79,7 +75,6 @@ function UserBubble({ content, dark }: { content: string; dark: boolean }) {
             )
           }
           if (seg.type === 'file') {
-            // Extract a friendly name if present
             const nameMatch =
               seg.value.match(/\*\*([^*]+)\*\*/) ||
               seg.value.match(/File:\s*([^\n-]+)/) ||
@@ -89,7 +84,7 @@ function UserBubble({ content, dark }: { content: string; dark: boolean }) {
               <div
                 key={i}
                 className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium ${
-                  dark ? 'bg-white/10 text-slate-200' : 'bg-slate-100 text-slate-700'
+                  dark ? 'bg-white/10 text-slate-200' : 'bg-slate-100/80 text-slate-700'
                 }`}
               >
                 <FileText className="w-4 h-4 shrink-0 opacity-70" />
@@ -97,7 +92,6 @@ function UserBubble({ content, dark }: { content: string; dark: boolean }) {
               </div>
             )
           }
-          // text — only render once for the combined shownText
           return null
         })}
         {shownText && (
