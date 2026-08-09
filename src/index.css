@@ -108,10 +108,11 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 /* ═══════════════════════════════════════════
    GLASSMORPHISM DESIGN SYSTEM
+   Reference: frosted translucent glass with luminous rim
    Toggle: html.glass-on (Settings → Appearance)
    ═══════════════════════════════════════════ */
 
-/* Core blur engine — only when glass is on */
+/* Core blur — strong frost so background shows through */
 html.glass-on .glass-surface,
 html.glass-on .glass-panel,
 html.glass-on .glass-header,
@@ -122,21 +123,21 @@ html.glass-on .glass-menu,
 html.glass-on .glass-btn,
 html.glass-on .glass-card,
 html.glass-on .glass-sheet {
-  backdrop-filter: blur(24px) saturate(1.5);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
 }
 
 html.glass-on .glass-surface-sm,
 html.glass-on .glass-btn {
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
 }
 
 html.glass-on .glass-surface-lg,
 html.glass-on .glass-sidebar,
 html.glass-on .glass-sheet {
-  backdrop-filter: blur(32px) saturate(1.6);
-  -webkit-backdrop-filter: blur(32px) saturate(1.6);
+  backdrop-filter: blur(40px) saturate(1.7);
+  -webkit-backdrop-filter: blur(40px) saturate(1.7);
 }
 
 html:not(.glass-on) .glass-surface,
@@ -155,31 +156,59 @@ html:not(.glass-on) .glass-surface-lg {
   -webkit-backdrop-filter: none;
 }
 
-/* ── Glass panel (general elevated surface) ── */
+/* Shared luminous glass rim */
+html.glass-on .glass-panel,
+html.glass-on .glass-btn,
+html.glass-on .glass-chip,
+html.glass-on .glass-bubble,
+html.glass-on .glass-menu,
+html.glass-on .glass-surface,
+html.glass-on .glass-card,
+html.glass-on .glass-sheet {
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.06) inset,
+    0 8px 32px -8px rgba(15, 23, 42, 0.18);
+}
+
+html.glass-on.dark .glass-panel,
+html.glass-on.dark .glass-btn,
+html.glass-on.dark .glass-chip,
+html.glass-on.dark .glass-bubble,
+html.glass-on.dark .glass-menu,
+html.glass-on.dark .glass-surface,
+html.glass-on.dark .glass-card,
+html.glass-on.dark .glass-sheet {
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.25) inset,
+    0 12px 40px -10px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Glass panel (cards, settings rows) ── */
 .glass-panel {
   border-radius: 1.25rem;
   transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 html:not(.dark) .glass-panel {
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 8px 32px -8px rgba(79, 70, 229, 0.1),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.45);
 }
 html.dark .glass-panel {
-  background: rgba(26, 26, 34, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 12px 40px -12px rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 html:not(.glass-on):not(.dark) .glass-panel {
   background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 html:not(.glass-on).dark .glass-panel {
   background: #1a1a22;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 /* ── Glass header bar ── */
@@ -187,20 +216,16 @@ html:not(.glass-on).dark .glass-panel {
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 html:not(.dark) .glass-header {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.45) 0%,
-    rgba(255, 255, 255, 0.25) 100%
-  );
-  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
 }
 html.dark .glass-header {
-  background: linear-gradient(
-    180deg,
-    rgba(17, 17, 20, 0.65) 0%,
-    rgba(17, 17, 20, 0.4) 100%
-  );
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(17, 17, 20, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+html.glass-on .glass-header {
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
 }
 html:not(.glass-on):not(.dark) .glass-header {
   background: rgba(248, 250, 252, 0.95);
@@ -214,82 +239,84 @@ html:not(.glass-on).dark .glass-header {
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 html:not(.dark) .glass-sidebar {
-  background: rgba(255, 255, 255, 0.5);
-  border-right: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: 4px 0 32px -8px rgba(79, 70, 229, 0.08);
+  background: rgba(255, 255, 255, 0.25);
+  border-right: 1px solid rgba(255, 255, 255, 0.4);
 }
 html.dark .glass-sidebar {
-  background: rgba(14, 14, 20, 0.7);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 4px 0 40px -8px rgba(0, 0, 0, 0.4);
+  background: rgba(14, 14, 20, 0.4);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 html:not(.glass-on):not(.dark) .glass-sidebar {
   background: #ffffff;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
 }
 html:not(.glass-on).dark .glass-sidebar {
   background: #0e0e14;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* ── Glass pill buttons (header controls) ── */
+/* ── Glass pills / segmented controls ── */
 .glass-btn {
   transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 html:not(.dark) .glass-btn {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 2px 8px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 html:not(.dark) .glass-btn:hover {
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 1) inset,
-    0 4px 12px rgba(79, 70, 229, 0.1);
+  background: rgba(255, 255, 255, 0.38);
 }
 html.dark .glass-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 html.dark .glass-btn:hover {
-  background: rgba(255, 255, 255, 0.13);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.16);
 }
 html:not(.glass-on):not(.dark) .glass-btn {
   background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 html:not(.glass-on).dark .glass-btn {
   background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
 }
 
-/* ── Glass chips (suggestion pills) ── */
+/* Selected / active glass pill (like Inbox segment) */
+html.glass-on .glass-btn-active,
+html.glass-on .glass-btn[aria-pressed="true"],
+html.glass-on .glass-btn[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.42);
+  border-color: rgba(255, 255, 255, 0.65);
+}
+html.glass-on.dark .glass-btn-active,
+html.glass-on.dark .glass-btn[aria-pressed="true"],
+html.glass-on.dark .glass-btn[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* ── Glass chips ── */
 .glass-chip {
   transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 html:not(.dark) .glass-chip {
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.85) inset,
-    0 2px 10px rgba(79, 70, 229, 0.06);
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.45);
 }
 html:not(.dark) .glass-chip:hover {
-  background: rgba(255, 255, 255, 0.75);
-  border-color: rgba(165, 180, 252, 0.5);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 1) inset,
-    0 4px 16px rgba(99, 102, 241, 0.12);
+  background: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.65);
 }
 html.dark .glass-chip {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 html.dark .glass-chip:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(129, 140, 248, 0.3);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 /* ── Glass message bubbles ── */
@@ -297,28 +324,22 @@ html.dark .glass-chip:hover {
   transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 html:not(.dark) .glass-bubble {
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 4px 16px -4px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 html.dark .glass-bubble {
-  background: linear-gradient(
-    145deg,
-    rgba(44, 44, 56, 0.75) 0%,
-    rgba(36, 36, 48, 0.7) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.05) inset,
-    0 4px 20px -4px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 html:not(.glass-on):not(.dark) .glass-bubble {
   background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
 }
 html:not(.glass-on).dark .glass-bubble {
   background: linear-gradient(145deg, #2c2c38, #242430);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 /* ── Glass dropdown menus ── */
@@ -326,119 +347,111 @@ html:not(.glass-on).dark .glass-bubble {
   transition: background 0.25s ease, border-color 0.25s ease;
 }
 html:not(.dark) .glass-menu {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.95) inset,
-    0 16px 48px -12px rgba(15, 23, 42, 0.15),
-    0 4px 16px rgba(79, 70, 229, 0.06);
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.55);
 }
 html.dark .glass-menu {
-  background: rgba(22, 22, 31, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 20px 50px -12px rgba(0, 0, 0, 0.55);
+  background: rgba(22, 22, 31, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 html:not(.glass-on):not(.dark) .glass-menu {
   background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 16px 48px -12px rgba(15, 23, 42, 0.15);
 }
 html:not(.glass-on).dark .glass-menu {
   background: #16161f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.55);
 }
 
-/* ── Glass cards / sheets (modals, settings) ── */
+/* ── Glass cards / sheets (settings) ── */
 .glass-card,
 .glass-sheet {
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 html:not(.dark) .glass-card {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.85) inset,
-    0 12px 40px -10px rgba(79, 70, 229, 0.1);
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.48);
 }
 html.dark .glass-card {
-  background: rgba(28, 28, 36, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.05) inset,
-    0 16px 48px -12px rgba(0, 0, 0, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 html:not(.dark) .glass-sheet {
-  background: rgba(242, 242, 247, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 24px 64px -16px rgba(15, 23, 42, 0.2);
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 html.dark .glass-sheet {
-  background: rgba(10, 10, 12, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 24px 64px -16px rgba(0, 0, 0, 0.6);
+  background: rgba(10, 10, 12, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 html:not(.glass-on):not(.dark) .glass-sheet {
   background: #f2f2f7;
+  border: none;
+  box-shadow: 0 24px 64px -16px rgba(15, 23, 42, 0.2);
 }
 html:not(.glass-on).dark .glass-sheet {
   background: #0a0a0c;
+  border: none;
+  box-shadow: 0 24px 64px -16px rgba(0, 0, 0, 0.6);
 }
 html:not(.glass-on):not(.dark) .glass-card {
   background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: none;
 }
 html:not(.glass-on).dark .glass-card {
   background: #1c1c24;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
-/* ── Glass input composer (typing bar) ── */
+/* ── Glass composer (typing bar) ── */
 html:not(.dark) .glass-surface {
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.95) inset,
-    0 12px 40px rgba(79, 70, 229, 0.08),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.55);
 }
 html.dark .glass-surface {
-  background: rgba(22, 22, 31, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 16px 48px -8px rgba(0, 0, 0, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 html:not(.glass-on):not(.dark) .glass-surface {
   background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 40px rgba(79, 70, 229, 0.08);
 }
 html:not(.glass-on).dark .glass-surface {
   background: rgba(22, 22, 31, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.45);
 }
 
-/* Soft specular highlight line on glass elements */
+/* Soft specular sheen on large glass */
+html.glass-on .glass-panel,
+html.glass-on .glass-menu,
+html.glass-on .glass-surface,
+html.glass-on .glass-sheet {
+  position: relative;
+  overflow: hidden;
+}
 html.glass-on .glass-panel::before,
 html.glass-on .glass-menu::before,
-html.glass-on .glass-surface::before {
+html.glass-on .glass-surface::before,
+html.glass-on .glass-sheet::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
   background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.15) 0%,
-    transparent 40%,
-    transparent 60%,
-    rgba(255, 255, 255, 0.04) 100%
+    145deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.06) 35%,
+    transparent 55%,
+    rgba(255, 255, 255, 0.03) 100%
   );
-  opacity: 0.6;
-}
-html.glass-on .glass-panel,
-html.glass-on .glass-menu,
-html.glass-on .glass-surface {
-  position: relative;
-  overflow: hidden;
+  opacity: 0.85;
 }
 
 /* AI markdown */
