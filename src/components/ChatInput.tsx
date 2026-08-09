@@ -261,7 +261,17 @@ export default function ChatInput({
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={onKeyDown}
-                onFocus={() => setComposerFocus(true)}
+                onFocus={() => {
+                  setComposerFocus(true)
+                  // Pin document — empty chat must not scroll on focus/keyboard
+                  const pin = () => {
+                    window.scrollTo(0, 0)
+                    document.documentElement.scrollTop = 0
+                    document.body.scrollTop = 0
+                  }
+                  pin()
+                  requestAnimationFrame(pin)
+                }}
                 onBlur={() => setComposerFocus(false)}
                 rows={1}
                 placeholder={listening ? 'Listening…' : 'Ask anything'}
