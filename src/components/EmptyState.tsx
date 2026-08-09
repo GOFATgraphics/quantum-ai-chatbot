@@ -33,6 +33,33 @@ export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
             }`}
             aria-hidden
           />
+          {/* Orbit ring */}
+          <motion.div
+            className="absolute inset-0 -m-4 rounded-full border border-indigo-400/25 pointer-events-none"
+            style={{ width: 96, height: 96, left: '50%', top: '50%', marginLeft: -48, marginTop: -48 }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
+            aria-hidden
+          >
+            <span
+              className={`absolute w-2 h-2 rounded-full -top-1 left-1/2 -translate-x-1/2 ${
+                dark ? 'bg-indigo-300 shadow-[0_0_8px_rgba(165,180,252,0.8)]' : 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]'
+              }`}
+            />
+          </motion.div>
+          <motion.div
+            className="absolute inset-0 -m-6 rounded-full border border-violet-400/15 pointer-events-none"
+            style={{ width: 112, height: 112, left: '50%', top: '50%', marginLeft: -56, marginTop: -56 }}
+            animate={{ rotate: -360 }}
+            transition={{ duration: 28, repeat: Infinity, ease: 'linear' }}
+            aria-hidden
+          >
+            <span
+              className={`absolute w-1.5 h-1.5 rounded-full top-1/2 -right-0.5 -translate-y-1/2 ${
+                dark ? 'bg-violet-300' : 'bg-violet-500'
+              }`}
+            />
+          </motion.div>
           <motion.div
             animate={{ scale: [1, 1.04, 1] }}
             transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
@@ -69,6 +96,7 @@ export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.15 + i * 0.06, duration: 0.35 }}
+                  whileHover={{ y: -2, scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => onSuggestion(s.text)}
                   className={`chip glass-chip ${
