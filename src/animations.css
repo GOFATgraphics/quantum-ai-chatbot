@@ -1,0 +1,41 @@
+/* Quantum ambient particles + reduced-motion extras */
+
+.quantum-particles { z-index: 0; }
+.quantum-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(129, 140, 248, 0.55);
+  box-shadow: 0 0 10px rgba(129, 140, 248, 0.45);
+  animation: quantum-float 12s ease-in-out infinite;
+  opacity: 0.55;
+}
+html.dark .quantum-particle {
+  background: rgba(165, 180, 252, 0.45);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+}
+.quantum-particle-0 { top: 18%; left: 12%; animation-duration: 11s; animation-delay: 0s; }
+.quantum-particle-1 { top: 28%; right: 14%; width: 3px; height: 3px; animation-duration: 14s; animation-delay: -2s; }
+.quantum-particle-2 { bottom: 32%; left: 22%; width: 5px; height: 5px; animation-duration: 16s; animation-delay: -4s; opacity: 0.35; }
+.quantum-particle-3 { bottom: 22%; right: 18%; animation-duration: 13s; animation-delay: -1s; }
+.quantum-particle-4 { top: 42%; left: 48%; width: 2px; height: 2px; animation-duration: 10s; animation-delay: -3s; opacity: 0.4; }
+.quantum-particle-5 { top: 55%; right: 40%; width: 3px; height: 3px; animation-duration: 15s; animation-delay: -5s; }
+
+@keyframes quantum-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.35; }
+  25% { transform: translate3d(12px, -18px, 0) scale(1.2); opacity: 0.7; }
+  50% { transform: translate3d(-10px, -8px, 0) scale(0.9); opacity: 0.45; }
+  75% { transform: translate3d(8px, 14px, 0) scale(1.1); opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  .chat-glow-orb,
+  .quantum-particle,
+  .animate-float,
+  .animate-pulse-dot,
+  .stream-caret {
+    animation: none !important;
+  }
+}
