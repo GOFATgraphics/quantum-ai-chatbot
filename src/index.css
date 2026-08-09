@@ -3,19 +3,22 @@
 @tailwind utilities;
 
 * { -webkit-tap-highlight-color: transparent; }
+
 html { scroll-behavior: smooth; }
 html, body, #root {
   height: 100%;
+  height: 100dvh;
   margin: 0;
-  padding: 0;
   overflow: hidden;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.35s ease, color 0.35s ease;
+  transition: background-color 0.4s ease, color 0.4s ease;
+  position: relative;
+  isolation: isolate;
 }
 
 /*
@@ -26,21 +29,31 @@ body::before,
 body::after {
   content: '';
   position: fixed;
-  inset: -20%;
-  z-index: -1;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
   pointer-events: none;
-  filter: blur(60px);
-  will-change: transform;
+  z-index: -1;
+  filter: blur(80px);
+  will-change: transform, opacity;
+  opacity: 0.9;
 }
+
 body::before {
+  top: -25%;
+  left: -15%;
   animation: bg-orb-a 16s ease-in-out infinite;
 }
+
 body::after {
+  bottom: -30%;
+  right: -20%;
   animation: bg-orb-b 20s ease-in-out infinite;
 }
 
 html:not(.dark) body {
-  background-color: #eef0fb;
+  background-color: #f4f5fb;
+  color: #0f172a;
 }
 html:not(.dark) body::before {
   background: radial-gradient(circle, rgba(129, 140, 248, 0.65) 0%, rgba(167, 139, 250, 0.35) 40%, transparent 70%);
@@ -56,6 +69,7 @@ html.dark #root {
 }
 html.dark body {
   background-color: #111114;
+  color: #f1f5f9;
 }
 html.dark body::before {
   background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, rgba(139, 92, 246, 0.2) 40%, transparent 70%);
@@ -64,9 +78,12 @@ html.dark body::after {
   background: radial-gradient(circle, rgba(129, 140, 248, 0.3) 0%, rgba(56, 189, 248, 0.12) 45%, transparent 70%);
 }
 
+/* Keep app content above background orbs */
 #root {
   position: relative;
   z-index: 1;
+  height: 100%;
+  height: 100dvh;
 }
 
 @keyframes bg-orb-a {
@@ -164,3 +181,33 @@ html.dark .chat-glow-orb-c {
     animation: none !important;
   }
 }
+
+::selection {
+  background: rgba(99, 102, 241, 0.25);
+  color: inherit;
+}
+html.dark ::selection {
+  background: rgba(129, 140, 248, 0.35);
+}
+
+/* Glass composition system — simplified core so UI still works while full stylesheet is restored */
+html.glass-on:not(.dark) .glass-header {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+html.glass-on.dark .glass-header {
+  background: rgba(17, 17, 20, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+html:not(.glass-on) .glass-header {
+  background: transparent !important;
+}
+html:not(.glass-on).dark .glass-header {
+  background: transparent !important;
+}
+
+@import './index-part2.css';
