@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mic, MicOff, Send, Plus, Square, AudioLines, Brain, Globe, X, FileText, Image as ImageIcon } from 'lucide-react'
+import { Send, Plus, Square, AudioLines, Brain, Globe, X, FileText, Image as ImageIcon } from 'lucide-react'
 
 type PendingFile = { name: string; type: string; text?: string }
 
@@ -149,12 +149,24 @@ export default function ChatInput({
     onFilesChange(pendingFiles.filter((_, i) => i !== idx))
   }
 
-  const softBtn = dark
-    ? 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white/[0.07] text-slate-200 hover:bg-white/[0.12] disabled:opacity-40'
-    : 'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition bg-white text-slate-600 shadow-sm ring-1 ring-black/[0.03] hover:bg-white disabled:opacity-40'
+  const chip = (active: boolean, tone: 'violet' | 'sky') => {
+    if (active) {
+      if (tone === 'violet') {
+        return dark
+          ? 'bg-violet-500/20 text-violet-200 ring-1 ring-violet-400/35'
+          : 'bg-violet-50 text-violet-700 ring-1 ring-violet-200'
+      }
+      return dark
+        ? 'bg-sky-500/20 text-sky-200 ring-1 ring-sky-400/35'
+        : 'bg-sky-50 text-sky-700 ring-1 ring-sky-200'
+    }
+    return dark
+      ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.11]'
+      : 'bg-slate-100/80 text-slate-700 hover:bg-slate-100'
+  }
 
   return (
-    <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-2">
+    <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <div className="max-w-2xl mx-auto">
         {errorHint && (
           <p
@@ -167,29 +179,27 @@ export default function ChatInput({
           </p>
         )}
         <div
-          className={`glass-surface rounded-[28px] px-3.5 pt-3.5 pb-2.5 transition-all duration-200 ${
+          className={`glass-surface rounded-[26px] px-3 pt-3 pb-2.5 transition-all duration-200 ${
             dark
               ? `bg-[#16161f]/92 border shadow-xl shadow-black/40 ${
                   focused || listening
                     ? 'border-indigo-400/30 shadow-indigo-500/10'
                     : 'border-white/[0.08]'
                 }`
-              : `bg-white/80 border shadow-[0_12px_40px_rgba(79,70,229,0.08)] ${
+              : `bg-white/90 border shadow-[0_12px_40px_rgba(79,70,229,0.08)] ${
                   focused || listening
                     ? 'border-indigo-300/50 shadow-[0_12px_40px_rgba(99,102,241,0.12)]'
-                    : 'border-white/70'
+                    : 'border-white/80'
                 }`
           }`}
         >
           {pendingFiles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-2 px-1">
+            <div className="flex flex-wrap gap-1.5 mb-2 px-0.5">
               {pendingFiles.map((f, idx) => (
                 <span
                   key={`${f.name}-${idx}`}
                   className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-full ${
-                    dark
-                      ? 'bg-white/10 text-slate-200'
-                      : 'bg-slate-100 text-slate-700'
+                    dark ? 'bg-white/10 text-slate-200' : 'bg-slate-100 text-slate-700'
                   }`}
                 >
                   {f.type.startsWith('image/') ? (
@@ -210,6 +220,7 @@ export default function ChatInput({
               ))}
             </div>
           )}
+
           <textarea
             ref={textareaRef}
             value={value}
@@ -225,7 +236,9 @@ export default function ChatInput({
                 : 'text-slate-900 placeholder:text-slate-400'
             }`}
           />
-          <div className="flex items-center gap-1.5 mt-2.5">
+
+          {/* Toolbar: left tools + right primary CTA — no overflow */}
+          <div className="mt-2.5 flex items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -234,130 +247,103 @@ export default function ChatInput({
               className="hidden"
               onChange={onFileSelected}
             />
-            <button
-              type="button"
-              onClick={onPickFiles}
-              disabled={isLoading}
-              title="Attach files"
-              className={softBtn}
-              aria-label="Add attachment"
-            >
-              <Plus className="w-[18px] h-[18px]" />
-            </button>
-            <button
-              type="button"
-              onClick={onToggleThink}
-              title="Think — deeper step-by-step reasoning"
-              className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
-                thinkActive
-                  ? dark
-                    ? 'bg-violet-500/20 text-violet-200 ring-1 ring-violet-400/35'
-                    : 'bg-violet-50 text-violet-700 shadow-sm ring-1 ring-violet-200'
-                  : dark
-                    ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.11]'
-                    : 'bg-white/90 text-slate-700 shadow-sm ring-1 ring-black/[0.03]'
-              }`}
-            >
-              <Brain className={`w-3.5 h-3.5 ${thinkActive ? (dark ? 'text-violet-300' : 'text-violet-600') : ''}`} />
-              Think
-            </button>
-            <button
-              type="button"
-              onClick={onToggleDeepSearch}
-              title="DeepSearch — thorough research-style answers"
-              className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
-                deepSearchActive
-                  ? dark
-                    ? 'bg-sky-500/20 text-sky-200 ring-1 ring-sky-400/35'
-                    : 'bg-sky-50 text-sky-700 shadow-sm ring-1 ring-sky-200'
-                  : dark
-                    ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.11]'
-                    : 'bg-white/90 text-slate-700 shadow-sm ring-1 ring-black/[0.03]'
-              }`}
-            >
-              <Globe className={`w-3.5 h-3.5 ${deepSearchActive ? (dark ? 'text-sky-300' : 'text-sky-600') : ''}`} />
-              DeepSearch
-            </button>
-            <div className="flex-1" />
-            <button
-              type="button"
-              onClick={toggleListen}
-              disabled={!speechSupported || isLoading}
-              title={
-                !speechSupported
-                  ? 'Voice input not supported in this browser'
-                  : listening
-                    ? 'Stop listening'
-                    : 'Voice input'
-              }
-              className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition ${
-                listening
-                  ? dark
-                    ? 'bg-rose-500/25 text-rose-300 ring-1 ring-rose-400/40'
-                    : 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
-                  : speechSupported
-                    ? dark
-                      ? 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.08]'
-                      : 'text-slate-400 hover:text-slate-600 hover:bg-black/[0.04]'
-                    : 'text-slate-400 opacity-40'
-              }`}
-              aria-label={listening ? 'Stop voice input' : 'Voice input'}
-              aria-pressed={listening}
-            >
-              {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            </button>
-            {isLoading ? (
-              <motion.button
+
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none">
+              <button
                 type="button"
-                initial={{ scale: 0.92, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                onClick={onStop}
-                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition ${
+                onClick={onPickFiles}
+                disabled={isLoading}
+                title="Attach files"
+                className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${
                   dark
-                    ? 'bg-white/15 text-white hover:bg-white/25 ring-1 ring-white/15'
-                    : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/15'
+                    ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.12]'
+                    : 'bg-slate-100/80 text-slate-600 hover:bg-slate-100'
                 }`}
-                aria-label="Stop generating"
+                aria-label="Add attachment"
               >
-                <Square className="w-3 h-3 fill-current" />
-                Stop
-              </motion.button>
-            ) : hasText ? (
-              <motion.button
+                <Plus className="w-[18px] h-[18px]" />
+              </button>
+
+              <button
                 type="button"
-                initial={false}
-                animate={{ scale: 1, opacity: 1 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={onSend}
-                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition ${
-                  dark
-                    ? 'bg-white text-slate-900 hover:bg-slate-100'
-                    : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
-                }`}
-                aria-label="Send"
+                onClick={onToggleThink}
+                title="Think — deeper step-by-step reasoning"
+                className={`h-9 shrink-0 px-2.5 rounded-full flex items-center gap-1.5 text-[13px] font-medium transition ${chip(!!thinkActive, 'violet')}`}
               >
-                <Send className="w-3.5 h-3.5" />
-                Send
-              </motion.button>
-            ) : (
-              <motion.button
+                <Brain className={`w-3.5 h-3.5 ${thinkActive ? (dark ? 'text-violet-300' : 'text-violet-600') : ''}`} />
+                Think
+              </button>
+
+              <button
                 type="button"
-                initial={false}
-                animate={{ scale: 1, opacity: 1 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={toggleListen}
-                disabled={!speechSupported}
-                className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold shrink-0 transition disabled:opacity-40 ${
-                  dark
-                    ? 'bg-white text-slate-900 hover:bg-slate-100'
-                    : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
-                }`}
-                aria-label="Speak"
+                onClick={onToggleDeepSearch}
+                title="DeepSearch — thorough research-style answers"
+                className={`h-9 shrink-0 px-2.5 rounded-full flex items-center gap-1.5 text-[13px] font-medium transition ${chip(!!deepSearchActive, 'sky')}`}
               >
-                <AudioLines className="w-4 h-4" />
-                Speak
-              </motion.button>
-            )}
+                <Globe className={`w-3.5 h-3.5 ${deepSearchActive ? (dark ? 'text-sky-300' : 'text-sky-600') : ''}`} />
+                DeepSearch
+              </button>
+            </div>
+
+            <div className="shrink-0">
+              {isLoading ? (
+                <motion.button
+                  type="button"
+                  initial={{ scale: 0.92, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  onClick={onStop}
+                  className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition ${
+                    dark
+                      ? 'bg-white/15 text-white hover:bg-white/25 ring-1 ring-white/15'
+                      : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/15'
+                  }`}
+                  aria-label="Stop generating"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                  Stop
+                </motion.button>
+              ) : hasText ? (
+                <motion.button
+                  type="button"
+                  initial={false}
+                  animate={{ scale: 1, opacity: 1 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={onSend}
+                  className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition ${
+                    dark
+                      ? 'bg-white text-slate-900 hover:bg-slate-100'
+                      : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
+                  }`}
+                  aria-label="Send"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Send
+                </motion.button>
+              ) : (
+                <motion.button
+                  type="button"
+                  initial={false}
+                  animate={{ scale: 1, opacity: 1 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={toggleListen}
+                  disabled={!speechSupported}
+                  className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition disabled:opacity-40 ${
+                    listening
+                      ? dark
+                        ? 'bg-rose-500/25 text-rose-200 ring-1 ring-rose-400/40'
+                        : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
+                      : dark
+                        ? 'bg-white text-slate-900 hover:bg-slate-100'
+                        : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
+                  }`}
+                  aria-label={listening ? 'Stop listening' : 'Speak'}
+                  aria-pressed={listening}
+                >
+                  <AudioLines className="w-4 h-4" />
+                  {listening ? 'Listening' : 'Speak'}
+                </motion.button>
+              )}
+            </div>
           </div>
         </div>
       </div>
