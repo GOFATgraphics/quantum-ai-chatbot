@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 const DEFAULT_STEPS = ['Thinking', 'Gathering context', 'Working on it']
 const THINK_STEPS = ['Reasoning', 'Checking assumptions', 'Refining answer']
@@ -48,6 +48,7 @@ export default function ThinkingStatus({
   const steps = pickSteps(prompt, thinkActive, deepSearchActive)
   const [i, setI] = useState(0)
   const [elapsed, setElapsed] = useState(0)
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     setI(0)
@@ -64,22 +65,35 @@ export default function ThinkingStatus({
     deepSearchActive ? 'DeepSearch' : thinkActive ? 'Think' : null
 
   return (
-    <div className="flex flex-col gap-2 py-1.5 min-h-[32px]">
+    <div
+      className="flex flex-col gap-2 py-1.5 min-h-[32px]"
+      role="status"
+      aria-live="polite"
+      aria-label={steps[i]}
+    >
       <div className="flex items-center gap-2.5">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" aria-hidden>
           {[0, 1, 2].map((d) => (
             <motion.span
               key={d}
               className={`block w-1.5 h-1.5 rounded-full ${
                 dark ? 'bg-indigo-300' : 'bg-indigo-500'
               }`}
-              animate={{ opacity: [0.35, 1, 0.35], scale: [0.85, 1, 0.85] }}
-              transition={{
-                duration: 1.1,
-                repeat: Infinity,
-                delay: d * 0.18,
-                ease: 'easeInOut',
-              }}
+              animate={
+                reduceMotion
+                  ? { opacity: 0.7 }
+                  : { opacity: [0.35, 1, 0.35], scale: [0.85, 1, 0.85] }
+              }
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : {
+                      duration: 1.1,
+                      repeat: Infinity,
+                      delay: d * 0.18,
+                      ease: 'easeInOut',
+                    }
+              }
             />
           ))}
         </div>
@@ -91,10 +105,10 @@ export default function ThinkingStatus({
           <AnimatePresence mode="wait">
             <motion.span
               key={steps[i]}
-              initial={{ opacity: 0, y: 5 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.18 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -5 }}
+              transition={{ duration: reduceMotion ? 0 : 0.18 }}
               className="inline-block"
             >
               {steps[i]}
@@ -103,7 +117,7 @@ export default function ThinkingStatus({
         </div>
         {label && (
           <motion.span
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
               deepSearchActive
@@ -120,11 +134,11 @@ export default function ThinkingStatus({
         )}
       </div>
 
-      {/* Indeterminate quantum progress bar */}
       <div
         className={`ml-6 h-[2px] w-[min(180px,40%)] rounded-full overflow-hidden ${
           dark ? 'bg-white/10' : 'bg-indigo-100'
         }`}
+        aria-hidden
       >
         <motion.div
           className={`h-full w-1/3 rounded-full ${
@@ -132,12 +146,16 @@ export default function ThinkingStatus({
               ? 'bg-gradient-to-r from-indigo-400 via-violet-400 to-sky-400'
               : 'bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500'
           }`}
-          animate={{ x: ['-100%', '300%'] }}
-          transition={{
-            duration: 1.4,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
+          animate={reduceMotion ? { x: '100%' } : { x: ['-100%', '300%'] }}
+          transition={
+            reduceMotion
+              ? { duration: 0 }
+              : {
+                  duration: 1.4,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }
+          }
         />
       </div>
 
