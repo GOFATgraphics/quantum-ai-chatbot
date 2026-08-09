@@ -23,7 +23,9 @@
       (function () {
         try {
           var t = localStorage.getItem('quantumy-theme');
-          var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = t === 'dark' || ((t === 'system' || !t || t === '') && systemDark);
+          if (t === 'light') dark = false;
           if (dark) document.documentElement.classList.add('dark');
           else document.documentElement.classList.remove('dark');
         } catch (e) {}
