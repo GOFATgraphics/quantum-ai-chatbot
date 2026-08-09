@@ -625,16 +625,12 @@ export default function App() {
           </div>
         </header>
 
-        {/* Model menu — fixed to button center via measured position (reliable on mobile) */}
+        {/* Model menu: fixed wrapper owns position/centering; motion only animates opacity/y/scale */}
         <AnimatePresence>
           {showModelMenu && menuPos && (
             <>
               <div className="fixed inset-0 z-[60]" onClick={() => setShowModelMenu(false)} />
-              <motion.div
-                initial={{ opacity: 0, y: -4, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                transition={{ duration: 0.15 }}
+              <div
                 style={{
                   position: 'fixed',
                   top: menuPos.top,
@@ -642,47 +638,54 @@ export default function App() {
                   transform: 'translateX(-50%)',
                   zIndex: 70,
                 }}
-                className={`w-[min(260px,calc(100vw-24px))] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}
               >
-                <div className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Model
-                </div>
-                {MODELS.map((m) => {
-                  const active = selectedModel.id === m.id
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        selectModel(m)
-                      }}
-                      className={`w-full text-left px-4 py-2.5 flex items-start gap-2 ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'} ${active ? (dark ? 'bg-white/8' : 'bg-black/[0.04]') : ''}`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{m.name}</span>
-                          {m.badge && (
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
-                              m.id === 'quantum-pro'
-                                ? dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700'
-                                : dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'
-                            }`}>
-                              {m.badge}
-                            </span>
-                          )}
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  className={`w-[min(260px,calc(100vw-24px))] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}
+                >
+                  <div className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Model
+                  </div>
+                  {MODELS.map((m) => {
+                    const active = selectedModel.id === m.id
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          selectModel(m)
+                        }}
+                        className={`w-full text-left px-4 py-2.5 flex items-start gap-2 ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'} ${active ? (dark ? 'bg-white/8' : 'bg-black/[0.04]') : ''}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{m.name}</span>
+                            {m.badge && (
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
+                                m.id === 'quantum-pro'
+                                  ? dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700'
+                                  : dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'
+                              }`}>
+                                {m.badge}
+                              </span>
+                            )}
+                          </div>
+                          <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {m.blurb}
+                          </div>
                         </div>
-                        <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
-                          {m.blurb}
-                        </div>
-                      </div>
-                      {active && (
-                        <Check className={`w-4 h-4 mt-0.5 shrink-0 ${dark ? 'text-indigo-300' : 'text-indigo-600'}`} />
-                      )}
-                    </button>
-                  )
-                })}
-              </motion.div>
+                        {active && (
+                          <Check className={`w-4 h-4 mt-0.5 shrink-0 ${dark ? 'text-indigo-300' : 'text-indigo-600'}`} />
+                        )}
+                      </button>
+                    )
+                  })}
+                </motion.div>
+              </div>
             </>
           )}
         </AnimatePresence>
