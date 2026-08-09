@@ -568,13 +568,13 @@ export default function App() {
       </AnimatePresence>
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative">
-        <header className={`relative pt-[env(safe-area-inset-top)] shrink-0 ${showModelMenu ? 'z-50' : 'z-10'}`}>
+        <header className={`glass-header relative pt-[env(safe-area-inset-top)] shrink-0 ${showModelMenu ? 'z-50' : 'z-10'}`}>
           <div className="h-14 grid grid-cols-[1fr_auto_1fr] items-center px-3 gap-2">
             {/* Left: mobile menu */}
             <div className="flex items-center justify-start min-w-0">
               <button
                 onClick={() => setMobileSidebar(true)}
-                className={`lg:hidden w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-white/70 text-slate-700 shadow-sm hover:bg-white'}`}
+                className={`glass-btn lg:hidden w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'text-slate-200' : 'text-slate-700'}`}
                 aria-label="Menu"
               >
                 <Menu className="w-5 h-5" />
@@ -589,7 +589,7 @@ export default function App() {
                 onClick={() => setShowModelMenu((v) => !v)}
                 aria-haspopup="listbox"
                 aria-expanded={showModelMenu}
-                className={`flex items-center gap-1.5 px-3 h-10 rounded-full text-[14px] font-medium transition ${dark ? 'bg-white/10 text-slate-100 hover:bg-white/15' : 'bg-white/70 text-slate-800 shadow-sm hover:bg-white'}`}
+                className={`glass-btn flex items-center gap-1.5 px-3 h-10 rounded-full text-[14px] font-medium transition ${dark ? 'text-slate-100' : 'text-slate-800'}`}
               >
                 <span className="truncate max-w-[140px] sm:max-w-none">{selectedModel.name}</span>
                 {selectedModel.badge && (
@@ -606,7 +606,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={cycleTheme}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-white/70 text-slate-700 shadow-sm hover:bg-white'}`}
+                className={`glass-btn w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'text-slate-200' : 'text-slate-700'}`}
                 aria-label={`Theme: ${themeMode}`}
                 title={`Theme: ${themeMode}`}
               >
@@ -615,7 +615,7 @@ export default function App() {
               {!isEmpty && (
                 <button
                   onClick={startNewChat}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-white/70 text-slate-700 shadow-sm hover:bg-white'}`}
+                  className={`glass-btn w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'text-slate-200' : 'text-slate-700'}`}
                   aria-label="New chat"
                 >
                   <PenLine className="w-5 h-5" />
@@ -644,7 +644,7 @@ export default function App() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.97 }}
                   transition={{ duration: 0.15 }}
-                  className={`w-[min(260px,calc(100vw-24px))] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}
+                  className={`glass-menu w-[min(260px,calc(100vw-24px))] rounded-2xl py-1 ${dark ? 'text-slate-100' : 'text-slate-800'}`}
                 >
                   <div className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
                     Model
@@ -743,9 +743,7 @@ export default function App() {
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: 24, opacity: 0 }}
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className={`w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden shadow-2xl ${
-                dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
-              }`}
+              className={`glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden`}
               onClick={(e) => e.stopPropagation()}
             >
               <Settings
@@ -781,9 +779,7 @@ export default function App() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 24, opacity: 0 }}
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className={`w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden shadow-2xl ${
-                dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
-              }`}
+              className={`glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden`}
               onClick={(e) => e.stopPropagation()}
             >
               <Connectors
