@@ -126,6 +126,12 @@ export const CONNECTOR_CATALOG = [
 /** Build a short chat title from message content (not a raw first-line dump). */
 export function makeChatTitle(raw: string): string {
   let t = raw.replace(/\s+/g, ' ').trim()
+  // Strip attachment noise so titles stay readable
+  t = t.replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+  t = t.replace(/📎\s*\*\*[^*]+\*\*/g, '')
+  t = t.replace(/---\s*File:[^-]+---/g, '')
+  t = t.replace(/\[(?:Image|File) attached:[^\]]+\]/gi, '')
+  t = t.replace(/\s+/g, ' ').trim()
   t = t.replace(
     /^(please |can you |could you |would you |i want (you )?to |i need (you )?to |help me (to )?|hey[, ]+|hi[, ]+)/i,
     ''
