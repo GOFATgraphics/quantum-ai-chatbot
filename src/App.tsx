@@ -1,1 +1,5 @@
-RESTORE_VIA_READ
+import AppMain from './AppMain'
+
+export default function App() {
+  return <AppMain />
+}
