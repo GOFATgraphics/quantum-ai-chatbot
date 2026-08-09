@@ -70,19 +70,9 @@ function Toggle({
   )
 }
 
-function GroupCard({
-  children,
-  dark,
-}: {
-  children: React.ReactNode
-  dark: boolean
-}) {
+function GroupCard({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className={`rounded-2xl overflow-hidden ${
-        dark ? 'bg-[#1c1c1e]' : 'bg-white shadow-sm'
-      }`}
-    >
+    <div className="glass-panel rounded-2xl overflow-hidden">
       {children}
     </div>
   )
@@ -183,13 +173,12 @@ export default function Settings({
     'You'
   const initial = (displayName[0] || 'Q').toUpperCase()
 
-  const bg = dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
   const textMain = dark ? 'text-white' : 'text-slate-900'
   const textMuted = dark ? 'text-white/45' : 'text-slate-500'
-  const inputCls = `w-full rounded-xl px-3.5 py-3 text-[16px] outline-none ${
+  const inputCls = `glass-panel w-full rounded-xl px-3.5 py-3 text-[16px] outline-none ${
     dark
-      ? 'bg-white/[0.08] border border-white/[0.08] text-white placeholder:text-white/30'
-      : 'bg-white border border-black/[0.06] text-slate-900 placeholder:text-slate-400'
+      ? 'text-white placeholder:text-white/30'
+      : 'text-slate-900 placeholder:text-slate-400'
   }`
 
   useEffect(() => {
@@ -277,14 +266,14 @@ export default function Settings({
   const match = (s: string) => !q || s.toLowerCase().includes(q)
 
   return (
-    <div className={`flex flex-col h-full min-h-0 ${bg}`}>
+    <div className="flex flex-col h-full min-h-0 bg-transparent">
       <div className="relative flex items-center justify-center h-14 shrink-0 px-4">
         {page === 'home' ? (
           <button
             type="button"
             onClick={onClose}
-            className={`absolute left-4 w-9 h-9 rounded-full flex items-center justify-center ${
-              dark ? 'bg-white/10 text-white' : 'bg-white text-slate-800 shadow-sm'
+            className={`glass-btn absolute left-4 w-9 h-9 rounded-full flex items-center justify-center ${
+              dark ? 'text-white' : 'text-slate-800'
             }`}
             aria-label="Close"
           >
@@ -312,8 +301,8 @@ export default function Settings({
               <button
                 type="button"
                 onClick={() => setPage('profile')}
-                className={`w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition ${
-                  dark ? 'bg-[#1c1c1e] active:bg-white/5' : 'bg-white shadow-sm active:bg-black/[0.02]'
+                className={`glass-panel w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left transition ${
+                  dark ? 'active:bg-white/5' : 'active:bg-black/[0.02]'
                 }`}
               >
                 <div className="w-12 h-12 rounded-full bg-violet-600 flex items-center justify-center text-white text-lg font-semibold shrink-0">
@@ -331,10 +320,11 @@ export default function Settings({
               match('notifications') ||
               match('widget') ||
               match('language') ||
-              match('app')) && (
+              match('app') ||
+              match('glass')) && (
               <div>
                 <SectionLabel dark={dark}>App</SectionLabel>
-                <GroupCard dark={dark}>
+                <GroupCard>
                   {match('appearance') && (
                     <ListRow
                       icon={<Sun className="w-5 h-5" />}
@@ -381,7 +371,7 @@ export default function Settings({
               match('quantumy')) && (
               <div>
                 <SectionLabel dark={dark}>Quantumy</SectionLabel>
-                <GroupCard dark={dark}>
+                <GroupCard>
                   {match('customize') && (
                     <ListRow
                       icon={<Settings2 className="w-5 h-5" />}
@@ -419,11 +409,7 @@ export default function Settings({
               </div>
             )}
 
-            <div
-              className={`flex items-center gap-2 rounded-2xl px-3.5 h-11 ${
-                dark ? 'bg-[#1c1c1e]' : 'bg-white shadow-sm'
-              }`}
-            >
+            <div className="glass-panel flex items-center gap-2 rounded-2xl px-3.5 h-11">
               <Search className={`w-4 h-4 shrink-0 ${textMuted}`} />
               <input
                 value={search}
@@ -435,7 +421,7 @@ export default function Settings({
               />
             </div>
 
-            <GroupCard dark={dark}>
+            <GroupCard>
               <ListRow label="Sign out" onClick={onSignOut} dark={dark} danger last />
             </GroupCard>
           </>
@@ -450,7 +436,7 @@ export default function Settings({
               <p className={`mt-3 text-[18px] font-semibold ${textMain}`}>{displayName}</p>
               <p className={`text-[14px] ${textMuted}`}>{user.email}</p>
             </div>
-            <GroupCard dark={dark}>
+            <GroupCard>
               <div className="px-4 py-3 space-y-3">
                 <div>
                   <label className={`text-[13px] ${textMuted}`}>What we call you</label>
@@ -497,7 +483,7 @@ export default function Settings({
                 </button>
               </div>
             </GroupCard>
-            <GroupCard dark={dark}>
+            <GroupCard>
               <ListRow label="Sign out" onClick={onSignOut} dark={dark} danger last />
             </GroupCard>
           </div>
@@ -505,43 +491,45 @@ export default function Settings({
 
         {page === 'appearance' && (
           <div className="space-y-4">
-            <GroupCard dark={dark}>
-              <ListRow
-                icon={dark ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-                label="Dark Mode"
-                dark={dark}
-                last={!onToggleGlass}
-                onClick={onToggleTheme}
-                value={dark ? 'On' : 'Off'}
-              />
+            <GroupCard>
+              <div className={`flex items-center gap-3 px-4 py-3.5 ${dark ? 'border-b border-white/[0.06]' : 'border-b border-black/[0.06]'}`}>
+                <span className={dark ? 'text-white/70' : 'text-slate-600'}>
+                  {dark ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                </span>
+                <div className="flex-1">
+                  <p className={`text-[16px] ${textMain}`}>Dark Mode</p>
+                  <p className={`text-[13px] ${textMuted}`}>{dark ? 'On' : 'Off'}</p>
+                </div>
+                <Toggle on={dark} onChange={onToggleTheme} dark={dark} />
+              </div>
               {onToggleGlass && (
-                <div
-                  className={`flex items-center gap-3 px-4 py-3.5 ${
-                    dark ? 'border-t border-white/[0.06]' : 'border-t border-black/[0.06]'
-                  }`}
-                >
+                <div className="flex items-center gap-3 px-4 py-3.5">
                   <span className={dark ? 'text-white/70' : 'text-slate-600'}>
                     <Sparkles className="w-5 h-5" />
                   </span>
-                  <div className="flex-1">
-                    <p className={`text-[16px] ${textMain}`}>Glass surfaces</p>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[16px] ${textMain}`}>Glassmorphism</p>
                     <p className={`text-[13px] ${textMuted}`}>
-                      {glass ? 'Frosted glass on' : 'Solid surfaces'}
+                      {glass
+                        ? 'Frosted glass on chat, header, sidebar, composer & settings'
+                        : 'Solid surfaces — glass off'}
                     </p>
                   </div>
-                  <Toggle on={glass} onChange={onToggleGlass!} dark={dark} />
+                  <Toggle on={glass} onChange={onToggleGlass} dark={dark} />
                 </div>
               )}
             </GroupCard>
             <p className={`text-[13px] px-1 ${textMuted}`}>
-              Theme applies across chat, sidebar, and settings.
+              Glassmorphism applies to the full app in both light and dark mode: header, sidebar,
+              typing bar, menus, message bubbles, and this settings sheet. Turn it off anytime for
+              solid surfaces.
             </p>
           </div>
         )}
 
         {page === 'notifications' && (
           <div className="space-y-4">
-            <GroupCard dark={dark}>
+            <GroupCard>
               <div className="flex items-center gap-3 px-4 py-3.5">
                 <Bell className={`w-5 h-5 ${dark ? 'text-white/70' : 'text-slate-600'}`} />
                 <div className="flex-1">
@@ -559,15 +547,15 @@ export default function Settings({
 
         {page === 'widget' && (
           <div className="space-y-4">
-            <GroupCard dark={dark}>
+            <GroupCard>
               <div className="px-4 py-5 space-y-3">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                      dark ? 'bg-white/10' : 'bg-slate-100'
+                    className={`glass-btn w-12 h-12 rounded-2xl flex items-center justify-center ${
+                      dark ? 'text-white' : 'text-slate-700'
                     }`}
                   >
-                    <LayoutGrid className={`w-6 h-6 ${dark ? 'text-white' : 'text-slate-700'}`} />
+                    <LayoutGrid className="w-6 h-6" />
                   </div>
                   <div>
                     <p className={`text-[17px] font-semibold ${textMain}`}>Home screen widget</p>
@@ -578,11 +566,7 @@ export default function Settings({
                   Add Quantumy to your home screen for one-tap access. On iPhone: Share → Add to Home
                   Screen. On Android: browser menu → Install app / Add to Home screen.
                 </p>
-                <div
-                  className={`rounded-xl px-3.5 py-3 text-[14px] ${
-                    dark ? 'bg-white/[0.06] text-white/70' : 'bg-slate-50 text-slate-600'
-                  }`}
-                >
+                <div className={`glass-panel rounded-xl px-3.5 py-3 text-[14px] ${textMuted}`}>
                   <p className="font-medium mb-1">Tips</p>
                   <ul className="list-disc pl-4 space-y-1">
                     <li>Use the install banner when it appears in chat</li>
@@ -597,7 +581,7 @@ export default function Settings({
 
         {page === 'language' && (
           <div className="space-y-4">
-            <GroupCard dark={dark}>
+            <GroupCard>
               <ListRow label="English" value="Selected" dark={dark} last />
             </GroupCard>
             <p className={`text-[13px] px-1 ${textMuted}`}>
@@ -611,7 +595,7 @@ export default function Settings({
             <p className={`text-[13px] px-1 ${textMuted}`}>
               How Quantumy should respond — tone, length, rules, and preferences.
             </p>
-            <GroupCard dark={dark}>
+            <GroupCard>
               <div className="p-4">
                 <textarea
                   value={instructions}
@@ -646,7 +630,7 @@ export default function Settings({
             <p className={`text-[13px] px-1 ${textMuted}`}>
               What Quantumy can do when apps are connected.
             </p>
-            <GroupCard dark={dark}>
+            <GroupCard>
               {[
                 { title: 'Email', desc: 'Search, draft, and send' },
                 { title: 'Drive & Docs', desc: 'Find files and read documents' },
@@ -684,7 +668,7 @@ export default function Settings({
 
         {page === 'memory' && (
           <div className="space-y-4">
-            <GroupCard dark={dark}>
+            <GroupCard>
               <div className="flex items-center gap-3 px-4 py-3.5">
                 <Brain className={`w-5 h-5 ${dark ? 'text-white/70' : 'text-slate-600'}`} />
                 <div className="flex-1">
@@ -695,7 +679,7 @@ export default function Settings({
               </div>
             </GroupCard>
 
-            <GroupCard dark={dark}>
+            <GroupCard>
               <div className="p-4 space-y-2">
                 <textarea
                   value={newFact}
@@ -734,7 +718,7 @@ export default function Settings({
             ) : memories.length === 0 ? (
               <p className={`text-sm text-center py-6 ${textMuted}`}>No memories yet</p>
             ) : (
-              <GroupCard dark={dark}>
+              <GroupCard>
                 {memories.map((m, i) => (
                   <div
                     key={m.id}
@@ -778,8 +762,8 @@ export default function Settings({
             <button
               type="button"
               onClick={saveProfile}
-              className={`w-full h-11 rounded-xl text-[15px] font-medium ${
-                dark ? 'bg-white/10 text-white' : 'bg-white text-slate-800 shadow-sm'
+              className={`glass-btn w-full h-11 rounded-xl text-[15px] font-medium ${
+                dark ? 'text-white' : 'text-slate-800'
               }`}
             >
               Save memory preference
