@@ -655,13 +655,12 @@ export default function App() {
                                 m.id === 'quantum-pro'
                                   ? dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700'
                                   : dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'
-                              }`}
-                              >
+                              }`}>
                                 {m.badge}
                               </span>
                             )}
                           </div>
-                          <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'`}>
                             {m.blurb}
                           </div>
                         </div>
@@ -677,65 +676,57 @@ export default function App() {
           )}
         </AnimatePresence>
 
+        {/* Empty: center greeting+bar on md+; on phone bar stays at bottom. With messages: bar at bottom. */}
         <div
           className={`relative z-10 flex-1 flex flex-col min-h-0 ${
-            isEmpty ? 'justify-center' : ''
+            isEmpty ? 'md:justify-center' : ''
           }`}
         >
           {isEmpty ? (
-            <div className="flex flex-col items-center w-full px-4">
+            <div className="flex flex-col items-center justify-center flex-1 md:flex-none w-full px-4">
               <EmptyState
                 greeting={greetingLine || creativeGreeting(firstName)}
                 dark={dark}
               />
-              <div className="w-full max-w-2xl mx-auto mt-6 shrink-0">
-                <ChatInput
-                  value={input}
-                  onChange={setInput}
-                  onSend={() => handleSend()}
-                  onStop={handleStop}
-                  onSpeak={() => setShowLiveVoice(true)}
-                  isLoading={isLoading}
-                  dark={dark}
-                  errorHint={errorHint}
-                  pendingFiles={pendingFiles}
-                  onFilesChange={setPendingFiles}
-                />
-              </div>
             </div>
           ) : (
-            <>
-              <main className="flex-1 overflow-y-auto min-h-0">
-                <MessageList
-                  messages={messages}
-                  isLoading={isLoading}
-                  lastUserPrompt={lastUserPrompt}
-                  dark={dark}
-                  messagesEndRef={messagesEndRef}
-                  thoughtSeconds={thoughtSeconds}
-                  thinkActive={false}
-                  deepSearchActive={false}
-                  onRegenerate={() => {
-                    if (lastUserPrompt) handleSend(lastUserPrompt)
-                  }}
-                />
-              </main>
-              <div className="shrink-0">
-                <ChatInput
-                  value={input}
-                  onChange={setInput}
-                  onSend={() => handleSend()}
-                  onStop={handleStop}
-                  onSpeak={() => setShowLiveVoice(true)}
-                  isLoading={isLoading}
-                  dark={dark}
-                  errorHint={errorHint}
-                  pendingFiles={pendingFiles}
-                  onFilesChange={setPendingFiles}
-                />
-              </div>
-            </>
+            <main className="flex-1 overflow-y-auto min-h-0">
+              <MessageList
+                messages={messages}
+                isLoading={isLoading}
+                lastUserPrompt={lastUserPrompt}
+                dark={dark}
+                messagesEndRef={messagesEndRef}
+                thoughtSeconds={thoughtSeconds}
+                thinkActive={false}
+                deepSearchActive={false}
+                onRegenerate={() => {
+                  if (lastUserPrompt) handleSend(lastUserPrompt)
+                }}
+              />
+            </main>
           )}
+
+          <div
+            className={
+              isEmpty
+                ? 'shrink-0 w-full md:max-w-2xl md:mx-auto md:mt-6 md:px-4'
+                : 'shrink-0'
+            }
+          >
+            <ChatInput
+              value={input}
+              onChange={setInput}
+              onSend={() => handleSend()}
+              onStop={handleStop}
+              onSpeak={() => setShowLiveVoice(true)}
+              isLoading={isLoading}
+              dark={dark}
+              errorHint={errorHint}
+              pendingFiles={pendingFiles}
+              onFilesChange={setPendingFiles}
+            />
+          </div>
         </div>
 
         <InstallPWA dark={dark} />
