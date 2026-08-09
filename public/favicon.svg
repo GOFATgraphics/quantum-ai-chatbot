@@ -1,17 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" fill="none">
   <defs>
-    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8b9bff"/>
-      <stop offset="40%" stop-color="#3b5bff"/>
-      <stop offset="100%" stop-color="#1a1460"/>
+    <linearGradient id="r" x1="8%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a5b4fc"/>
+      <stop offset="45%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#312e81"/>
     </linearGradient>
-    <radialGradient id="sphere" cx="32%" cy="28%" r="72%">
-      <stop offset="0%" stop-color="#3a3a44"/>
-      <stop offset="50%" stop-color="#16161c"/>
-      <stop offset="100%" stop-color="#050508"/>
+    <radialGradient id="s" cx="34%" cy="28%" r="72%">
+      <stop offset="0%" stop-color="#4a4a58"/>
+      <stop offset="45%" stop-color="#1a1a24"/>
+      <stop offset="100%" stop-color="#06060a"/>
     </radialGradient>
   </defs>
-  <ellipse cx="64" cy="72" rx="54" ry="15" fill="url(#ring)" transform="rotate(-20 64 64)" opacity="0.85"/>
-  <circle cx="64" cy="64" r="38" fill="url(#sphere)"/>
-  <ellipse cx="64" cy="56" rx="54" ry="15" fill="url(#ring)" transform="rotate(-20 64 64)"/>
+  <ellipse cx="64" cy="74" rx="52" ry="14" fill="none" stroke="url(#r)" stroke-width="7" transform="rotate(-22 64 64)" opacity="0.55"/>
+  <circle cx="64" cy="64" r="36" fill="url(#s)"/>
+  <ellipse cx="64" cy="54" rx="52" ry="14" fill="none" stroke="url(#r)" stroke-width="7" transform="rotate(-22 64 64)"/>
+  <circle cx="64" cy="64" r="6" fill="#a5b4fc"/>
+  <circle cx="64" cy="64" r="2.5" fill="#eef2ff"/>
 </svg>

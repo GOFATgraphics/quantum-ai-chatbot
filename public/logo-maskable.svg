@@ -1,20 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <rect width="128" height="128" rx="28" fill="#07070c"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" fill="none">
   <defs>
-    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8b9bff"/>
-      <stop offset="40%" stop-color="#3b5bff"/>
-      <stop offset="100%" stop-color="#1a1460"/>
+    <linearGradient id="ringL" x1="8%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a5b4fc"/>
+      <stop offset="45%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#312e81"/>
     </linearGradient>
-    <radialGradient id="sphere" cx="32%" cy="28%" r="72%">
-      <stop offset="0%" stop-color="#3a3a44"/>
-      <stop offset="50%" stop-color="#16161c"/>
-      <stop offset="100%" stop-color="#050508"/>
+    <radialGradient id="sphereL" cx="34%" cy="28%" r="72%">
+      <stop offset="0%" stop-color="#4a4a58"/>
+      <stop offset="45%" stop-color="#1a1a24"/>
+      <stop offset="100%" stop-color="#06060a"/>
+    </radialGradient>
+    <radialGradient id="glowL" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <g transform="translate(0 2)">
-    <ellipse cx="64" cy="72" rx="44" ry="12" fill="url(#ring)" transform="rotate(-20 64 64)" opacity="0.85"/>
-    <circle cx="64" cy="64" r="30" fill="url(#sphere)"/>
-    <ellipse cx="64" cy="56" rx="44" ry="12" fill="url(#ring)" transform="rotate(-20 64 64)"/>
-  </g>
+  <circle cx="64" cy="64" r="58" fill="url(#glowL)"/>
+  <ellipse cx="64" cy="74" rx="52" ry="14" fill="none" stroke="url(#ringL)" stroke-width="6.5" transform="rotate(-22 64 64)" opacity="0.55"/>
+  <circle cx="64" cy="64" r="36" fill="url(#sphereL)"/>
+  <ellipse cx="52" cy="50" rx="12" ry="8" fill="#ffffff" opacity="0.12"/>
+  <ellipse cx="64" cy="54" rx="52" ry="14" fill="none" stroke="url(#ringL)" stroke-width="6.5" transform="rotate(-22 64 64)" opacity="0.95"/>
+  <circle cx="64" cy="64" r="6" fill="#a5b4fc" opacity="0.9"/>
+  <circle cx="64" cy="64" r="2.5" fill="#eef2ff"/>
 </svg>
