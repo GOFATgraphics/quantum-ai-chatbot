@@ -74,14 +74,6 @@ export default function EmptyState({ greeting, dark }: Props) {
         >
           {greeting}
         </h1>
-
-        <p
-          className={`mt-3 text-[14px] leading-relaxed max-w-sm ${
-            dark ? 'text-slate-400' : 'text-slate-500'
-          }`}
-        >
-          Connect your tools and let Quantumy handle email, docs, and schedules.
-        </p>
       </motion.div>
     </div>
   )
