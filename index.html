@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Quantumy AI — personal assistant that remembers you, drafts email, and connects to your work." />
-    <meta name="theme-color" content="#eef2ff" />
+    <meta name="theme-color" content="#111114" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Quantumy" />
     <meta name="application-name" content="Quantumy" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -19,12 +19,26 @@
     <link rel="preload" href="/logo.svg" as="image" type="image/svg+xml" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
     <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /></noscript>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('quantumy-theme');
+          var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+          else document.documentElement.classList.remove('dark');
+        } catch (e) {}
+      })();
+    </script>
     <style>
       html, body, #root {
         margin: 0;
         padding: 0;
         height: 100%;
         background: #eef2ff;
+      }
+      html.dark, html.dark body, html.dark #root {
+        background: #111114 !important;
+        color: #ececf1;
       }
     </style>
   </head>
