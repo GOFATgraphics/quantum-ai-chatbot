@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import './index-part2.css'
 import './animations.css'
 import './chat-glow-modes.css'
 

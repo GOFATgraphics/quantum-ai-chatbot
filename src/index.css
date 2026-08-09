@@ -209,5 +209,3 @@ html:not(.glass-on) .glass-header {
 html:not(.glass-on).dark .glass-header {
   background: transparent !important;
 }
-
-@import './index-part2.css';
