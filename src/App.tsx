@@ -13,8 +13,6 @@ import EmptyState from './components/EmptyState'
 import ChatInput from './components/ChatInput'
 import InstallPWA from './components/InstallPWA'
 
-// Deploy fix: EmptyState no longer accepts onSuggestion
-
 const MODELS = [
   {
     id: 'quantum-flash',
@@ -532,11 +530,6 @@ export default function App() {
           isLoading={isLoading}
           dark={dark}
           errorHint={errorHint}
-          fastActive={selectedModel.id === 'quantum-flash' && !thinkActive}
-          onToggleFast={() => {
-            setThinkActive(false)
-            selectModel(MODELS[0])
-          }}
           thinkActive={thinkActive}
           onToggleThink={() => {
             setThinkActive((v) => {
