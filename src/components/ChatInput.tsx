@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mic, MicOff, Send, Plus, Zap, Square, AudioLines, Brain, Globe, X, FileText, Image as ImageIcon } from 'lucide-react'
+import { Mic, MicOff, Send, Plus, Square, AudioLines, Brain, Globe, X, FileText, Image as ImageIcon } from 'lucide-react'
 
 type PendingFile = { name: string; type: string; text?: string }
 
@@ -12,8 +12,6 @@ type Props = {
   isLoading: boolean
   dark: boolean
   errorHint?: string | null
-  fastActive?: boolean
-  onToggleFast?: () => void
   thinkActive?: boolean
   onToggleThink?: () => void
   deepSearchActive?: boolean
@@ -30,8 +28,6 @@ export default function ChatInput({
   isLoading,
   dark,
   errorHint,
-  fastActive,
-  onToggleFast,
   thinkActive,
   onToggleThink,
   deepSearchActive,
@@ -121,7 +117,7 @@ export default function ChatInput({
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (!isLoading && value.trim()) onSend()
+      if (!isLoading && (value.trim() || pendingFiles.length > 0)) onSend()
     }
   }
 
@@ -222,7 +218,7 @@ export default function ChatInput({
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             rows={1}
-            placeholder={listening ? 'Listening…' : 'Ask Anything'}
+            placeholder={listening ? 'Listening…' : 'Ask anything'}
             className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${
               dark
                 ? 'text-slate-50 placeholder:text-slate-500'
@@ -247,23 +243,6 @@ export default function ChatInput({
               aria-label="Add attachment"
             >
               <Plus className="w-[18px] h-[18px]" />
-            </button>
-            <button
-              type="button"
-              onClick={onToggleFast}
-              title="Fast responses"
-              className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium shrink-0 transition ${
-                fastActive
-                  ? dark
-                    ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/35'
-                    : 'bg-white text-slate-800 shadow-sm ring-1 ring-black/[0.05]'
-                  : dark
-                    ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.11]'
-                    : 'bg-white/90 text-slate-700 shadow-sm ring-1 ring-black/[0.03]'
-              }`}
-            >
-              <Zap className={`w-3.5 h-3.5 ${fastActive ? (dark ? 'text-indigo-300' : 'text-indigo-500') : ''}`} />
-              Fast
             </button>
             <button
               type="button"
