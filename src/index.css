@@ -243,8 +243,12 @@ html:not(.glass-on).dark .glass-header {
 }
 
 /*
- * Gemini-style composer pill:
- * solid fill + soft shadow only. Zero border / ring / outline / inset lines.
+ * Gemini-style composer pill — iOS Safari hairline fix
+ *
+ * iOS draws a 1px fringe on elements that combine:
+ *   border-radius + opaque bg + box-shadow
+ * Fix: no box-shadow on the pill itself (drop-shadow on parent),
+ * promote to its own compositing layer, force clip.
  */
 .composer-surface {
   border: 0 !important;
@@ -252,12 +256,22 @@ html:not(.glass-on).dark .glass-header {
   border-style: none !important;
   border-color: transparent !important;
   outline: none !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
   -webkit-appearance: none !important;
   appearance: none !important;
-  /* prevent any glass ring or inset from leaking */
   --tw-ring-shadow: 0 0 #0000 !important;
   --tw-ring-offset-shadow: 0 0 #0000 !important;
   --tw-shadow: 0 0 #0000 !important;
+  /* Own layer — kills subpixel fringe on iOS */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backfaceVisibility: hidden;
+  isolation: isolate;
+  -webkit-background-clip: padding-box;
+  background-clip: padding-box;
+  overflow: hidden;
 }
 .composer-surface::before,
 .composer-surface::after {
