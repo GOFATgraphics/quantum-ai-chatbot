@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Copy, Check, ThumbsUp, ThumbsDown, Volume2, Share2, RotateCcw } from 'lucide-react'
 
 type Props = {
@@ -51,18 +52,52 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
   }
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
       className={`inline-flex items-center gap-0.5 mt-2.5 px-1 py-0.5 rounded-full ${
         dark ? 'bg-white/[0.03]' : 'bg-black/[0.02]'
       }`}
     >
       <button type="button" onClick={copy} className={`p-1.5 rounded-full transition ${muted}`} title="Copy">
-        {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+        <AnimatePresence mode="wait" initial={false}>
+          {copied ? (
+            <motion.span
+              key="check"
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+              className="block"
+            >
+              <Check className="w-3.5 h-3.5 text-emerald-500" />
+            </motion.span>
+          ) : (
+            <motion.span
+              key="copy"
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="block"
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </motion.span>
+          )}
+        </AnimatePresence>
       </button>
       {onRegenerate && (
-        <button type="button" onClick={onRegenerate} className={`p-1.5 rounded-full transition ${muted}`} title="Regenerate">
+        <motion.button
+          type="button"
+          whileTap={{ rotate: -45, scale: 0.92 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+          onClick={onRegenerate}
+          className={`p-1.5 rounded-full transition ${muted}`}
+          title="Regenerate"
+        >
           <RotateCcw className="w-3.5 h-3.5" />
-        </button>
+        </motion.button>
       )}
       <button type="button" onClick={share} className={`p-1.5 rounded-full transition ${muted}`} title="Share">
         <Share2 className="w-3.5 h-3.5" />
@@ -71,22 +106,24 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
         <Volume2 className="w-3.5 h-3.5" />
       </button>
       <span className={`w-px h-3 mx-0.5 ${dark ? 'bg-white/10' : 'bg-black/8'}`} />
-      <button
+      <motion.button
         type="button"
+        whileTap={{ scale: 0.88 }}
         onClick={() => setLiked(liked === 'up' ? null : 'up')}
         className={`p-1.5 rounded-full transition ${liked === 'up' ? active : muted}`}
         title="Good response"
       >
         <ThumbsUp className="w-3.5 h-3.5" />
-      </button>
-      <button
+      </motion.button>
+      <motion.button
         type="button"
+        whileTap={{ scale: 0.88 }}
         onClick={() => setLiked(liked === 'down' ? null : 'down')}
         className={`p-1.5 rounded-full transition ${liked === 'down' ? active : muted}`}
         title="Bad response"
       >
         <ThumbsDown className="w-3.5 h-3.5" />
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   )
 }

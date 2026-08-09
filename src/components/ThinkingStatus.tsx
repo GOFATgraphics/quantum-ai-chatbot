@@ -64,7 +64,7 @@ export default function ThinkingStatus({
     deepSearchActive ? 'DeepSearch' : thinkActive ? 'Think' : null
 
   return (
-    <div className="flex flex-col gap-1 py-1.5 min-h-[32px]">
+    <div className="flex flex-col gap-2 py-1.5 min-h-[32px]">
       <div className="flex items-center gap-2.5">
         <div className="flex items-center gap-1">
           {[0, 1, 2].map((d) => (
@@ -102,7 +102,9 @@ export default function ThinkingStatus({
           </AnimatePresence>
         </div>
         {label && (
-          <span
+          <motion.span
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
             className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
               deepSearchActive
                 ? dark
@@ -114,9 +116,31 @@ export default function ThinkingStatus({
             }`}
           >
             {label}
-          </span>
+          </motion.span>
         )}
       </div>
+
+      {/* Indeterminate quantum progress bar */}
+      <div
+        className={`ml-6 h-[2px] w-[min(180px,40%)] rounded-full overflow-hidden ${
+          dark ? 'bg-white/10' : 'bg-indigo-100'
+        }`}
+      >
+        <motion.div
+          className={`h-full w-1/3 rounded-full ${
+            dark
+              ? 'bg-gradient-to-r from-indigo-400 via-violet-400 to-sky-400'
+              : 'bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500'
+          }`}
+          animate={{ x: ['-100%', '300%'] }}
+          transition={{
+            duration: 1.4,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+      </div>
+
       {elapsed > 0 && (
         <div className={`text-[12px] pl-6 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
           {elapsed}s

@@ -9,6 +9,19 @@ export type ChatMessage = { id: string; role: 'user' | 'assistant'; content: str
 
 const USER_SNIPPET_LEN = 220
 
+const messageVariants = {
+  user: {
+    initial: { opacity: 0, y: 14, x: 12, scale: 0.98 },
+    animate: { opacity: 1, y: 0, x: 0, scale: 1 },
+    exit: { opacity: 0, y: -8, scale: 0.97 },
+  },
+  assistant: {
+    initial: { opacity: 0, y: 12, x: -8, scale: 0.98 },
+    animate: { opacity: 1, y: 0, x: 0, scale: 1 },
+    exit: { opacity: 0, y: -8, scale: 0.97 },
+  },
+}
+
 /** Split user content into text segments and image attachments */
 function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] {
   const parts: { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] = []
@@ -142,17 +155,24 @@ export default function MessageList({
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-5 py-4 pb-6 space-y-6">
-      <AnimatePresence initial={false}>
+      <AnimatePresence initial={false} mode="popLayout">
         {messages.map((msg, idx) => {
           const isLast = idx === messages.length - 1
           const isStreamingThis = streaming && isLast && msg.role === 'assistant'
+          const variants = msg.role === 'user' ? messageVariants.user : messageVariants.assistant
 
           return (
             <motion.div
               key={msg.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              layout
+              initial={variants.initial}
+              animate={variants.animate}
+              exit={variants.exit}
+              transition={{
+                duration: 0.32,
+                ease: [0.22, 1, 0.36, 1],
+                layout: { duration: 0.25 },
+              }}
               className={msg.role === 'user' ? 'flex justify-end' : ''}
             >
               {msg.role === 'user' ? (
@@ -173,9 +193,7 @@ export default function MessageList({
                         />
                         {isStreamingThis && (
                           <span
-                            className={`inline-block w-[2px] h-[1em] ml-0.5 align-text-bottom rounded-full animate-pulse ${
-                              dark ? 'bg-indigo-300' : 'bg-indigo-500'
-                            }`}
+                            className="stream-caret"
                             aria-hidden
                           />
                         )}
@@ -185,7 +203,10 @@ export default function MessageList({
                   {msg.content && !isStreamingThis && (
                     <>
                       {isLast && thoughtSeconds != null && thoughtSeconds > 0 && (
-                        <div
+                        <motion.div
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.25 }}
                           className={`mt-2 text-[12px] font-medium ${
                             dark ? 'text-slate-500' : 'text-slate-400'
                           }`}
@@ -195,7 +216,7 @@ export default function MessageList({
                             : deepSearchActive
                               ? `Researched for ${thoughtSeconds}s`
                               : `Responded in ${thoughtSeconds}s`}
-                        </div>
+                        </motion.div>
                       )}
                       <MessageActions
                         content={msg.content}
@@ -211,20 +232,25 @@ export default function MessageList({
         })}
       </AnimatePresence>
 
-      {isLoading &&
-        !(last?.role === 'assistant' && last?.content) && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <ThinkingStatus
-              prompt={lastUserPrompt}
-              dark={dark}
-              thinkActive={thinkActive}
-              deepSearchActive={deepSearchActive}
-            />
-          </motion.div>
-        )}
+      <AnimatePresence>
+        {isLoading &&
+          !(last?.role === 'assistant' && last?.content) && (
+            <motion.div
+              key="thinking"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.25 }}
+            >
+              <ThinkingStatus
+                prompt={lastUserPrompt}
+                dark={dark}
+                thinkActive={thinkActive}
+                deepSearchActive={deepSearchActive}
+              />
+            </motion.div>
+          )}
+      </AnimatePresence>
 
       <div ref={messagesEndRef} />
     </div>
