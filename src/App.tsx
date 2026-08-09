@@ -13,6 +13,8 @@ import EmptyState from './components/EmptyState'
 import ChatInput from './components/ChatInput'
 import InstallPWA from './components/InstallPWA'
 
+// Deploy fix: EmptyState no longer accepts onSuggestion
+
 const MODELS = [
   {
     id: 'quantum-flash',
@@ -87,7 +89,7 @@ export default function App() {
       const found = MODELS.find((m) => m.id === saved)
       if (found) return found
     } catch { /* ignore */ }
-    return MODELS[1] // Quantum Lite
+    return MODELS[1]
   })
   const [thinkActive, setThinkActive] = useState(false)
   const [deepSearchActive, setDeepSearchActive] = useState(false)
@@ -214,7 +216,6 @@ export default function App() {
   const scrollToBottom = useCallback((smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' })
   }, [])
-  // Only pin to bottom when the user sends (new user message), not while the AI streams
   const prevMsgCount = useRef(0)
   useEffect(() => {
     const count = messages.length
@@ -534,13 +535,13 @@ export default function App() {
           fastActive={selectedModel.id === 'quantum-flash' && !thinkActive}
           onToggleFast={() => {
             setThinkActive(false)
-            selectModel(MODELS[0]) // Flash
+            selectModel(MODELS[0])
           }}
           thinkActive={thinkActive}
           onToggleThink={() => {
             setThinkActive((v) => {
               const next = !v
-              if (next) selectModel(MODELS[2]) // Pro for deep reasoning
+              if (next) selectModel(MODELS[2])
               return next
             })
           }}
