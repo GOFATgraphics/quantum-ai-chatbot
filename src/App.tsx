@@ -14,6 +14,7 @@ import EmptyState from './components/EmptyState'
 import ChatInput, { type PendingFile } from './components/ChatInput'
 import LiveVoice, { type VoiceGender } from './components/LiveVoice'
 import InstallPWA from './components/InstallPWA'
+import CommandPalette from './components/CommandPalette'
 
 // Redeploy trigger
 
@@ -118,6 +119,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
   const [showLiveVoice, setShowLiveVoice] = useState(false)
+  const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [voiceGender, setVoiceGender] = useState<VoiceGender>(() => {
     try {
       const v = localStorage.getItem('quantumy-voice')
@@ -220,6 +222,40 @@ export default function App() {
   useEffect(() => {
     if (messages.length === 0) setGreetingLine((g) => g || creativeGreeting(firstName))
   }, [firstName, messages.length])
+
+  // Fast navigation: Cmd/Ctrl+K, Cmd/Ctrl+N
+  useEffect(() => {
+    if (!user || needsOnboarding) return
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      const isTyping =
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        target?.isContentEditable
+
+      if (mod && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault()
+        setShowCommandPalette((v) => !v)
+        return
+      }
+      if (mod && (e.key === 'n' || e.key === 'N') && !e.shiftKey) {
+        // Allow in inputs only if not typing a lot; still useful globally
+        e.preventDefault()
+        setShowCommandPalette(false)
+        startNewChat()
+        return
+      }
+      if (e.key === '/' && !mod && !isTyping) {
+        e.preventDefault()
+        setShowCommandPalette(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, needsOnboarding, firstName])
 
   const ensureConversation = async (firstUserText: string) => {
     if (currentConversationId) return currentConversationId
@@ -536,6 +572,7 @@ export default function App() {
     onOpenSettings: () => { setShowSettings(true); setMobileSidebar(false) },
     onOpenConnectors: () => { setShowConnectors(true); setMobileSidebar(false) },
     onSelectProject: setCurrentProjectId, onCreateProject: createProject, onDeleteProject: deleteProject,
+    onOpenCommandPalette: () => { setShowCommandPalette(true); setMobileSidebar(false) },
   }
 
   return (
@@ -736,6 +773,22 @@ export default function App() {
 
         <InstallPWA dark={dark} />
       </div>
+
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        dark={dark}
+        conversations={conversations}
+        projects={projects}
+        currentConversationId={currentConversationId}
+        currentProjectId={currentProjectId}
+        onNewChat={startNewChat}
+        onSelectChat={loadMessages}
+        onSelectProject={setCurrentProjectId}
+        onOpenSettings={() => setShowSettings(true)}
+        onOpenConnectors={() => setShowConnectors(true)}
+        onToggleTheme={() => setDark((d) => !d)}
+      />
 
       <AnimatePresence>
         {showSettings && (

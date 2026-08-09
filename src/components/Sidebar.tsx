@@ -24,6 +24,7 @@ type Props = {
   onSelectProject: (id: string | null) => void
   onCreateProject: (name: string) => void
   onDeleteProject: (id: string) => void
+  onOpenCommandPalette?: () => void
   onClose?: () => void
   showClose?: boolean
 }
@@ -31,7 +32,7 @@ type Props = {
 export default function Sidebar({
   dark, user, conversations, projects, currentConversationId, currentProjectId,
   deletingId, onNewChat, onSelectChat, onDeleteChat, onOpenSettings, onOpenConnectors,
-  onSelectProject, onCreateProject, onDeleteProject, onClose, showClose,
+  onSelectProject, onCreateProject, onDeleteProject, onOpenCommandPalette, onClose, showClose,
 }: Props) {
   const [query, setQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
@@ -68,6 +69,14 @@ export default function Sidebar({
     setShowNewProject(false)
   }
 
+  const openSearch = () => {
+    if (onOpenCommandPalette) {
+      onOpenCommandPalette()
+      return
+    }
+    setShowSearch((v) => !v)
+  }
+
   return (
     <div className={`glass-sidebar flex flex-col h-full min-h-0 w-full ${text}`}>
       <div className="flex items-center justify-between px-4 pt-[max(1.1rem,env(safe-area-inset-top))] pb-2 shrink-0">
@@ -91,9 +100,15 @@ export default function Sidebar({
           <SquarePen className="w-[18px] h-[18px]" />
           New chat
         </motion.button>
-        <button onClick={() => setShowSearch((v) => !v)} className={`w-full flex items-center gap-3 h-11 rounded-full px-4 text-[15px] transition ${hover} ${dark ? 'text-slate-300' : 'text-slate-700'}`}>
+        <button
+          onClick={openSearch}
+          className={`w-full flex items-center gap-3 h-11 rounded-full px-4 text-[15px] transition ${hover} ${dark ? 'text-slate-300' : 'text-slate-700'}`}
+        >
           <Search className="w-[18px] h-[18px]" />
-          Search chats
+          <span className="flex-1 text-left">Search chats</span>
+          <kbd className={`hidden sm:inline text-[10px] font-medium px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10 text-slate-400' : 'bg-black/[0.06] text-slate-500'}`}>
+            ⌘K
+          </kbd>
         </button>
         <button onClick={onOpenConnectors} className={`w-full flex items-center gap-3 h-11 rounded-full px-4 text-[15px] transition ${hover} ${dark ? 'text-slate-300' : 'text-slate-700'}`}>
           <Link2 className="w-[18px] h-[18px]" />
@@ -102,7 +117,7 @@ export default function Sidebar({
       </div>
 
       <AnimatePresence>
-        {showSearch && (
+        {showSearch && !onOpenCommandPalette && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
