@@ -278,18 +278,24 @@ export default async function handler(req, res) {
 
     for (let round = 0; round < 4; round++) {
       let data;
+      const maxTokens = (() => {
+        const m = body?.model || '';
+        if (body?.think || m.includes('opus')) return 8192;
+        if (m.includes('haiku')) return 2048;
+        return 4096;
+      })();
       if (wantStream) {
         data = await runClaudeStream({
           apiKey, system: systemPrompt, messages: anthropicMessages,
           tools: tools.length ? tools : undefined, model: body?.model,
-          maxTokens: body?.think ? 8192 : 4096,
+          maxTokens,
           onDelta: (delta) => { try { sseWrite(res, { delta }); } catch (_) {} },
         });
       } else {
         data = await runClaude({
           apiKey, system: systemPrompt, messages: anthropicMessages,
           tools: tools.length ? tools : undefined, model: body?.model,
-          maxTokens: body?.think ? 8192 : 4096,
+          maxTokens,
         });
       }
 
