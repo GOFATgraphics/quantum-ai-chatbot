@@ -533,14 +533,14 @@ export default function App() {
         {mobileSidebar && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/25 z-40 lg:hidden" onClick={() => setMobileSidebar(false)} />
-            <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }} transition={{ type: 'spring', damping: 32, stiffness: 360 }} className="fixed inset-y-0 left-0 z-50 w-[min(320px,90vw)] lg:hidden bg-white shadow-2xl">
+            <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }} transition={{ type: 'spring', damping: 32, stiffness: 360 }} className={`fixed inset-y-0 left-0 z-50 w-[min(320px,90vw)] lg:hidden shadow-2xl ${dark ? "bg-[#16161f]" : "bg-white"}`}>
               <Sidebar {...sidebarProps} showClose onClose={() => setMobileSidebar(false)} />
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
-      <div className={`flex-1 flex flex-col min-w-0 min-h-0 h-full relative overflow-hidden transition-colors duration-500 ${dark ? '' : 'bg-white'}`}>
+      <div className={`flex-1 flex flex-col min-w-0 min-h-0 h-full relative overflow-hidden ${dark ? '' : 'bg-white'}`}>
         <div
           className={`chat-glow ${isLoading ? 'chat-glow--thinking' : isEmpty ? 'chat-glow--idle' : 'chat-glow--done'}`}
           aria-hidden="true"
@@ -550,7 +550,7 @@ export default function App() {
           <span className="chat-glow-orb chat-glow-orb-c" />
         </div>
 
-        <header className={`glass-header sticky top-0 relative pt-[env(safe-area-inset-top)] shrink-0 ${showModelMenu ? 'z-50' : 'z-20'}`}>
+        <header className={`glass-header sticky top-0 pt-[env(safe-area-inset-top)] shrink-0 ${showModelMenu ? 'z-50' : 'z-30'}`}>
           <div className="h-14 grid grid-cols-[1fr_auto_1fr] items-center px-3 gap-2">
             <div className="flex items-center justify-start min-w-0">
               <button
@@ -650,8 +650,13 @@ export default function App() {
         <div className="relative z-10 flex-1 flex flex-col min-h-0">
           {isEmpty ? (
             <div className="relative flex-1 min-h-0 overflow-hidden w-full">
-              <div className="absolute inset-0 flex items-center justify-center px-4 pointer-events-none">
-                <div className="w-full pointer-events-auto">
+              {/*
+                Upper-anchored empty state (not dead-center) so mobile keyboard /
+                focus never scrolls the sticky header away. Orbit + greeting only
+                get a soft nudge via EmptyState composing prop.
+              */}
+              <div className="absolute inset-0 flex flex-col items-center px-4 pt-[min(16vh,120px)] sm:pt-[min(18vh,140px)] pointer-events-none overflow-hidden">
+                <div className="w-full max-w-lg pointer-events-auto">
                   <EmptyState
                     greeting={greetingLine || creativeGreeting(firstName)}
                     dark={dark}
