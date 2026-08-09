@@ -148,7 +148,7 @@ html.glass-on .glass-btn,
 html.glass-on .glass-chip,
 html.glass-on .glass-bubble,
 html.glass-on .glass-menu,
-html.glass-on .glass-surface,
+html.glass-on .glass-surface:not(.composer-surface),
 html.glass-on .glass-card,
 html.glass-on .glass-sheet {
   box-shadow:
@@ -162,7 +162,7 @@ html.glass-on.dark .glass-btn,
 html.glass-on.dark .glass-chip,
 html.glass-on.dark .glass-bubble,
 html.glass-on.dark .glass-menu,
-html.glass-on.dark .glass-surface,
+html.glass-on.dark .glass-surface:not(.composer-surface),
 html.glass-on.dark .glass-card,
 html.glass-on.dark .glass-sheet {
   box-shadow:
@@ -242,7 +242,10 @@ html:not(.glass-on).dark .glass-header {
   display: none !important;
 }
 
-/* Input pill: kill the white hairline border/outline under the whole bar */
+/*
+ * Composer input pill — completely isolated from glass border / hairline rules.
+ * The 0.5px white ring + inset lines from .glass-surface were still visible on iOS.
+ */
 .composer-surface,
 html:not(.dark) .composer-surface,
 html.dark .composer-surface,
@@ -250,21 +253,37 @@ html:not(.glass-on) .composer-surface,
 html.glass-on .composer-surface,
 html.glass-on.dark .composer-surface,
 html:not(.glass-on):not(.dark) .composer-surface,
-html:not(.glass-on).dark .composer-surface {
-  border: none !important;
+html:not(.glass-on).dark .composer-surface,
+html.glass-on .glass-surface.composer-surface,
+html.glass-on.dark .glass-surface.composer-surface {
+  border: 0 !important;
+  border-width: 0 !important;
+  border-style: none !important;
   border-color: transparent !important;
   outline: none !important;
-  /* soft drop only — no 0.5px white ring, no bottom inset line */
+  /* soft drop only — no 0.5px ring, no inset top/bottom lines */
   box-shadow: 0 8px 28px -10px rgba(15, 23, 42, 0.14) !important;
+  -webkit-box-shadow: 0 8px 28px -10px rgba(15, 23, 42, 0.14) !important;
 }
 html.dark .composer-surface,
 html.glass-on.dark .composer-surface,
-html:not(.glass-on).dark .composer-surface {
+html:not(.glass-on).dark .composer-surface,
+html.glass-on.dark .glass-surface.composer-surface {
   box-shadow: 0 12px 36px -12px rgba(0, 0, 0, 0.5) !important;
+  -webkit-box-shadow: 0 12px 36px -12px rgba(0, 0, 0, 0.5) !important;
 }
-html.glass-on .composer-surface::before {
+/* Kill the glass shine pseudo-element on the composer */
+html.glass-on .composer-surface::before,
+html.glass-on .glass-surface.composer-surface::before {
   display: none !important;
   content: none !important;
+  opacity: 0 !important;
+  background: none !important;
+}
+/* Also neutralize any ring utility that might leak when not focused */
+.composer-surface:not(:focus-within) {
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
 }
 
 .glass-sidebar { transition: background 0.3s ease, border-color 0.3s ease; }
@@ -424,36 +443,50 @@ html:not(.glass-on).dark .glass-card {
   box-shadow: none;
 }
 
-html:not(.dark) .glass-surface {
+html:not(.dark) .glass-surface:not(.composer-surface) {
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(226, 232, 240, 0.9);
   color: #0f172a;
 }
-html.dark .glass-surface {
+html.dark .glass-surface:not(.composer-surface) {
   background: rgba(22, 22, 31, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.16);
 }
-html:not(.glass-on):not(.dark) .glass-surface {
+html:not(.glass-on):not(.dark) .glass-surface:not(.composer-surface) {
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 12px 40px rgba(79, 70, 229, 0.08);
 }
-html:not(.glass-on).dark .glass-surface {
+html:not(.glass-on).dark .glass-surface:not(.composer-surface) {
   background: rgba(22, 22, 31, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.45);
 }
 
+/* Composer background (no border) */
+html:not(.dark) .composer-surface {
+  background: rgba(255, 255, 255, 0.96) !important;
+}
+html.dark .composer-surface {
+  background: rgba(22, 22, 31, 0.85) !important;
+}
+html:not(.glass-on):not(.dark) .composer-surface {
+  background: rgba(255, 255, 255, 0.98) !important;
+}
+html:not(.glass-on).dark .composer-surface {
+  background: rgba(22, 22, 31, 0.98) !important;
+}
+
 html.glass-on .glass-panel,
 html.glass-on .glass-menu,
-html.glass-on .glass-surface,
+html.glass-on .glass-surface:not(.composer-surface),
 html.glass-on .glass-sheet {
   position: relative;
   overflow: hidden;
 }
 html.glass-on .glass-panel::before,
 html.glass-on .glass-menu::before,
-html.glass-on .glass-surface::before,
+html.glass-on .glass-surface:not(.composer-surface)::before,
 html.glass-on .glass-sheet::before {
   content: '';
   position: absolute;
@@ -471,7 +504,7 @@ html.glass-on .glass-sheet::before {
 }
 html.glass-on .glass-panel > *,
 html.glass-on .glass-menu > *,
-html.glass-on .glass-surface > *,
+html.glass-on .glass-surface:not(.composer-surface) > *,
 html.glass-on .glass-sheet > * {
   position: relative;
   z-index: 1;
