@@ -163,17 +163,15 @@ export default function ChatInput({
     onFilesChange(pendingFiles.filter((_, i) => i !== idx))
   }
 
-  const toolBtn = dark
-    ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.12]'
-    : 'bg-slate-100/80 text-slate-600 hover:bg-slate-100'
+  const toolBtn = `glass-btn ${dark ? 'text-slate-200' : 'text-slate-600'}`
 
   return (
     <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <div className="max-w-2xl mx-auto">
         {errorHint && (
           <p
-            className={`text-xs text-center mb-2 px-3 py-1.5 rounded-full mx-auto w-fit ${
-              dark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-800'
+            className={`glass-chip text-xs text-center mb-2 px-3 py-1.5 rounded-full mx-auto w-fit ${
+              dark ? 'text-amber-300' : 'text-amber-800'
             }`}
             role="status"
           >
@@ -182,17 +180,11 @@ export default function ChatInput({
         )}
         <div
           className={`glass-surface rounded-[26px] px-3 pt-3 pb-2.5 transition-all duration-200 ${
-            dark
-              ? `bg-[#16161f]/92 border shadow-xl shadow-black/40 ${
-                  focused || listening
-                    ? 'border-indigo-400/30 shadow-indigo-500/10'
-                    : 'border-white/[0.08]'
-                }`
-              : `bg-white/90 border shadow-[0_12px_40px_rgba(79,70,229,0.08)] ${
-                  focused || listening
-                    ? 'border-indigo-300/50 shadow-[0_12px_40px_rgba(99,102,241,0.12)]'
-                    : 'border-white/80'
-                }`
+            focused || listening
+              ? dark
+                ? 'ring-1 ring-indigo-400/30'
+                : 'ring-1 ring-indigo-300/40'
+              : ''
           }`}
         >
           {pendingFiles.length > 0 && (
@@ -200,9 +192,9 @@ export default function ChatInput({
               {pendingFiles.map((f, idx) => (
                 <div
                   key={`${f.name}-${idx}`}
-                  className={`relative group rounded-xl overflow-hidden ${
+                  className={`relative group rounded-xl overflow-hidden glass-panel ${
                     f.dataUrl ? 'w-[72px] h-[72px]' : ''
-                  } ${dark ? 'bg-white/10' : 'bg-slate-100'}`}
+                  }`}
                 >
                   {f.dataUrl ? (
                     <img src={f.dataUrl} alt={f.name} className="w-full h-full object-cover" />
@@ -223,9 +215,7 @@ export default function ChatInput({
                   <button
                     type="button"
                     onClick={() => removeFile(idx)}
-                    className={`absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center ${
-                      dark ? 'bg-black/60 text-white' : 'bg-black/50 text-white'
-                    }`}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center bg-black/50 text-white"
                     aria-label={`Remove ${f.name}`}
                   >
                     <X className="w-3 h-3" />
