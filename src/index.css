@@ -108,6 +108,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 /* ═══════════════════════════════════════════
    GLASSMORPHISM DESIGN SYSTEM
+   Toggle: html.glass-on (Settings → Appearance)
    ═══════════════════════════════════════════ */
 
 /* Core blur engine — only when glass is on */
@@ -379,8 +380,20 @@ html.dark .glass-sheet {
     0 1px 0 rgba(255, 255, 255, 0.04) inset,
     0 24px 64px -16px rgba(0, 0, 0, 0.6);
 }
+html:not(.glass-on):not(.dark) .glass-sheet {
+  background: #f2f2f7;
+}
+html:not(.glass-on).dark .glass-sheet {
+  background: #0a0a0c;
+}
+html:not(.glass-on):not(.dark) .glass-card {
+  background: rgba(255, 255, 255, 0.95);
+}
+html:not(.glass-on).dark .glass-card {
+  background: #1c1c24;
+}
 
-/* ── Glass input composer ── */
+/* ── Glass input composer (typing bar) ── */
 html:not(.dark) .glass-surface {
   background: rgba(255, 255, 255, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.85);
