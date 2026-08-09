@@ -227,7 +227,7 @@ html:not(.glass-on).dark .glass-header {
   background: transparent !important;
 }
 
-/* Composer footer — fully transparent, no lines */
+/* Composer footer — transparent, no separator line */
 .composer-footer {
   border: none !important;
   border-top: none !important;
@@ -243,40 +243,50 @@ html:not(.glass-on).dark .glass-header {
 }
 
 /*
- * Gemini-style composer pill — iOS Safari hairline fix
- *
- * iOS draws a 1px fringe on elements that combine:
- *   border-radius + opaque bg + box-shadow
- * Fix: no box-shadow on the pill itself (drop-shadow on parent),
- * promote to its own compositing layer, force clip.
+ * Typing bar — border + soft shadow
  */
 .composer-surface {
-  border: 0 !important;
-  border-width: 0 !important;
-  border-style: none !important;
-  border-color: transparent !important;
-  outline: none !important;
-  box-shadow: none !important;
-  -webkit-box-shadow: none !important;
-  -webkit-appearance: none !important;
-  appearance: none !important;
-  --tw-ring-shadow: 0 0 #0000 !important;
-  --tw-ring-offset-shadow: 0 0 #0000 !important;
-  --tw-shadow: 0 0 #0000 !important;
-  /* Own layer — kills subpixel fringe on iOS */
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  backfaceVisibility: hidden;
-  isolation: isolate;
-  -webkit-background-clip: padding-box;
-  background-clip: padding-box;
-  overflow: hidden;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 .composer-surface::before,
 .composer-surface::after {
   content: none !important;
   display: none !important;
+}
+
+/* Light mode */
+html:not(.dark) .composer-surface {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px -6px rgba(15, 23, 42, 0.1);
+}
+html:not(.dark).glass-on .composer-surface {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 10px 28px -8px rgba(15, 23, 42, 0.12);
+}
+
+/* Dark mode */
+html.dark .composer-surface {
+  background: rgba(28, 28, 36, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 10px 28px -6px rgba(0, 0, 0, 0.45);
+}
+html.dark.glass-on .composer-surface {
+  background: rgba(28, 28, 36, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    0 12px 32px -8px rgba(0, 0, 0, 0.5);
 }
 
 .glass-sidebar { transition: background 0.3s ease, border-color 0.3s ease; }
