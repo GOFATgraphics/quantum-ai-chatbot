@@ -1,0 +1,122 @@
+/* Composer footer — transparent, no separator line */
+.composer-footer {
+  border: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+.composer-footer::before,
+.composer-footer::after {
+  content: none !important;
+  display: none !important;
+}
+
+/*
+ * Typing bar — border + soft shadow
+ */
+.composer-surface {
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px rgba(15, 23, 42, 0.06);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+html.dark .composer-surface {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 8px 28px rgba(0, 0, 0, 0.28);
+}
+.composer-surface:focus-within {
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow:
+    0 0 0 3px rgba(99, 102, 241, 0.12),
+    0 8px 24px rgba(15, 23, 42, 0.08);
+}
+html.dark .composer-surface:focus-within {
+  border-color: rgba(129, 140, 248, 0.45);
+  box-shadow:
+    0 0 0 3px rgba(99, 102, 241, 0.18),
+    0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* Glass buttons / menu / sheet — essential styles */
+.glass-btn {
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.glass-btn:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+html.dark .glass-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.glass-btn:active {
+  transform: scale(0.96);
+}
+
+.glass-menu {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(226, 232, 240, 0.98);
+  color: #0f172a;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+html.dark .glass-menu {
+  background: rgba(22, 22, 31, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.glass-sheet {
+  background: #fff;
+  color: #0f172a;
+}
+html.dark .glass-sheet {
+  background: #16161f;
+  color: #f1f5f9;
+}
+html.glass-on:not(.dark) .glass-sheet {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+html.glass-on.dark .glass-sheet {
+  background: rgba(22, 22, 31, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Theme tokens used by components */
+:root {
+  --q-surface: #ffffff;
+  --q-surface-2: #f8fafc;
+  --q-border: rgba(15, 23, 42, 0.08);
+  --q-text: #0f172a;
+  --q-muted: #64748b;
+}
+html.dark {
+  --q-surface: #16161f;
+  --q-surface-2: #222228;
+  --q-border: rgba(255, 255, 255, 0.08);
+  --q-text: #ececf1;
+  --q-muted: #a1a1aa;
+}
+
+/* Scrollbar polish */
+main::-webkit-scrollbar {
+  width: 6px;
+}
+main::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+html.dark main::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.7);
+}
