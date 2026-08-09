@@ -676,14 +676,10 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Empty: center greeting+bar on md+; on phone bar stays at bottom. With messages: bar at bottom. */}
-        <div
-          className={`relative z-10 flex-1 flex flex-col min-h-0 ${
-            isEmpty ? 'md:justify-center' : ''
-          }`}
-        >
+        {/* Typing bar always at bottom; logo/greeting centered in remaining space when empty */}
+        <div className="relative z-10 flex-1 flex flex-col min-h-0">
           {isEmpty ? (
-            <div className="flex flex-col items-center justify-center flex-1 md:flex-none w-full px-4">
+            <div className="flex-1 flex flex-col items-center justify-center w-full px-4 min-h-0">
               <EmptyState
                 greeting={greetingLine || creativeGreeting(firstName)}
                 dark={dark}
@@ -707,13 +703,7 @@ export default function App() {
             </main>
           )}
 
-          <div
-            className={
-              isEmpty
-                ? 'shrink-0 w-full md:max-w-2xl md:mx-auto md:mt-6 md:px-4'
-                : 'shrink-0'
-            }
-          >
+          <div className="shrink-0">
             <ChatInput
               value={input}
               onChange={setInput}
