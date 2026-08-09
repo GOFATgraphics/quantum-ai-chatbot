@@ -1,5 +1,6 @@
 import { useState, type RefObject } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { FileText } from 'lucide-react'
 import MessageActions from './MessageActions'
 import ThinkingStatus from './ThinkingStatus'
 import { formatMarkdown } from '../lib/markdown'
@@ -8,10 +9,46 @@ export type ChatMessage = { id: string; role: 'user' | 'assistant'; content: str
 
 const USER_SNIPPET_LEN = 220
 
+/** Split user content into text segments and image attachments */
+function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] {
+  const parts: { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] = []
+  // Match markdown images: ![alt](src) including data URLs
+  const imgRe = /!\[([^\]]*)\]\(([^)]+)\)/g
+  let last = 0
+  let m: RegExpExecArray | null
+  while ((m = imgRe.exec(content)) !== null) {
+    if (m.index > last) {
+      const text = content.slice(last, m.index).trim()
+      if (text) parts.push({ type: 'text', value: text })
+    }
+    parts.push({ type: 'image', value: m[2], alt: m[1] || 'Image' })
+    last = m.index + m[0].length
+  }
+  const rest = content.slice(last).trim()
+  if (rest) {
+    // Detect file-style attachments that aren't images
+    if (/^📎\s*\*\*/.test(rest) || /^---\s*File:/.test(rest) || /^\[File attached:/.test(rest) || /^\[Image attached:/.test(rest)) {
+      parts.push({ type: 'file', value: rest })
+    } else {
+      parts.push({ type: 'text', value: rest })
+    }
+  }
+  if (parts.length === 0 && content.trim()) {
+    parts.push({ type: 'text', value: content })
+  }
+  return parts
+}
+
 function UserBubble({ content, dark }: { content: string; dark: boolean }) {
   const [expanded, setExpanded] = useState(false)
-  const long = content.length > USER_SNIPPET_LEN
-  const shown = !long || expanded ? content : content.slice(0, USER_SNIPPET_LEN).trimEnd() + '…'
+  const segments = parseUserContent(content)
+
+  const textOnly = segments
+    .filter((s) => s.type === 'text')
+    .map((s) => s.value)
+    .join('\n\n')
+  const long = textOnly.length > USER_SNIPPET_LEN
+  const shownText = !long || expanded ? textOnly : textOnly.slice(0, USER_SNIPPET_LEN).trimEnd() + '…'
 
   return (
     <div
@@ -21,7 +58,52 @@ function UserBubble({ content, dark }: { content: string; dark: boolean }) {
           : 'bg-white/90 text-slate-900 border border-black/[0.04] shadow-[0_2px_12px_rgba(15,23,42,0.04)]'
       }`}
     >
-      <div className="whitespace-pre-wrap break-words">{shown}</div>
+      <div className="space-y-2">
+        {segments.map((seg, i) => {
+          if (seg.type === 'image') {
+            return (
+              <a
+                key={i}
+                href={seg.value}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block overflow-hidden rounded-xl -mx-1"
+              >
+                <img
+                  src={seg.value}
+                  alt={seg.alt || 'Attached image'}
+                  className="max-w-full max-h-[280px] object-contain rounded-xl"
+                  loading="lazy"
+                />
+              </a>
+            )
+          }
+          if (seg.type === 'file') {
+            // Extract a friendly name if present
+            const nameMatch =
+              seg.value.match(/\*\*([^*]+)\*\*/) ||
+              seg.value.match(/File:\s*([^\n-]+)/) ||
+              seg.value.match(/\[(?:File|Image) attached:\s*([^\]]+)\]/)
+            const name = nameMatch?.[1]?.trim() || 'Attachment'
+            return (
+              <div
+                key={i}
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium ${
+                  dark ? 'bg-white/10 text-slate-200' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                <FileText className="w-4 h-4 shrink-0 opacity-70" />
+                <span className="truncate">{name}</span>
+              </div>
+            )
+          }
+          // text — only render once for the combined shownText
+          return null
+        })}
+        {shownText && (
+          <div className="whitespace-pre-wrap break-words">{shownText}</div>
+        )}
+      </div>
       {long && (
         <button
           type="button"
