@@ -30,6 +30,131 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Fixed animated gradient mesh behind the app */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -20%;
+  width: 140%;
+  height: 140%;
+  z-index: -1;
+  pointer-events: none;
+  will-change: background-position, transform;
+  background-repeat: no-repeat;
+  animation: gradient-mesh 28s ease-in-out infinite;
+}
+
+html:not(.dark) body {
+  background-color: #f4f5fb;
+  color: #0f172a;
+}
+html:not(.dark) body::before {
+  background:
+    radial-gradient(ellipse 55% 45% at 20% 15%, rgba(129, 140, 248, 0.42), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 20%, rgba(167, 139, 250, 0.32), transparent 55%),
+    radial-gradient(ellipse 45% 40% at 10% 80%, rgba(196, 181, 253, 0.36), transparent 55%),
+    radial-gradient(ellipse 40% 35% at 75% 85%, rgba(56, 189, 248, 0.18), transparent 50%),
+    radial-gradient(ellipse 35% 30% at 50% 50%, rgba(165, 180, 252, 0.2), transparent 50%),
+    linear-gradient(180deg, #f0f0ff 0%, #eef2ff 40%, #f8fafc 100%);
+  background-size:
+    140% 140%,
+    130% 130%,
+    140% 140%,
+    120% 120%,
+    150% 150%,
+    100% 100%;
+  background-position:
+    0% 20%,
+    100% 0%,
+    0% 100%,
+    100% 100%,
+    50% 50%,
+    0% 0%;
+}
+
+html.dark,
+html.dark body,
+html.dark #root {
+  background-color: #111114 !important;
+  color: #ececf1;
+}
+html.dark body {
+  background-color: #111114;
+  color: #ececf1;
+}
+html.dark body::before {
+  background:
+    radial-gradient(ellipse 55% 45% at 25% 10%, rgba(99, 102, 241, 0.22), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 90% 25%, rgba(139, 92, 246, 0.16), transparent 55%),
+    radial-gradient(ellipse 45% 40% at 5% 85%, rgba(129, 140, 248, 0.14), transparent 55%),
+    radial-gradient(ellipse 40% 35% at 80% 90%, rgba(56, 189, 248, 0.08), transparent 50%),
+    radial-gradient(ellipse 35% 30% at 50% 55%, rgba(99, 102, 241, 0.1), transparent 50%),
+    #111114;
+  background-size:
+    140% 140%,
+    130% 130%,
+    140% 140%,
+    120% 120%,
+    150% 150%,
+    100% 100%;
+  background-position:
+    0% 20%,
+    100% 0%,
+    0% 100%,
+    100% 100%,
+    50% 50%,
+    0% 0%;
+}
+
+@keyframes gradient-mesh {
+  0%, 100% {
+    background-position:
+      0% 20%,
+      100% 0%,
+      0% 100%,
+      100% 100%,
+      50% 50%,
+      0% 0%;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  25% {
+    background-position:
+      30% 5%,
+      70% 25%,
+      15% 70%,
+      85% 80%,
+      40% 60%,
+      0% 0%;
+    transform: translate3d(-1.5%, 1%, 0) scale(1.03);
+  }
+  50% {
+    background-position:
+      60% 30%,
+      40% 10%,
+      25% 55%,
+      70% 65%,
+      55% 40%,
+      0% 0%;
+    transform: translate3d(1%, -1.5%, 0) scale(1.05);
+  }
+  75% {
+    background-position:
+      20% 40%,
+      90% 15%,
+      5% 90%,
+      60% 75%,
+      45% 55%,
+      0% 0%;
+    transform: translate3d(-1%, 0.5%, 0) scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none !important;
+  }
+}
+
 ::selection {
   background: rgba(99, 102, 241, 0.25);
   color: inherit;
@@ -40,30 +165,6 @@ html.dark ::selection {
 
 input, textarea, button, select {
   font-size: 16px;
-}
-
-html:not(.dark) body {
-  background:
-    radial-gradient(ellipse 100% 80% at 50% -20%, rgba(129, 140, 248, 0.32), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 100% 15%, rgba(167, 139, 250, 0.18), transparent 50%),
-    radial-gradient(ellipse 55% 45% at 0% 85%, rgba(196, 181, 253, 0.22), transparent 50%),
-    radial-gradient(ellipse 40% 30% at 80% 90%, rgba(56, 189, 248, 0.08), transparent 50%),
-    linear-gradient(180deg, #f0f0ff 0%, #eef2ff 35%, #f8fafc 100%);
-  color: #0f172a;
-}
-
-html.dark,
-html.dark body,
-html.dark #root {
-  background-color: #111114 !important;
-  color: #ececf1;
-}
-html.dark body {
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.12), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 100% 80%, rgba(139, 92, 246, 0.08), transparent 50%);
-  background-color: #111114;
-  color: #ececf1;
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
