@@ -567,7 +567,14 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative overflow-hidden">
+        {/* Ambient glowing gradient in chat layout */}
+        <div className="chat-glow" aria-hidden="true">
+          <span className="chat-glow-orb chat-glow-orb-a" />
+          <span className="chat-glow-orb chat-glow-orb-b" />
+          <span className="chat-glow-orb chat-glow-orb-c" />
+        </div>
+
         <header className={`glass-header relative pt-[env(safe-area-inset-top)] shrink-0 ${showModelMenu ? 'z-50' : 'z-10'}`}>
           <div className="h-14 grid grid-cols-[1fr_auto_1fr] items-center px-3 gap-2">
             {/* Left: mobile menu */}
