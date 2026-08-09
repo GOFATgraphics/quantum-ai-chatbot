@@ -10,6 +10,25 @@ function readStoredMode(): ThemeMode {
   return 'system'
 }
 
+function applyThemeDom(dark: boolean, themeMode: ThemeMode) {
+  const root = document.documentElement
+  root.classList.toggle('dark', dark)
+  // Instant switch — no CSS transition on theme tokens
+  root.style.setProperty('color-scheme', dark ? 'dark' : 'light')
+  const appRoot = document.getElementById('root')
+  if (appRoot) {
+    appRoot.style.background = dark ? '#111114' : 'transparent'
+    appRoot.style.color = dark ? '#ececf1' : ''
+  }
+  document.body.style.backgroundColor = dark ? '#111114' : ''
+  document.body.style.color = dark ? '#f1f5f9' : ''
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', dark ? '#111114' : '#eef2ff')
+  try {
+    localStorage.setItem('quantumy-theme', themeMode)
+  } catch { /* ignore */ }
+}
+
 export function useTheme() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(readStoredMode)
   const [systemDark, setSystemDark] = useState(() =>
@@ -29,28 +48,26 @@ export function useTheme() {
     }
   }, [])
 
+  // Apply immediately on every theme change (no transition delay)
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-    const root = document.getElementById('root')
-    if (root) {
-      root.style.background = dark ? '#111114' : 'transparent'
-      root.style.color = dark ? '#ececf1' : ''
-    }
-    document.body.style.backgroundColor = dark ? '#111114' : ''
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', dark ? '#111114' : '#eef2ff')
-    try {
-      localStorage.setItem('quantumy-theme', themeMode)
-    } catch { /* ignore */ }
+    applyThemeDom(dark, themeMode)
   }, [dark, themeMode])
 
   const cycleTheme = () => {
-    setThemeMode((m) => (m === 'system' ? 'light' : m === 'light' ? 'dark' : 'system'))
+    setThemeMode((m) => {
+      const next = m === 'system' ? 'light' : m === 'light' ? 'dark' : 'system'
+      const nextDark = next === 'dark' || (next === 'system' && systemDark)
+      // Synchronous DOM update so the switch feels instant
+      applyThemeDom(nextDark, next)
+      return next
+    })
   }
 
   const setDark = (updater: boolean | ((d: boolean) => boolean)) => {
     const next = typeof updater === 'function' ? updater(dark) : updater
-    setThemeMode(next ? 'dark' : 'light')
+    const mode: ThemeMode = next ? 'dark' : 'light'
+    applyThemeDom(next, mode)
+    setThemeMode(mode)
   }
 
   return { dark, themeMode, setThemeMode, setDark, cycleTheme, systemDark }

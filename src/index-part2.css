@@ -93,6 +93,60 @@ html.glass-on.dark .glass-sheet {
   -webkit-backdrop-filter: blur(20px);
 }
 
+/* Sidebar surfaces — solid readable colors in both themes */
+.glass-sidebar {
+  background: #f8f9fc;
+  border-right: 1px solid rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+}
+html.dark .glass-sidebar {
+  background: #16161f;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  color: #f1f5f9;
+}
+html.glass-on:not(.dark) .glass-sidebar {
+  background: rgba(248, 249, 252, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+html.glass-on.dark .glass-sidebar {
+  background: rgba(22, 22, 31, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-surface,
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+html.dark .glass-surface,
+html.dark .glass-panel {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+html.glass-on:not(.dark) .glass-surface,
+html.glass-on:not(.dark) .glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+html.glass-on.dark .glass-surface,
+html.glass-on.dark .glass-panel {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-chip {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+html.dark .glass-chip {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 /* Theme tokens used by components */
 :root {
   --q-surface: #ffffff;
@@ -100,6 +154,7 @@ html.glass-on.dark .glass-sheet {
   --q-border: rgba(15, 23, 42, 0.08);
   --q-text: #0f172a;
   --q-muted: #64748b;
+  --q-sidebar: #f8f9fc;
 }
 html.dark {
   --q-surface: #16161f;
@@ -107,6 +162,7 @@ html.dark {
   --q-border: rgba(255, 255, 255, 0.08);
   --q-text: #ececf1;
   --q-muted: #a1a1aa;
+  --q-sidebar: #16161f;
 }
 
 /* Scrollbar polish */
