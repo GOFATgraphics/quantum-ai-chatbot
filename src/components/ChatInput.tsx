@@ -166,7 +166,7 @@ export default function ChatInput({
   const toolBtn = `glass-btn ${dark ? 'text-slate-200' : 'text-slate-600'}`
 
   return (
-    <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="max-w-2xl mx-auto">
         <AnimatePresence>
           {errorHint && (
@@ -183,6 +183,7 @@ export default function ChatInput({
             </motion.p>
           )}
         </AnimatePresence>
+
         <motion.div
           animate={{
             boxShadow: focused || listening
@@ -192,8 +193,9 @@ export default function ChatInput({
               : '0 0 0 0px transparent',
           }}
           transition={{ duration: 0.25 }}
-          className="glass-surface composer-surface rounded-[26px] px-3 pt-3 pb-2.5"
+          className="glass-surface composer-surface rounded-[26px] px-3 pt-2.5 pb-2"
         >
+          {/* Pending file previews */}
           <AnimatePresence initial={false}>
             {pendingFiles.length > 0 && (
               <motion.div
@@ -245,66 +247,72 @@ export default function ChatInput({
             )}
           </AnimatePresence>
 
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={onKeyDown}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            rows={1}
-            placeholder={listening ? 'Listening…' : 'Ask anything'}
-            className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 ${
-              dark
-                ? 'text-slate-50 placeholder:text-slate-500'
-                : 'text-slate-900 placeholder:text-slate-400'
-            }`}
-          />
-
-          <div className="mt-2.5 flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*"
-              className="hidden"
-              onChange={onFileSelected}
-            />
-
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.92 }}
-                onClick={onPickFiles}
-                disabled={isLoading}
-                title="Attach files"
-                className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${toolBtn}`}
-                aria-label="Add attachment"
-              >
-                <Plus className="w-[18px] h-[18px]" />
-              </motion.button>
-
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.92 }}
-                onClick={toggleListen}
-                disabled={!speechSupported || isLoading}
-                title={listening ? 'Stop dictation' : 'Dictate with mic'}
-                className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${
-                  listening
-                    ? dark
-                      ? 'bg-rose-500/25 text-rose-200 ring-1 ring-rose-400/40'
-                      : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
-                    : toolBtn
+          {/* Typing area + action buttons row */}
+          <div className="flex items-end gap-2">
+            {/* Left tools + textarea */}
+            <div className="flex-1 min-w-0 flex flex-col">
+              <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onKeyDown={onKeyDown}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                rows={1}
+                placeholder={listening ? 'Listening…' : 'Ask anything'}
+                className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 py-1.5 ${
+                  dark
+                    ? 'text-slate-50 placeholder:text-slate-500'
+                    : 'text-slate-900 placeholder:text-slate-400'
                 }`}
-                aria-label={listening ? 'Stop listening' : 'Speech to text'}
-                aria-pressed={listening}
-              >
-                {listening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
-              </motion.button>
+              />
+
+              {/* Bottom tools row (Plus + Mic) – sits tightly under the text */}
+              <div className="flex items-center gap-1.5 pt-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*"
+                  className="hidden"
+                  onChange={onFileSelected}
+                />
+
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.92 }}
+                  onClick={onPickFiles}
+                  disabled={isLoading}
+                  title="Attach files"
+                  className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${toolBtn}`}
+                  aria-label="Add attachment"
+                >
+                  <Plus className="w-[18px] h-[18px]" />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.92 }}
+                  onClick={toggleListen}
+                  disabled={!speechSupported || isLoading}
+                  title={listening ? 'Stop dictation' : 'Dictate with mic'}
+                  className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${
+                    listening
+                      ? dark
+                        ? 'bg-rose-500/25 text-rose-200 ring-1 ring-rose-400/40'
+                        : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
+                      : toolBtn
+                  }`}
+                  aria-label={listening ? 'Stop listening' : 'Speech to text'}
+                  aria-pressed={listening}
+                >
+                  {listening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
+                </motion.button>
+              </div>
             </div>
 
-            <div className="shrink-0 min-w-[88px] flex justify-end">
+            {/* Right primary action button – always aligned to the bottom of the composer */}
+            <div className="shrink-0 pb-0.5">
               <AnimatePresence mode="wait" initial={false}>
                 {isLoading ? (
                   <motion.button
