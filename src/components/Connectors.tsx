@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { supabase, CONNECTOR_CATALOG, type Connector } from '../lib/supabase'
 import {
   GmailIcon, DriveIcon, SheetsIcon, DocsIcon, CalendarIcon, OutlookIcon, ExcelIcon,
@@ -27,6 +28,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [justConnected, setJustConnected] = useState<string | null>(null)
 
   const bg = dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
   const textMain = dark ? 'text-white' : 'text-slate-900'
@@ -48,8 +50,13 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
   useEffect(() => {
     load()
     const params = new URLSearchParams(window.location.search)
-    if (params.get('connected') || params.get('connector_error')) {
+    const connected = params.get('connected')
+    if (connected || params.get('connector_error')) {
       load()
+      if (connected) {
+        setJustConnected(connected)
+        setTimeout(() => setJustConnected(null), 2200)
+      }
       const url = new URL(window.location.href)
       url.searchParams.delete('connected')
       url.searchParams.delete('connector_error')
@@ -114,7 +121,6 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
 
   return (
     <div className={`flex flex-col h-full min-h-0 ${bg}`}>
-      {/* Header — matches Grok sheet */}
       <div className="relative flex items-center justify-center h-[52px] shrink-0 px-4">
         <button
           type="button"
@@ -132,14 +138,38 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-6">
+        <AnimatePresence>
+          {justConnected && (
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6 }}
+              className={`rounded-2xl px-4 py-3 text-[14px] flex items-center gap-2 ${
+                dark ? 'bg-emerald-500/15 text-emerald-200' : 'bg-emerald-50 text-emerald-800'
+              }`}
+            >
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+              >
+                <Check className="w-4 h-4" />
+              </motion.span>
+              Connected successfully
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {error && (
-          <div
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
             className={`rounded-2xl px-4 py-3 text-[14px] ${
               dark ? 'bg-amber-500/10 text-amber-200' : 'bg-amber-50 text-amber-800'
             }`}
           >
             {error}
-          </div>
+          </motion.div>
         )}
 
         {loading ? (
@@ -147,12 +177,23 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
             <Loader2 className={`w-6 h-6 animate-spin ${textMuted}`} />
           </div>
         ) : selectedItem ? (
-          /* Detail for a connected app */
-          <div className="space-y-4">
+          <motion.div
+            key={selectedItem.provider}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -12 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-4"
+          >
             <div className={`rounded-2xl ${card} px-4 py-6 flex flex-col items-center text-center`}>
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${iconBg}`}>
+              <motion.div
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+                className={`w-16 h-16 rounded-2xl flex items-center justify-center ${iconBg}`}
+              >
                 {BRAND[selectedItem.provider]}
-              </div>
+              </motion.div>
               <p className={`mt-3 text-[18px] font-semibold ${textMain}`}>{selectedItem.name}</p>
               <p className={`text-[14px] mt-1 ${textMuted}`}>
                 {selectedConn?.account_email || selectedItem.description}
@@ -171,18 +212,21 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                 'Disconnect'
               )}
             </button>
-          </div>
+          </motion.div>
         ) : (
           <>
-            {/* Connected — Grok style: icon + name + chevron */}
             {connectedList.length > 0 && (
               <div>
                 <p className={`text-[13px] font-medium px-1 mb-2 ${textMuted}`}>Connected</p>
                 <div className={`rounded-[20px] overflow-hidden ${card}`}>
                   {connectedList.map((item, i) => (
-                    <button
+                    <motion.button
                       key={item.provider}
                       type="button"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.04, duration: 0.25 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => setSelected(item.provider)}
                       className={`w-full flex items-center gap-3.5 px-3.5 py-[14px] text-left active:opacity-80 ${
                         i < connectedList.length - 1 ? `border-b ${rowBorder}` : ''
@@ -197,13 +241,12 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                       <ChevronRight
                         className={`w-[18px] h-[18px] shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`}
                       />
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Suggested — Grok style: icon + name + Connect pill */}
             {suggestedList.length > 0 && (
               <div>
                 <p className={`text-[13px] font-medium px-1 mb-2 ${textMuted}`}>Suggested</p>
@@ -211,8 +254,11 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                   {suggestedList.map((item, i) => {
                     const isBusy = busy === item.provider
                     return (
-                      <div
+                      <motion.div
                         key={item.provider}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.05 + i * 0.04, duration: 0.25 }}
                         className={`flex items-center gap-3.5 px-3.5 py-[14px] ${
                           i < suggestedList.length - 1 ? `border-b ${rowBorder}` : ''
                         }`}
@@ -223,8 +269,9 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                           {BRAND[item.provider]}
                         </div>
                         <p className={`flex-1 text-[16px] font-medium ${textMain}`}>{item.name}</p>
-                        <button
+                        <motion.button
                           type="button"
+                          whileTap={{ scale: 0.94 }}
                           onClick={() => connect(item.provider)}
                           disabled={isBusy}
                           className={`shrink-0 h-[30px] px-3.5 rounded-full text-[13px] font-medium transition disabled:opacity-50 ${
@@ -238,8 +285,8 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                           ) : (
                             'Connect'
                           )}
-                        </button>
-                      </div>
+                        </motion.button>
+                      </motion.div>
                     )
                   })}
                 </div>
