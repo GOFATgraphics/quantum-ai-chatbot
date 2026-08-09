@@ -43,29 +43,13 @@ function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
-/** Work-focused greetings — personalized with first name when available */
-const GREETINGS = [
-  (n: string) => `What email draft should we review and send${n}?`,
-  (n: string) => `Which client document should we open next${n}?`,
-  (n: string) => `What data are we updating in the spreadsheet${n}?`,
-  (n: string) => `Shall we organize our priority inbox for today${n}?`,
-  (n: string) => `What project proposal are we drafting in Google Docs${n}?`,
-  (n: string) => `Which unread email thread requires our immediate response${n}?`,
-  (n: string) => `What monthly report are we compiling in Excel${n}?`,
-  (n: string) => `Shall we check incoming messages in Outlook${n}?`,
-  (n: string) => `What file in Google Drive needs our attention${n}?`,
-  (n: string) => `Which team update should we send out this morning${n}?`,
-  (n: string) => `What financial figures are we analyzing in the spreadsheet${n}?`,
-  (n: string) => `Shall we draft a follow-up message for the client${n}?`,
-  (n: string) => `What contract or agreement are we reviewing today${n}?`,
-  (n: string) => `Which meeting summary should we generate and email${n}?`,
-  (n: string) => `What operational workflow are we documenting next${n}?`,
-]
-
+/** Simple personalized greeting */
 function creativeGreeting(firstName: string) {
   const n = (firstName || '').trim()
-  const suffix = n && n.toLowerCase() !== 'there' ? `, ${n}` : ''
-  return GREETINGS[Math.floor(Math.random() * GREETINGS.length)](suffix)
+  if (n && n.toLowerCase() !== 'there') {
+    return `What can I help you with today, ${n}?`
+  }
+  return 'What can I help you with today?'
 }
 
 /** Build user message content that preserves displayable attachments */
@@ -671,7 +655,8 @@ export default function App() {
                                 m.id === 'quantum-pro'
                                   ? dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700'
                                   : dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'
-                              }`}>
+                              }`}
+                              >
                                 {m.badge}
                               </span>
                             )}
@@ -694,54 +679,63 @@ export default function App() {
 
         <div
           className={`relative z-10 flex-1 flex flex-col min-h-0 ${
-            isEmpty ? 'md:justify-center' : ''
+            isEmpty ? 'justify-center' : ''
           }`}
         >
           {isEmpty ? (
-            <div className="flex flex-col items-center justify-center flex-1 md:flex-none px-4 pb-2 md:pb-0">
+            <div className="flex flex-col items-center w-full px-4">
               <EmptyState
                 greeting={greetingLine || creativeGreeting(firstName)}
                 dark={dark}
               />
+              <div className="w-full max-w-2xl mx-auto mt-6 shrink-0">
+                <ChatInput
+                  value={input}
+                  onChange={setInput}
+                  onSend={() => handleSend()}
+                  onStop={handleStop}
+                  onSpeak={() => setShowLiveVoice(true)}
+                  isLoading={isLoading}
+                  dark={dark}
+                  errorHint={errorHint}
+                  pendingFiles={pendingFiles}
+                  onFilesChange={setPendingFiles}
+                />
+              </div>
             </div>
           ) : (
-            <main className="flex-1 overflow-y-auto min-h-0">
-              <MessageList
-                messages={messages}
-                isLoading={isLoading}
-                lastUserPrompt={lastUserPrompt}
-                dark={dark}
-                messagesEndRef={messagesEndRef}
-                thoughtSeconds={thoughtSeconds}
-                thinkActive={false}
-                deepSearchActive={false}
-                onRegenerate={() => {
-                  if (lastUserPrompt) handleSend(lastUserPrompt)
-                }}
-              />
-            </main>
+            <>
+              <main className="flex-1 overflow-y-auto min-h-0">
+                <MessageList
+                  messages={messages}
+                  isLoading={isLoading}
+                  lastUserPrompt={lastUserPrompt}
+                  dark={dark}
+                  messagesEndRef={messagesEndRef}
+                  thoughtSeconds={thoughtSeconds}
+                  thinkActive={false}
+                  deepSearchActive={false}
+                  onRegenerate={() => {
+                    if (lastUserPrompt) handleSend(lastUserPrompt)
+                  }}
+                />
+              </main>
+              <div className="shrink-0">
+                <ChatInput
+                  value={input}
+                  onChange={setInput}
+                  onSend={() => handleSend()}
+                  onStop={handleStop}
+                  onSpeak={() => setShowLiveVoice(true)}
+                  isLoading={isLoading}
+                  dark={dark}
+                  errorHint={errorHint}
+                  pendingFiles={pendingFiles}
+                  onFilesChange={setPendingFiles}
+                />
+              </div>
+            </>
           )}
-
-          <div
-            className={
-              isEmpty
-                ? 'w-full max-w-2xl mx-auto shrink-0 md:pb-10 lg:pb-14'
-                : 'shrink-0'
-            }
-          >
-            <ChatInput
-              value={input}
-              onChange={setInput}
-              onSend={() => handleSend()}
-              onStop={handleStop}
-              onSpeak={() => setShowLiveVoice(true)}
-              isLoading={isLoading}
-              dark={dark}
-              errorHint={errorHint}
-              pendingFiles={pendingFiles}
-              onFilesChange={setPendingFiles}
-            />
-          </div>
         </div>
 
         <InstallPWA dark={dark} />
