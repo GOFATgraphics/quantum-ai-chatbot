@@ -547,83 +547,92 @@ export default function App() {
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative">
         <header className={`relative pt-[env(safe-area-inset-top)] shrink-0 ${showModelMenu ? 'z-50' : 'z-10'}`}>
-          <div className="h-14 flex items-center justify-between px-3">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <button onClick={() => setMobileSidebar(true)} className={`lg:hidden w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-white/70 text-slate-700 shadow-sm hover:bg-white'}`} aria-label="Menu">
+          <div className="h-14 grid grid-cols-[1fr_auto_1fr] items-center px-3 gap-2">
+            {/* Left: mobile menu */}
+            <div className="flex items-center justify-start min-w-0">
+              <button
+                onClick={() => setMobileSidebar(true)}
+                className={`lg:hidden w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-white/70 text-slate-700 shadow-sm hover:bg-white'}`}
+                aria-label="Menu"
+              >
                 <Menu className="w-5 h-5" />
               </button>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowModelMenu((v) => !v)}
-                  aria-haspopup="listbox"
-                  aria-expanded={showModelMenu}
-                  className={`flex items-center gap-1.5 px-3 h-10 rounded-full text-[14px] font-medium transition ${dark ? 'bg-white/10 text-slate-100 hover:bg-white/15' : 'bg-white/70 text-slate-800 shadow-sm hover:bg-white'}`}
-                >
-                  <span className="truncate max-w-[140px] sm:max-w-none">{selectedModel.name}</span>
-                  {selectedModel.badge && (
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'}`}>
-                      {selectedModel.badge}
-                    </span>
-                  )}
-                  <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition ${showModelMenu ? 'rotate-180' : ''}`} />
-                </button>
-                <AnimatePresence>
-                  {showModelMenu && (
-                    <>
-                      <div className="fixed inset-0 z-[60]" onClick={() => setShowModelMenu(false)} />
-                      <motion.div
-                        initial={{ opacity: 0, y: -4, scale: 0.97 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                        transition={{ duration: 0.15 }}
-                        className={`absolute left-0 top-full mt-1 z-[70] min-w-[220px] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}
-                      >
-                        <div className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
-                          Model
-                        </div>
-                        {MODELS.map((m) => {
-                          const active = selectedModel.id === m.id
-                          return (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                selectModel(m)
-                              }}
-                              className={`w-full text-left px-4 py-2.5 flex items-start gap-2 ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'} ${active ? (dark ? 'bg-white/8' : 'bg-black/[0.04]') : ''}`}
-                            >
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium">{m.name}</span>
-                                  {m.badge && (
-                                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
-                                      m.id === 'quantum-pro'
-                                        ? dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700'
-                                        : dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'
-                                    }`}>
-                                      {m.badge}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
-                                  {m.blurb}
-                                </div>
-                              </div>
-                              {active && (
-                                <Check className={`w-4 h-4 mt-0.5 shrink-0 ${dark ? 'text-indigo-300' : 'text-indigo-600'}`} />
-                              )}
-                            </button>
-                          )
-                        })}
-                      </motion.div>
-                    </>
-                  )}
-                </AnimatePresence>
-              </div>
             </div>
-            <div className="flex items-center gap-1.5">
+
+            {/* Center: model switcher */}
+            <div className="relative flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowModelMenu((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={showModelMenu}
+                className={`flex items-center gap-1.5 px-3 h-10 rounded-full text-[14px] font-medium transition ${dark ? 'bg-white/10 text-slate-100 hover:bg-white/15' : 'bg-white/70 text-slate-800 shadow-sm hover:bg-white'}`}
+              >
+                <span className="truncate max-w-[140px] sm:max-w-none">{selectedModel.name}</span>
+                {selectedModel.badge && (
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'}`}>
+                    {selectedModel.badge}
+                  </span>
+                )}
+                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition ${showModelMenu ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {showModelMenu && (
+                  <>
+                    <div className="fixed inset-0 z-[60]" onClick={() => setShowModelMenu(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                      transition={{ duration: 0.15 }}
+                      className={`absolute left-1/2 -translate-x-1/2 top-full mt-1 z-[70] min-w-[220px] rounded-2xl py-1 shadow-lg border ${dark ? 'bg-[#16161f] border-white/10' : 'bg-white border-black/[0.06]'}`}
+                    >
+                      <div className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Model
+                      </div>
+                      {MODELS.map((m) => {
+                        const active = selectedModel.id === m.id
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              selectModel(m)
+                            }}
+                            className={`w-full text-left px-4 py-2.5 flex items-start gap-2 ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'} ${active ? (dark ? 'bg-white/8' : 'bg-black/[0.04]') : ''}`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{m.name}</span>
+                                {m.badge && (
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
+                                    m.id === 'quantum-pro'
+                                      ? dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700'
+                                      : dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500'
+                                  }`}>
+                                    {m.badge}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`text-[12px] mt-0.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {m.blurb}
+                              </div>
+                            </div>
+                            {active && (
+                              <Check className={`w-4 h-4 mt-0.5 shrink-0 ${dark ? 'text-indigo-300' : 'text-indigo-600'}`} />
+                            )}
+                          </button>
+                        )
+                      })}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Right: theme + new chat (hide new chat when already empty) */}
+            <div className="flex items-center justify-end gap-1.5 min-w-0">
               <button
                 type="button"
                 onClick={cycleTheme}
@@ -633,9 +642,15 @@ export default function App() {
               >
                 {dark ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
               </button>
-              <button onClick={startNewChat} className={`w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-white/70 text-slate-700 shadow-sm hover:bg-white'}`} aria-label="New chat">
-                <PenLine className="w-5 h-5" />
-              </button>
+              {!isEmpty && (
+                <button
+                  onClick={startNewChat}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition ${dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-white/70 text-slate-700 shadow-sm hover:bg-white'}`}
+                  aria-label="New chat"
+                >
+                  <PenLine className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
         </header>
