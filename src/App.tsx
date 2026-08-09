@@ -41,20 +41,29 @@ function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
-const GREETINGS = [
+const GREETINGS_NAMED = [
   (n: string) => `What should we tackle, ${n}?`,
   (n: string) => `What are you working on, ${n}?`,
   (n: string) => `Where should we start, ${n}?`,
   (n: string) => `What's on your mind, ${n}?`,
   (n: string) => `Ready when you are, ${n}.`,
-  (n: string) => `What can we move forward today, ${n}?`,
-  (n: string) => `Tell me what matters most right now, ${n}.`,
-  (n: string) => `How can I help you focus, ${n}?`,
+]
+
+const GREETINGS_ANON = [
+  'What should we tackle?',
+  'What are you working on?',
+  'Where should we start?',
+  "What's on your mind?",
+  'Ready when you are.',
+  'How can I help you focus?',
 ]
 
 function creativeGreeting(firstName: string) {
-  const n = firstName || 'there'
-  return GREETINGS[Math.floor(Math.random() * GREETINGS.length)](n)
+  const n = (firstName || '').trim()
+  if (!n || n.toLowerCase() === 'there') {
+    return GREETINGS_ANON[Math.floor(Math.random() * GREETINGS_ANON.length)]
+  }
+  return GREETINGS_NAMED[Math.floor(Math.random() * GREETINGS_NAMED.length)](n)
 }
 
 export default function App() {
@@ -202,8 +211,19 @@ export default function App() {
     if (currentProjectId === id) setCurrentProjectId(null)
   }
 
-  const scrollToBottom = useCallback(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [])
-  useEffect(() => { scrollToBottom() }, [messages, isLoading, scrollToBottom])
+  const scrollToBottom = useCallback((smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' })
+  }, [])
+  // Only pin to bottom when the user sends (new user message), not while the AI streams
+  const prevMsgCount = useRef(0)
+  useEffect(() => {
+    const count = messages.length
+    const last = messages[count - 1]
+    if (count > prevMsgCount.current && last?.role === 'user') {
+      scrollToBottom(true)
+    }
+    prevMsgCount.current = count
+  }, [messages, scrollToBottom])
 
   const streamAI = async (userMessage: string, history: ChatMessage[], assistantId: string) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'text/event-stream' }
@@ -485,7 +505,6 @@ export default function App() {
             <EmptyState
               greeting={greetingLine || creativeGreeting(firstName)}
               dark={dark}
-              onSuggestion={(text) => handleSend(text)}
             />
           ) : (
             <MessageList
