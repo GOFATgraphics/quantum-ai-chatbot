@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import './animations.css'
+import './chat-glow-modes.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
