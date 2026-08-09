@@ -4,9 +4,11 @@ import Logo from './Logo'
 type Props = {
   greeting: string
   dark: boolean
+  /** True while the composer is focused / user is typing */
+  composing?: boolean
 }
 
-export default function EmptyState({ greeting, dark }: Props) {
+export default function EmptyState({ greeting, dark, composing = false }: Props) {
   return (
     <div className="flex flex-col items-center justify-center w-full px-5 relative">
       <div className="quantum-particles absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
@@ -17,17 +19,27 @@ export default function EmptyState({ greeting, dark }: Props) {
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        animate={{
+          opacity: 1,
+          /* Gentle nudge only — stay visible, do not leave the screen */
+          y: composing ? -32 : 0,
+          scale: composing ? 0.96 : 1,
+        }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 flex flex-col items-center text-center w-full max-w-lg"
       >
         <div className="relative mb-6">
-          <div
+          <motion.div
             className={`absolute inset-0 -m-8 rounded-full blur-3xl ${
               dark
                 ? 'bg-gradient-to-br from-indigo-500/30 via-violet-500/20 to-sky-500/10'
                 : 'bg-gradient-to-br from-indigo-400/35 via-violet-400/25 to-sky-300/15'
             }`}
+            animate={{
+              scale: composing ? 1.08 : 1,
+              opacity: composing ? 0.85 : 1,
+            }}
+            transition={{ duration: 0.4 }}
             aria-hidden
           />
           <motion.div
@@ -59,8 +71,8 @@ export default function EmptyState({ greeting, dark }: Props) {
             />
           </motion.div>
           <motion.div
-            animate={{ scale: [1, 1.04, 1] }}
-            transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+            animate={{ scale: composing ? [1, 1.02, 1] : [1, 1.04, 1] }}
+            transition={{ duration: composing ? 2.8 : 4.5, repeat: Infinity, ease: 'easeInOut' }}
             className="relative"
           >
             <Logo size={64} dark={dark} animated />

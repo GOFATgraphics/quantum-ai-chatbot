@@ -1,4 +1,4 @@
-/* Quantumy chat glow modes: idle (bottom), thinking (top), done (none) */
+/* Quantumy chat glow modes: idle (bottom), thinking (top + large pulse), done (none) */
 .chat-glow--idle .chat-glow-orb-a,
 .chat-glow--idle .chat-glow-orb-b,
 .chat-glow--idle .chat-glow-orb-c {
@@ -29,37 +29,61 @@
   opacity: 0.85 !important;
 }
 
+/* While AI is responding — large, visible, strongly pulsing gradient across the top */
 .chat-glow--thinking .chat-glow-orb-a,
 .chat-glow--thinking .chat-glow-orb-b,
 .chat-glow--thinking .chat-glow-orb-c {
   bottom: auto !important;
 }
 .chat-glow--thinking .chat-glow-orb-a {
-  top: -22% !important;
-  left: -8% !important;
+  top: -28% !important;
+  left: -18% !important;
   right: auto !important;
-  width: min(75vw, 560px) !important;
-  height: min(55vw, 420px) !important;
+  width: min(110vw, 920px) !important;
+  height: min(85vw, 720px) !important;
   opacity: 1 !important;
-  animation: chat-glow-pulse-a 3.5s ease-in-out infinite !important;
+  filter: blur(64px) !important;
+  animation: chat-glow-pulse-a 2.4s ease-in-out infinite !important;
 }
 .chat-glow--thinking .chat-glow-orb-b {
-  top: -18% !important;
-  right: -10% !important;
+  top: -22% !important;
+  right: -16% !important;
   left: auto !important;
-  width: min(60vw, 460px) !important;
-  height: min(50vw, 380px) !important;
-  opacity: 0.95 !important;
-  animation: chat-glow-pulse-b 4.2s ease-in-out infinite !important;
+  width: min(95vw, 800px) !important;
+  height: min(75vw, 640px) !important;
+  opacity: 1 !important;
+  filter: blur(60px) !important;
+  animation: chat-glow-pulse-b 2.9s ease-in-out infinite !important;
 }
 .chat-glow--thinking .chat-glow-orb-c {
-  top: -8% !important;
-  left: 25% !important;
+  top: -10% !important;
+  left: 12% !important;
   right: auto !important;
-  width: min(70vw, 500px) !important;
-  height: min(40vw, 320px) !important;
-  opacity: 0.8 !important;
-  animation: chat-glow-pulse-c 5s ease-in-out infinite !important;
+  width: min(100vw, 860px) !important;
+  height: min(70vw, 580px) !important;
+  opacity: 0.95 !important;
+  filter: blur(72px) !important;
+  animation: chat-glow-pulse-c 3.4s ease-in-out infinite !important;
+}
+
+/* Stronger color wash while thinking */
+html:not(.dark) .chat-glow--thinking .chat-glow-orb-a {
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.85) 0%, rgba(167, 139, 250, 0.45) 42%, transparent 72%) !important;
+}
+html:not(.dark) .chat-glow--thinking .chat-glow-orb-b {
+  background: radial-gradient(circle, rgba(196, 181, 253, 0.8) 0%, rgba(56, 189, 248, 0.4) 48%, transparent 72%) !important;
+}
+html:not(.dark) .chat-glow--thinking .chat-glow-orb-c {
+  background: radial-gradient(circle, rgba(165, 180, 252, 0.75) 0%, rgba(139, 92, 246, 0.35) 50%, transparent 72%) !important;
+}
+html.dark .chat-glow--thinking .chat-glow-orb-a {
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.7) 0%, rgba(139, 92, 246, 0.4) 42%, transparent 72%) !important;
+}
+html.dark .chat-glow--thinking .chat-glow-orb-b {
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.55) 0%, rgba(56, 189, 248, 0.28) 48%, transparent 72%) !important;
+}
+html.dark .chat-glow--thinking .chat-glow-orb-c {
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.6) 0%, rgba(99, 102, 241, 0.3) 50%, transparent 72%) !important;
 }
 
 .chat-glow--done .chat-glow-orb {
@@ -68,14 +92,22 @@
 }
 
 @keyframes chat-glow-pulse-a {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
-  50% { transform: translate3d(4%, 3%, 0) scale(1.12); opacity: 1; }
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.75; }
+  50% { transform: translate3d(5%, 4%, 0) scale(1.22); opacity: 1; }
 }
 @keyframes chat-glow-pulse-b {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.8; }
-  50% { transform: translate3d(-5%, 4%, 0) scale(1.1); opacity: 1; }
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.7; }
+  50% { transform: translate3d(-6%, 5%, 0) scale(1.2); opacity: 1; }
 }
 @keyframes chat-glow-pulse-c {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.7; }
-  50% { transform: translate3d(3%, 2%, 0) scale(1.08); opacity: 0.95; }
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.65; }
+  50% { transform: translate3d(4%, 3%, 0) scale(1.18); opacity: 0.98; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-glow--thinking .chat-glow-orb-a,
+  .chat-glow--thinking .chat-glow-orb-b,
+  .chat-glow--thinking .chat-glow-orb-c {
+    animation: none !important;
+  }
 }

@@ -21,6 +21,8 @@ type Props = {
   errorHint?: string | null
   pendingFiles?: PendingFile[]
   onFilesChange?: (files: PendingFile[]) => void
+  /** Fired when the composer gains / loses focus */
+  onFocusChange?: (focused: boolean) => void
 }
 
 function readAsDataURL(file: File): Promise<string> {
@@ -43,6 +45,7 @@ export default function ChatInput({
   errorHint,
   pendingFiles = [],
   onFilesChange,
+  onFocusChange,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [listening, setListening] = useState(false)
@@ -101,6 +104,11 @@ export default function ChatInput({
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 140) + 'px'
   }, [value])
+
+  const setComposerFocus = (next: boolean) => {
+    setFocused(next)
+    onFocusChange?.(next)
+  }
 
   const toggleListen = () => {
     const rec = recognitionRef.current
@@ -195,7 +203,6 @@ export default function ChatInput({
           transition={{ duration: 0.25 }}
           className="glass-surface composer-surface rounded-[26px] px-3 pt-2.5 pb-2"
         >
-          {/* Pending file previews */}
           <AnimatePresence initial={false}>
             {pendingFiles.length > 0 && (
               <motion.div
@@ -247,17 +254,15 @@ export default function ChatInput({
             )}
           </AnimatePresence>
 
-          {/* Typing area + action buttons row */}
           <div className="flex items-end gap-2">
-            {/* Left tools + textarea */}
             <div className="flex-1 min-w-0 flex flex-col">
               <textarea
                 ref={textareaRef}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={onKeyDown}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
+                onFocus={() => setComposerFocus(true)}
+                onBlur={() => setComposerFocus(false)}
                 rows={1}
                 placeholder={listening ? 'Listening…' : 'Ask anything'}
                 className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 py-1.5 ${
@@ -267,7 +272,6 @@ export default function ChatInput({
                 }`}
               />
 
-              {/* Bottom tools row (Plus + Mic) – sits tightly under the text */}
               <div className="flex items-center gap-1.5 pt-1">
                 <input
                   ref={fileInputRef}
@@ -311,7 +315,6 @@ export default function ChatInput({
               </div>
             </div>
 
-            {/* Right primary action button – always aligned to the bottom of the composer */}
             <div className="shrink-0 pb-0.5">
               <AnimatePresence mode="wait" initial={false}>
                 {isLoading ? (
