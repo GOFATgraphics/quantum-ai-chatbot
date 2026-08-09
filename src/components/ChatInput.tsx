@@ -166,7 +166,7 @@ export default function ChatInput({
   const toolBtn = `glass-btn ${dark ? 'text-slate-200' : 'text-slate-600'}`
 
   return (
-    <div className="relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] border-t-0 shadow-none">
+    <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <div className="max-w-2xl mx-auto">
         {errorHint && (
           <p
@@ -179,7 +179,7 @@ export default function ChatInput({
           </p>
         )}
         <div
-          className={`glass-surface rounded-[26px] px-3 pt-3 pb-2.5 transition-all duration-200 ${
+          className={`glass-surface composer-surface rounded-[26px] px-3 pt-3 pb-2.5 transition-all duration-200 ${
             focused || listening
               ? dark
                 ? 'ring-1 ring-indigo-400/30'
