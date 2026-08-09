@@ -227,6 +227,34 @@ html:not(.glass-on).dark .glass-header {
   background: transparent !important;
 }
 
+/* Composer footer: no separator lines above/below the typing area */
+.composer-footer {
+  border: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+.composer-footer::before,
+.composer-footer::after {
+  content: none !important;
+  display: none !important;
+}
+/* Soften bottom edge of the input pill so it doesn’t read as a divider line */
+html.glass-on .composer-surface {
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 8px 32px -8px rgba(15, 23, 42, 0.18) !important;
+}
+html.glass-on.dark .composer-surface {
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 12px 40px -10px rgba(0, 0, 0, 0.45) !important;
+}
+
 .glass-sidebar { transition: background 0.3s ease, border-color 0.3s ease; }
 html:not(.dark) .glass-sidebar {
   background: rgba(255, 255, 255, 0.92);
