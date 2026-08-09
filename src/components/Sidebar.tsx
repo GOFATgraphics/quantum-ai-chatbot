@@ -53,10 +53,12 @@ export default function Sidebar({
     return list.filter((c) => (c.title || '').toLowerCase().includes(q))
   }, [conversations, query, currentProjectId])
 
-  const bg = dark ? 'bg-[#0e0e14] text-slate-100' : 'bg-white text-slate-900'
-  const hover = dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'
-  const active = dark ? 'bg-white/[0.08]' : 'bg-[#e8f0fe] text-[#1967d2]'
-  const newChat = dark ? 'bg-white/[0.08] hover:bg-white/[0.12]' : 'bg-[#f0f4f8] hover:bg-[#e8edf3]'
+  const text = dark ? 'text-slate-100' : 'text-slate-900'
+  const hover = dark ? 'hover:bg-white/[0.08]' : 'hover:bg-black/[0.04]'
+  const active = dark ? 'bg-white/[0.1]' : 'bg-white/70 text-[#1967d2]'
+  const newChat = dark
+    ? 'glass-btn bg-white/[0.08] hover:bg-white/[0.14]'
+    : 'glass-btn bg-white/60 hover:bg-white/80'
 
   const submitProject = () => {
     const name = projectName.trim()
@@ -67,14 +69,14 @@ export default function Sidebar({
   }
 
   return (
-    <div className={`flex flex-col h-full min-h-0 w-full ${bg}`}>
+    <div className={`glass-sidebar flex flex-col h-full min-h-0 w-full ${text}`}>
       <div className="flex items-center justify-between px-4 pt-[max(1.1rem,env(safe-area-inset-top))] pb-2 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <Logo size={32} dark={dark} className="shrink-0" />
           <span className="text-[20px] font-semibold tracking-tight truncate">Quantumy</span>
         </div>
         {showClose && onClose && (
-          <button onClick={onClose} className={`w-9 h-9 rounded-full flex items-center justify-center ${hover}`} aria-label="Close">
+          <button onClick={onClose} className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center ${hover}`} aria-label="Close">
             <X className="w-5 h-5 text-slate-600" />
           </button>
         )}
@@ -98,7 +100,7 @@ export default function Sidebar({
       <AnimatePresence>
         {showSearch && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="px-4 pt-2 overflow-hidden shrink-0">
-            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search chats…" className={`w-full h-10 rounded-full px-4 text-sm outline-none border ${dark ? 'bg-white/5 border-white/10 text-slate-100' : 'bg-[#f1f3f4] border-transparent text-slate-900'}`} />
+            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search chats…" className={`glass-panel w-full h-10 rounded-full px-4 text-sm outline-none ${dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'}`} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -112,7 +114,7 @@ export default function Sidebar({
         </div>
         {showNewProject && (
           <div className="flex gap-1.5 mb-2">
-            <input value={projectName} onChange={(e) => setProjectName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitProject()} placeholder="Project name" className={`flex-1 h-9 rounded-xl px-3 text-sm outline-none border ${dark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`} />
+            <input value={projectName} onChange={(e) => setProjectName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitProject()} placeholder="Project name" className={`glass-panel flex-1 h-9 rounded-xl px-3 text-sm outline-none ${dark ? 'text-slate-100' : 'text-slate-900'}`} />
             <button type="button" onClick={submitProject} className="h-9 px-3 rounded-xl text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900">Add</button>
           </div>
         )}
@@ -144,8 +146,8 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-black/[0.06] dark:border-white/[0.06] p-3">
-        <button type="button" onClick={onOpenSettings} className={`w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 transition ${hover}`}>
+      <div className={`shrink-0 p-3 ${dark ? 'border-t border-white/[0.06]' : 'border-t border-black/[0.05]'}`}>
+        <button type="button" onClick={onOpenSettings} className={`glass-panel w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 transition ${hover}`}>
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-sm font-semibold shrink-0">{initial}</div>
           <div className="flex-1 min-w-0 text-left">
             <p className="text-sm font-medium truncate">{displayName}</p>
