@@ -105,7 +105,7 @@ function ListRow({
       } ${!last ? (dark ? 'border-b border-white/[0.06]' : 'border-b border-black/[0.06]') : ''}`}
     >
       {icon && (
-        <span className={`shrink-0 ${dark ? 'text-white/70' : 'text-slate-600'}`}>{icon}</span>
+        <span className={`shrink-0 ${dark ? 'text-white/70' : 'text-slate-700'}`}>{icon}</span>
       )}
       <span
         className={`flex-1 text-[16px] ${
@@ -119,10 +119,10 @@ function ListRow({
         {label}
       </span>
       {value && (
-        <span className={`text-[15px] ${dark ? 'text-white/40' : 'text-slate-400'}`}>{value}</span>
+        <span className={`text-[15px] ${dark ? 'text-white/50' : 'text-slate-500'}`}>{value}</span>
       )}
       {onClick && !danger && (
-        <ChevronRight className={`w-4 h-4 shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`} />
+        <ChevronRight className={`w-4 h-4 shrink-0 ${dark ? 'text-white/35' : 'text-slate-400'}`} />
       )}
     </button>
   )
@@ -130,7 +130,7 @@ function ListRow({
 
 function SectionLabel({ children, dark }: { children: React.ReactNode; dark: boolean }) {
   return (
-    <p className={`text-[13px] font-medium px-1 mb-2 ${dark ? 'text-white/40' : 'text-slate-500'}`}>
+    <p className={`text-[13px] font-medium px-1 mb-2 ${dark ? 'text-white/50' : 'text-slate-600'}`}>
       {children}
     </p>
   )
@@ -174,7 +174,7 @@ export default function Settings({
   const initial = (displayName[0] || 'Q').toUpperCase()
 
   const textMain = dark ? 'text-white' : 'text-slate-900'
-  const textMuted = dark ? 'text-white/45' : 'text-slate-500'
+  const textMuted = dark ? 'text-white/55' : 'text-slate-600'
   const inputCls = `glass-panel w-full rounded-xl px-3.5 py-3 text-[16px] outline-none ${
     dark
       ? 'text-white placeholder:text-white/30'
@@ -266,7 +266,7 @@ export default function Settings({
   const match = (s: string) => !q || s.toLowerCase().includes(q)
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-transparent">
+    <div className={`flex flex-col h-full min-h-0 bg-transparent ${dark ? 'text-white' : 'text-slate-900'}`}>
       <div className="relative flex items-center justify-center h-14 shrink-0 px-4">
         {page === 'home' ? (
           <button
@@ -312,7 +312,7 @@ export default function Settings({
                   <p className={`text-[17px] font-semibold truncate ${textMain}`}>{displayName}</p>
                   <p className={`text-[14px] truncate ${textMuted}`}>{user.email}</p>
                 </div>
-                <ChevronRight className={`w-4 h-4 shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`} />
+                <ChevronRight className={`w-4 h-4 shrink-0 ${dark ? 'text-white/35' : 'text-slate-400'}`} />
               </button>
             )}
 
@@ -492,7 +492,7 @@ export default function Settings({
         {page === 'appearance' && (
           <div className="space-y-4">
             <GroupCard>
-              <div className={`flex items-center gap-3 px-4 py-3.5 ${dark ? 'border-b border-white/[0.06]' : 'border-b border-black/[0.06]'}`}>
+              <div className={`flex items-center gap-3 px-4 py-3.5 ${dark ? 'border-b border-white/[0.06]' : 'border-b border-black/[0.06]'`}>
                 <span className={dark ? 'text-white/70' : 'text-slate-600'}>
                   {dark ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
                 </span>
@@ -647,7 +647,7 @@ export default function Settings({
                       : ''
                   }`}
                 >
-                  <Sparkles className={`w-5 h-5 mt-0.5 ${dark ? 'text-white/50' : 'text-slate-400'}`} />
+                  <Sparkles className={`w-5 h-5 mt-0.5 ${dark ? 'text-white/55' : 'text-slate-500'}`} />
                   <div>
                     <p className={`text-[16px] ${textMain}`}>{c.title}</p>
                     <p className={`text-[13px] ${textMuted}`}>{c.desc}</p>
