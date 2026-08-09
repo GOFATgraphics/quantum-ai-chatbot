@@ -17,12 +17,19 @@ const SUGGESTIONS = [
 
 export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-5 pb-8">
+    <div className="flex flex-col items-center justify-center h-full px-5 pb-8 relative">
+      {/* Soft quantum particles (respect reduced-motion via CSS) */}
+      <div className="quantum-particles absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <span key={i} className={`quantum-particle quantum-particle-${i}`} />
+        ))}
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-col items-center text-center w-full max-w-lg"
+        className="relative z-10 flex flex-col items-center text-center w-full max-w-lg"
       >
         <div className="relative mb-7">
           <div
@@ -33,9 +40,8 @@ export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
             }`}
             aria-hidden
           />
-          {/* Orbit ring */}
           <motion.div
-            className="absolute inset-0 -m-4 rounded-full border border-indigo-400/25 pointer-events-none"
+            className="absolute pointer-events-none rounded-full border border-indigo-400/25"
             style={{ width: 96, height: 96, left: '50%', top: '50%', marginLeft: -48, marginTop: -48 }}
             animate={{ rotate: 360 }}
             transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
@@ -43,12 +49,14 @@ export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
           >
             <span
               className={`absolute w-2 h-2 rounded-full -top-1 left-1/2 -translate-x-1/2 ${
-                dark ? 'bg-indigo-300 shadow-[0_0_8px_rgba(165,180,252,0.8)]' : 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]'
+                dark
+                  ? 'bg-indigo-300 shadow-[0_0_8px_rgba(165,180,252,0.8)]'
+                  : 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]'
               }`}
             />
           </motion.div>
           <motion.div
-            className="absolute inset-0 -m-6 rounded-full border border-violet-400/15 pointer-events-none"
+            className="absolute pointer-events-none rounded-full border border-violet-400/15"
             style={{ width: 112, height: 112, left: '50%', top: '50%', marginLeft: -56, marginTop: -56 }}
             animate={{ rotate: -360 }}
             transition={{ duration: 28, repeat: Infinity, ease: 'linear' }}
@@ -85,35 +93,33 @@ export default function EmptyState({ greeting, dark, onSuggestion }: Props) {
           Connect your tools and let Quantumy handle email, docs, and schedules.
         </p>
 
-        {onSuggestion && (
-          <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-md">
-            {SUGGESTIONS.map((s, i) => {
-              const Icon = s.icon
-              return (
-                <motion.button
-                  key={s.text}
-                  type="button"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.15 + i * 0.06, duration: 0.35 }}
-                  whileHover={{ y: -2, scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => onSuggestion(s.text)}
-                  className={`chip glass-chip ${
-                    dark ? 'text-slate-200' : 'text-slate-700'
+        <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-md">
+          {SUGGESTIONS.map((s, i) => {
+            const Icon = s.icon
+            return (
+              <motion.button
+                key={s.text}
+                type="button"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.06, duration: 0.35 }}
+                whileHover={{ y: -2, scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => onSuggestion?.(s.text)}
+                className={`chip glass-chip ${
+                  dark ? 'text-slate-200' : 'text-slate-700'
+                }`}
+              >
+                <Icon
+                  className={`w-3.5 h-3.5 shrink-0 ${
+                    dark ? 'text-indigo-300' : 'text-indigo-500'
                   }`}
-                >
-                  <Icon
-                    className={`w-3.5 h-3.5 shrink-0 ${
-                      dark ? 'text-indigo-300' : 'text-indigo-500'
-                    }`}
-                  />
-                  {s.text}
-                </motion.button>
-              )
-            })}
-          </div>
-        )}
+                />
+                {s.text}
+              </motion.button>
+            )
+          })}
+        </div>
       </motion.div>
     </div>
   )
