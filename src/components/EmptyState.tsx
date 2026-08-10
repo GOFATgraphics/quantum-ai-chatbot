@@ -27,8 +27,8 @@ export default function EmptyState({ greeting, dark, composing = false }: Props)
         initial={reduceMotion ? false : { opacity: 0, y: 16 }}
         animate={{
           opacity: 1,
-          y: composing ? -14 : 0,
-          scale: composing ? 0.98 : 1,
+          y: composing ? -8 : 0,
+          scale: composing ? 0.99 : 1,
         }}
         transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 flex flex-col items-center text-center w-full max-w-lg"
