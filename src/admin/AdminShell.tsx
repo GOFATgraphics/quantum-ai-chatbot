@@ -130,13 +130,15 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <header
-          className={`h-14 shrink-0 flex items-center gap-3 px-4 border-b ${\n            dark ? 'border-white/5 bg-[#111114]/80' : 'border-slate-200 bg-white/80'
+          className={`h-14 shrink-0 flex items-center gap-3 px-4 border-b ${
+            dark ? 'border-white/5 bg-[#111114]/80' : 'border-slate-200 bg-white/80'
           } backdrop-blur-sm`}
         >
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className={`md:hidden w-9 h-9 rounded-full flex items-center justify-center ${\n              dark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-600 hover:bg-slate-100'
+            className={`md:hidden w-9 h-9 rounded-full flex items-center justify-center ${
+              dark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <Menu className="w-5 h-5" />
