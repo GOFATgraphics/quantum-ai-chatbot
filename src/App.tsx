@@ -15,6 +15,7 @@ import ChatInput, { type PendingFile } from './components/ChatInput'
 import LiveVoice, { type VoiceGender } from './components/LiveVoice'
 import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
+import ProjectsWorkspace from './components/ProjectsWorkspace'
 
 // visualViewport-sized shell — Gemini-style keyboard layout
 
@@ -88,6 +89,7 @@ export default function App() {
   const [showModelMenu, setShowModelMenu] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
+  const [showProjects, setShowProjects] = useState(false)
   const [showLiveVoice, setShowLiveVoice] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [composerFocused, setComposerFocused] = useState(false)
@@ -116,7 +118,6 @@ export default function App() {
     try { localStorage.setItem('quantumy-glass', glass ? '1' : '0') } catch {}
   }, [glass])
 
-  // Size the app to the *visible* viewport (above the keyboard) — Gemini-style.
   useEffect(() => {
     const root = document.documentElement
     const empty = messages.length === 0 && !isLoading
@@ -541,7 +542,8 @@ export default function App() {
     onNewChat: startNewChat, onSelectChat: loadMessages, onDeleteChat: deleteConversation,
     onOpenSettings: () => { setShowSettings(true); setMobileSidebar(false) },
     onOpenConnectors: () => { setShowConnectors(true); setMobileSidebar(false) },
-    onSelectProject: setCurrentProjectId, onCreateProject: createProject, onDeleteProject: deleteProject,
+    onOpenProjects: () => { setShowProjects(true); setMobileSidebar(false) },
+    onSelectProject: setCurrentProjectId,
     onOpenCommandPalette: () => { setShowCommandPalette(true); setMobileSidebar(false) },
   }
 
@@ -606,13 +608,12 @@ export default function App() {
                   {MODELS.map((m) => {
                     const active = selectedModel.id === m.id
                     return (
-                      <button key={m.id} type="button" onClick={(e) => { e.stopPropagation(); selectModel(m) }} className={`w-full text-left px-4 py-2.5 flex items-start gap-2 ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'} ${active ? (dark ? 'bg-white/8' : 'bg-black/[0.04]') : ''}`}>
+                      <button key={m.id} type="button" onClick={(e) => { e.stopPropagation(); selectModel(m) }} className={`w-full text-left px-4 py-2.5 flex items-start gap-2 ${dark ? 'hover:bg-white/5 text-slate-100' : 'hover:bg-black/[0.03] text-slate-800'} ${active ? (dark ? 'bg-white/8' : 'bg-black/[0.04]') : ''`}>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">{m.name}</span>
                             {m.badge && (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
-                                m.id === 'quantum-pro' ? (dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700') : (dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500')
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${\n                                m.id === 'quantum-pro' ? (dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700') : (dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500')
                               }`}>{m.badge}</span>
                             )}
                           </div>
@@ -692,7 +693,7 @@ export default function App() {
       <AnimatePresence>
         {showSettings && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowSettings(false)}>
-            <motion.div initial={{ y: 40, opacity: 0.9, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 24, opacity: 0 }} transition={{ type: 'spring', damping: 28, stiffness: 320 }} className={`glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden`} onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ y: 40, opacity: 0.9, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 24, opacity: 0 }} transition={{ type: 'spring', damping: 28, stiffness: 320 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <Settings
                 dark={dark}
                 glass={glass}
@@ -715,8 +716,41 @@ export default function App() {
       <AnimatePresence>
         {showConnectors && session?.access_token && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowConnectors(false)}>
-            <motion.div initial={{ y: 40, opacity: 0.9 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }} transition={{ type: 'spring', damping: 28, stiffness: 320 }} className={`glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden`} onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ y: 40, opacity: 0.9 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }} transition={{ type: 'spring', damping: 28, stiffness: 320 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <Connectors dark={dark} accessToken={session.access_token} onClose={() => setShowConnectors(false)} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showProjects && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-[2px]"
+            onClick={() => setShowProjects(false)}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0.9 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] sm:h-[min(85vh,680px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ProjectsWorkspace
+                dark={dark}
+                projects={projects}
+                conversations={conversations}
+                currentProjectId={currentProjectId}
+                onClose={() => setShowProjects(false)}
+                onSelectProject={setCurrentProjectId}
+                onCreateProject={createProject}
+                onDeleteProject={deleteProject}
+                onNewChat={startNewChat}
+              />
             </motion.div>
           </motion.div>
         )}
