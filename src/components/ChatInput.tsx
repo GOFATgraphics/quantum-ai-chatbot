@@ -144,7 +144,7 @@ export default function ChatInput({
   const toolBtn = `glass-btn ${dark ? 'text-slate-200' : 'text-slate-600'}`
 
   return (
-    <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <div className="max-w-2xl mx-auto">
         <AnimatePresence>
           {errorHint && (
@@ -175,12 +175,7 @@ export default function ChatInput({
         >
           <AnimatePresence initial={false}>
             {pendingFiles.length > 0 && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                 <div className="flex flex-wrap gap-2 mb-2 px-0.5">
                   {pendingFiles.map((f, idx) => (
                     <motion.div
@@ -216,18 +211,18 @@ export default function ChatInput({
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={onKeyDown}
-                onFocus={(e) => {
+                onFocus={() => {
                   setComposerFocus(true)
+                  // Shell tracks visualViewport — do not scrollIntoView (hides the bar under keyboard)
                   const pin = () => {
                     window.scrollTo(0, 0)
                     document.documentElement.scrollTop = 0
                     document.body.scrollTop = 0
-                    try { e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' }) } catch { /* ignore */ }
                   }
                   pin()
                   requestAnimationFrame(pin)
                   setTimeout(pin, 50)
-                  setTimeout(pin, 300)
+                  setTimeout(pin, 250)
                 }}
                 onBlur={() => setComposerFocus(false)}
                 rows={1}
