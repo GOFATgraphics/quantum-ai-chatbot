@@ -4,6 +4,7 @@ import { supabase, type Profile } from '../../lib/supabase'
 
 type Props = {
   dark: boolean
+  currentUserId: string
 }
 
 function formatDate(iso: string) {
@@ -18,11 +19,12 @@ function formatDate(iso: string) {
   }
 }
 
-export default function Users({ dark }: Props) {
+export default function Users({ dark, currentUserId }: Props) {
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -59,6 +61,33 @@ export default function Users({ dark }: Props) {
     })
   }, [users, query])
 
+  const toggleAdmin = async (u: Profile) => {
+    if (u.id === currentUserId) {
+      setError("You can't remove your own admin access from here.")
+      return
+    }
+    const next = !u.is_admin
+    const label = next ? 'grant admin to' : 'remove admin from'
+    if (!window.confirm('Really ' + label + ' ' + (u.email || u.preferred_name || u.id) + '?')) return
+
+    setTogglingId(u.id)
+    setError(null)
+    try {
+      const { error: err } = await supabase
+        .from('profiles')
+        .update({ is_admin: next, updated_at: new Date().toISOString() })
+        .eq('id', u.id)
+
+      if (err) throw err
+      setUsers((prev) => prev.map((p) => (p.id === u.id ? { ...p, is_admin: next } : p)))
+    } catch (e: any) {
+      console.warn('toggle admin', e)
+      setError(e?.message || 'Failed to update admin. Check RLS allows admin UPDATE on profiles.')
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
   const cardBg = dark ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm'
   const muted = dark ? 'text-slate-400' : 'text-slate-500'
   const title = dark ? 'text-white' : 'text-slate-900'
@@ -81,9 +110,7 @@ export default function Users({ dark }: Props) {
           disabled={loading}
           className={
             'h-9 px-3 rounded-xl text-sm font-medium flex items-center gap-2 transition disabled:opacity-50 self-start ' +
-            (dark
-              ? 'bg-white/10 text-slate-200 hover:bg-white/15'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+            (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
           }
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -109,12 +136,7 @@ export default function Users({ dark }: Props) {
           aria-label="Search users"
         />
         {query && (
-          <button
-            type="button"
-            onClick={() => setQuery('')}
-            className={'p-1 rounded-lg ' + (dark ? 'hover:bg-white/10' : 'hover:bg-slate-100')}
-            aria-label="Clear search"
-          >
+          <button type="button" onClick={() => setQuery('')} className={'p-1 rounded-lg ' + (dark ? 'hover:bg-white/10' : 'hover:bg-slate-100')} aria-label="Clear search">
             <X className={'w-4 h-4 ' + muted} />
           </button>
         )}
@@ -124,9 +146,7 @@ export default function Users({ dark }: Props) {
         <div
           className={
             'rounded-xl border px-4 py-3 text-sm ' +
-            (dark
-              ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
-              : 'border-amber-200 bg-amber-50 text-amber-800')
+            (dark ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')
           }
         >
           {error}
@@ -140,20 +160,21 @@ export default function Users({ dark }: Props) {
               <tr className={'border-b text-left ' + border}>
                 <th className={'px-4 py-3 font-medium ' + muted}>User</th>
                 <th className={'px-4 py-3 font-medium ' + muted + ' hidden sm:table-cell'}>Joined</th>
-                <th className={'px-4 py-3 font-medium ' + muted + ' w-24'}>Role</th>
+                <th className={'px-4 py-3 font-medium ' + muted}>Role</th>
+                <th className={'px-4 py-3 font-medium ' + muted + ' w-28'}>Action</th>
               </tr>
             </thead>
             <tbody>
               {loading && users.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-12 text-center">
+                  <td colSpan={4} className="px-4 py-12 text-center">
                     <Loader2 className={'w-5 h-5 animate-spin mx-auto ' + muted} />
                   </td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={3} className={'px-4 py-12 text-center ' + muted}>
+                  <td colSpan={4} className={'px-4 py-12 text-center ' + muted}>
                     {query.trim() ? 'No matching users' : 'No users found'}
                   </td>
                 </tr>
@@ -161,6 +182,8 @@ export default function Users({ dark }: Props) {
               {filtered.map((u) => {
                 const name = u.preferred_name || (u.email ? u.email.split('@')[0] : 'User')
                 const initial = name.charAt(0).toUpperCase()
+                const isSelf = u.id === currentUserId
+                const busy = togglingId === u.id
                 return (
                   <tr key={u.id} className={'border-b last:border-0 ' + border + ' ' + rowHover}>
                     <td className="px-4 py-3">
@@ -169,22 +192,21 @@ export default function Users({ dark }: Props) {
                           {initial}
                         </div>
                         <div className="min-w-0">
-                          <div className={'font-medium truncate ' + title}>{name}</div>
+                          <div className={'font-medium truncate ' + title}>
+                            {name}
+                            {isSelf ? <span className={'ml-1.5 text-xs font-normal ' + muted}>(you)</span> : null}
+                          </div>
                           <div className={'text-xs truncate ' + muted}>{u.email || u.id}</div>
                         </div>
                       </div>
                     </td>
-                    <td className={'px-4 py-3 ' + muted + ' hidden sm:table-cell'}>
-                      {formatDate(u.created_at)}
-                    </td>
+                    <td className={'px-4 py-3 ' + muted + ' hidden sm:table-cell'}>{formatDate(u.created_at)}</td>
                     <td className="px-4 py-3">
                       {u.is_admin ? (
                         <span
                           className={
                             'inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md ' +
-                            (dark
-                              ? 'bg-indigo-500/20 text-indigo-300'
-                              : 'bg-indigo-50 text-indigo-700')
+                            (dark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-indigo-700')
                           }
                         >
                           <Shield className="w-3 h-3" />
@@ -193,6 +215,25 @@ export default function Users({ dark }: Props) {
                       ) : (
                         <span className={'text-xs ' + muted}>User</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        disabled={busy || isSelf}
+                        onClick={() => toggleAdmin(u)}
+                        className={
+                          'text-xs font-medium px-2.5 py-1.5 rounded-lg transition disabled:opacity-40 ' +
+                          (u.is_admin
+                            ? dark
+                              ? 'bg-white/10 text-slate-300 hover:bg-white/15'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            : dark
+                              ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30'
+                              : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100')
+                        }
+                      >
+                        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : u.is_admin ? 'Revoke' : 'Make admin'}
+                      </button>
                     </td>
                   </tr>
                 )
@@ -203,7 +244,7 @@ export default function Users({ dark }: Props) {
       </div>
 
       <p className={'text-xs ' + (dark ? 'text-slate-600' : 'text-slate-400')}>
-        Showing up to 500 most recent profiles. Toggle admin is planned for a later batch.
+        You cannot revoke your own admin. Toggle needs an UPDATE policy for admins on profiles.
       </p>
     </div>
   )

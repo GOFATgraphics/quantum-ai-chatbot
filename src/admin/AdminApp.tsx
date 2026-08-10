@@ -6,6 +6,8 @@ import Logo from '../components/Logo'
 import AdminShell, { type AdminPage } from './AdminShell'
 import Overview from './pages/Overview'
 import Users from './pages/Users'
+import Conversations from './pages/Conversations'
+import ConnectorsPage from './pages/Connectors'
 
 export default function AdminApp() {
   const { dark } = useTheme()
@@ -119,10 +121,12 @@ export default function AdminApp() {
       onBackToApp={goToApp}
     >
       {page === 'overview' && <Overview dark={dark} />}
-      {page === 'users' && <Users dark={dark} />}
-      {page !== 'overview' && page !== 'users' && (
+      {page === 'users' && <Users dark={dark} currentUserId={profile.id} />}
+      {page === 'conversations' && <Conversations dark={dark} />}
+      {page === 'connectors' && <ConnectorsPage dark={dark} />}
+      {page === 'settings' && (
         <div className={'text-sm ' + (dark ? 'text-slate-400' : 'text-slate-500')}>
-          This section is coming in a later batch.
+          Settings is coming in a later batch.
         </div>
       )}
     </AdminShell>

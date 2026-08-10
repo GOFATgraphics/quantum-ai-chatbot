@@ -16,8 +16,8 @@ type Props = {
 const NAV: { id: AdminPage; label: string; icon: typeof LayoutDashboard; soon?: boolean }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'users', label: 'Users', icon: Users },
-  { id: 'conversations', label: 'Conversations', icon: MessageSquare, soon: true },
-  { id: 'connectors', label: 'Connectors', icon: Plug, soon: true },
+  { id: 'conversations', label: 'Conversations', icon: MessageSquare },
+  { id: 'connectors', label: 'Connectors', icon: Plug },
   { id: 'settings', label: 'Settings', icon: Settings, soon: true },
 ]
 
