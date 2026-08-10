@@ -613,7 +613,8 @@ export default function App() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">{m.name}</span>
                             {m.badge && (
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${\n                                m.id === 'quantum-pro' ? (dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700') : (dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500')
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
+                                m.id === 'quantum-pro' ? (dark ? 'bg-violet-500/20 text-violet-300' : 'bg-violet-50 text-violet-700') : (dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-500')
                               }`}>{m.badge}</span>
                             )}
                           </div>
