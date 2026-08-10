@@ -71,6 +71,15 @@ export type Connector = {
   updated_at: string
 }
 
+export type Profile = {
+  id: string
+  email: string | null
+  preferred_name: string | null
+  is_admin: boolean
+  created_at: string
+  updated_at: string
+}
+
 export const CONNECTOR_CATALOG = [
   {
     provider: 'gmail' as const,
@@ -144,4 +153,28 @@ export function makeChatTitle(raw: string): string {
     t = (sp > 18 ? cut.slice(0, sp) : cut).trim() + '…'
   }
   return t.charAt(0).toUpperCase() + t.slice(1)
+}
+
+/** Fetch the current user's profile (includes is_admin). Returns null if not logged in or no row. */
+export async function getMyProfile(): Promise<Profile | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email, preferred_name, is_admin, created_at, updated_at')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (error) {
+    console.warn('getMyProfile error:', error.message)
+    return null
+  }
+  return data as Profile | null
+}
+
+/** Quick check — true only if the logged-in user has is_admin = true */
+export async function getIsAdmin(): Promise<boolean> {
+  const profile = await getMyProfile()
+  return profile?.is_admin === true
 }
