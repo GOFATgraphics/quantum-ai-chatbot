@@ -30,9 +30,7 @@ export default function AdminApp() {
 
     init()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, s) => {
       setSession(s)
       if (s?.user) {
         const p = await getMyProfile()
@@ -54,51 +52,37 @@ export default function AdminApp() {
 
   if (loading) {
     return (
-      <div
-        className={
-          dark
-            ? 'min-h-dvh flex flex-col items-center justify-center gap-4 bg-[#0c0c10]'
-            : 'min-h-dvh flex flex-col items-center justify-center gap-4 bg-slate-50'
-        }
-      >
+      <div className={`min-h-dvh flex flex-col items-center justify-center gap-4 ${dark ? 'bg-[#0c0c10]' : 'bg-slate-50'}`}>
         <Logo size={48} dark={dark} />
-        <Loader2 className={dark ? 'w-5 h-5 animate-spin text-slate-500' : 'w-5 h-5 animate-spin text-slate-400'} />
+        <Loader2 className={`w-5 h-5 animate-spin ${dark ? 'text-slate-500' : 'text-slate-400'}`} />
       </div>
     )
   }
 
+  // Not logged in → send to main app (which shows Auth)
   if (!session?.user) {
     window.location.href = '/'
     return null
   }
 
+  // Logged in but not admin
   if (!profile?.is_admin) {
     return (
-      <div
-        className={
-          dark
-            ? 'min-h-dvh flex flex-col items-center justify-center px-6 bg-[#0c0c10] text-slate-100'
-            : 'min-h-dvh flex flex-col items-center justify-center px-6 bg-slate-50 text-slate-900'
-        }
-      >
+      <div className={`min-h-dvh flex flex-col items-center justify-center px-6 ${dark ? 'bg-[#0c0c10] text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
         <div
-          className={
-            dark
-              ? 'w-full max-w-sm rounded-2xl border p-6 text-center bg-white/[0.03] border-white/10'
-              : 'w-full max-w-sm rounded-2xl border p-6 text-center bg-white border-slate-200 shadow-sm'
-          }
+          className={`w-full max-w-sm rounded-2xl border p-6 text-center ${
+            dark ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm'
+          }`}
         >
           <div
-            className={
-              dark
-                ? 'mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-red-500/10 text-red-400'
-                : 'mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-red-50 text-red-600'
-            }
+            className={`mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 ${
+              dark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600'
+            }`}
           >
             <ShieldOff className="w-6 h-6" />
           </div>
           <h1 className="text-lg font-semibold">Access denied</h1>
-          <p className={dark ? 'mt-2 text-sm text-slate-400' : 'mt-2 text-sm text-slate-500'}>
+          <p className={`mt-2 text-sm ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
             Your account does not have admin privileges.
           </p>
           <button
@@ -114,10 +98,16 @@ export default function AdminApp() {
   }
 
   return (
-    <AdminShell dark={dark} email={profile.email} activePage={page} onNavigate={setPage} onBackToApp={goToApp}>
+    <AdminShell
+      dark={dark}
+      email={profile.email}
+      activePage={page}
+      onNavigate={setPage}
+      onBackToApp={goToApp}
+    >
       {page === 'overview' && <Overview dark={dark} />}
       {page !== 'overview' && (
-        <div className={dark ? 'text-sm text-slate-400' : 'text-sm text-slate-500'}>
+        <div className={`text-sm ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
           This section is coming in a later batch.
         </div>
       )}
