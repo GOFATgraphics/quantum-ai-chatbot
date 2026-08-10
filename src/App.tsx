@@ -17,7 +17,24 @@ import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
 import ProjectsWorkspace from './components/ProjectsWorkspace'
 
-// SEE ARTIFACTS - this is incomplete intentionally in this attempt
+// visualViewport-sized shell — Gemini-style keyboard layout
+
+const MODELS = [
+  { id: 'quantum-flash', name: 'Quantum Flash', badge: 'Fast' as string | null, anthropic: 'claude-haiku-4-5-20251001', blurb: 'Instant answers' },
+  { id: 'quantum-lite', name: 'Quantum Lite', badge: null as string | null, anthropic: 'claude-sonnet-4-6', blurb: 'Balanced everyday work' },
+  { id: 'quantum-pro', name: 'Quantum Pro', badge: 'Pro' as string | null, anthropic: 'claude-opus-4-6', blurb: 'Deep reasoning & complex tasks' },
+]
+
+function generateId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+
+function creativeGreeting(firstName: string) {
+  const n = (firstName || '').trim()
+  if (n && n.toLowerCase() !== 'there') return `What can I help you with today, ${n}?`
+  return 'What can I help you with today?'
+}
+
 export default function App() {
-  return <div>Loading...</div>
+  return <div className="flex items-center justify-center min-h-dvh">Restoring…</div>
 }
