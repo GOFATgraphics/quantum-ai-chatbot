@@ -16,7 +16,7 @@ import LiveVoice, { type VoiceGender } from './components/LiveVoice'
 import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
 
-// Redeploy trigger — fixed viewport shell, empty-chat scroll lock
+// visualViewport-sized shell — Gemini-style keyboard layout
 
 const MODELS = [
   { id: 'quantum-flash', name: 'Quantum Flash', badge: 'Fast' as string | null, anthropic: 'claude-haiku-4-5-20251001', blurb: 'Instant answers' },
@@ -116,58 +116,64 @@ export default function App() {
     try { localStorage.setItem('quantumy-glass', glass ? '1' : '0') } catch {}
   }, [glass])
 
-  // New-chat empty shell: hard lock — no page/region scroll while typing
+  // Size the app to the *visible* viewport (above the keyboard) — Gemini-style.
   useEffect(() => {
-    const empty = messages.length === 0 && !isLoading
     const root = document.documentElement
+    const empty = messages.length === 0 && !isLoading
     root.classList.toggle('is-empty-chat', empty)
-    if (!empty) return
 
-    const pin = () => {
+    const apply = () => {
+      const vv = window.visualViewport
+      if (vv) {
+        root.style.setProperty('--app-vh', `${Math.round(vv.height)}px`)
+        root.style.setProperty('--app-offset', `${Math.round(vv.offsetTop)}px`)
+      } else {
+        root.style.setProperty('--app-vh', `${window.innerHeight}px`)
+        root.style.setProperty('--app-offset', '0px')
+      }
       window.scrollTo(0, 0)
       root.scrollTop = 0
       document.body.scrollTop = 0
-      if (window.visualViewport) {
-        root.style.setProperty('--vvh', `${window.visualViewport.height}px`)
+    }
+    apply()
+
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', apply)
+    vv?.addEventListener('scroll', apply)
+    window.addEventListener('resize', apply)
+
+    let onTouchMove: ((e: TouchEvent) => void) | null = null
+    let onWheel: ((e: WheelEvent) => void) | null = null
+    if (empty) {
+      const allow = (t: EventTarget | null) => {
+        const el = t as HTMLElement | null
+        if (!el) return false
+        if (el.tagName === 'TEXTAREA' || el.closest?.('textarea')) return true
+        if (el.closest?.('[data-scrollable="true"]')) return true
+        return false
       }
-    }
-    pin()
-
-    const allowTarget = (t: EventTarget | null) => {
-      const el = t as HTMLElement | null
-      if (!el) return false
-      if (el.tagName === 'TEXTAREA' || el.closest?.('textarea')) return true
-      if (el.closest?.('[data-scrollable="true"]')) return true
-      return false
-    }
-
-    const onScroll = (e: Event) => { pin(); e.preventDefault() }
-    const onTouchMove = (e: TouchEvent) => {
-      if (allowTarget(e.target)) return
-      if (e.cancelable) e.preventDefault()
-    }
-    const onWheel = (e: WheelEvent) => {
-      if (allowTarget(e.target)) {
-        const el = (e.target as HTMLElement).closest?.('textarea') as HTMLTextAreaElement | null
-        if (el && el.scrollHeight > el.clientHeight + 1) return
+      onTouchMove = (e: TouchEvent) => {
+        if (allow(e.target)) return
+        if (e.cancelable) e.preventDefault()
       }
-      if (e.cancelable) e.preventDefault()
+      onWheel = (e: WheelEvent) => {
+        if (allow(e.target)) {
+          const el = (e.target as HTMLElement).closest?.('textarea') as HTMLTextAreaElement | null
+          if (el && el.scrollHeight > el.clientHeight + 1) return
+        }
+        if (e.cancelable) e.preventDefault()
+      }
+      document.addEventListener('touchmove', onTouchMove, { passive: false, capture: true })
+      document.addEventListener('wheel', onWheel, { passive: false, capture: true })
     }
-    const onVv = () => pin()
-
-    window.addEventListener('scroll', onScroll, { passive: false, capture: true })
-    document.addEventListener('touchmove', onTouchMove, { passive: false, capture: true })
-    document.addEventListener('wheel', onWheel, { passive: false, capture: true })
-    window.visualViewport?.addEventListener('resize', onVv)
-    window.visualViewport?.addEventListener('scroll', onVv)
 
     return () => {
       root.classList.remove('is-empty-chat')
-      window.removeEventListener('scroll', onScroll, true)
-      document.removeEventListener('touchmove', onTouchMove, true)
-      document.removeEventListener('wheel', onWheel, true)
-      window.visualViewport?.removeEventListener('resize', onVv)
-      window.visualViewport?.removeEventListener('scroll', onVv)
+      vv?.removeEventListener('resize', apply)
+      vv?.removeEventListener('scroll', apply)
+      window.removeEventListener('resize', apply)
+      if (onTouchMove) document.removeEventListener('touchmove', onTouchMove, true)
+      if (onWheel) document.removeEventListener('wheel', onWheel, true)
     }
   }, [messages.length, isLoading])
 
@@ -255,7 +261,6 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, needsOnboarding, firstName])
 
   const ensureConversation = async (firstUserText: string) => {
@@ -450,7 +455,6 @@ export default function App() {
       } catch { /* best-effort */ }
       return text
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [session?.access_token, firstName, currentProjectId],
   )
 
