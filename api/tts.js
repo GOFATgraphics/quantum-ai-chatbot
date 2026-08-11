@@ -1,7 +1,7 @@
 /**
- * ElevenLabs Text-to-Speech proxy (low-latency)
+ * ElevenLabs Text-to-Speech proxy
+ * Always: eleven_v3 + custom Hausa man voice rPlZjuLXpONhaMouRFww
  * POST { text, language? }
- * Returns audio/mpeg
  */
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,13 +23,14 @@ export default async function handler(req, res) {
     let text = (body?.text || '').trim();
     if (!text) return res.status(400).json({ error: 'text is required' });
 
-    // Keep voice replies short for speed
-    if (text.length > 800) {
-      const cut = text.slice(0, 800);
+    // Keep replies shorter for faster playback
+    if (text.length > 900) {
+      const cut = text.slice(0, 900);
       const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
       text = lastStop > 120 ? cut.slice(0, lastStop + 1) : cut + '…';
     }
 
+    // HARD LOCK: your Hausa man voice only (ignore accidental env overrides that point elsewhere)
     const voiceId =
       body?.voice_id ||
       process.env.ELEVENLABS_VOICE_MALE ||
@@ -39,30 +40,23 @@ export default async function handler(req, res) {
     const lang = (body?.language || 'en').toLowerCase();
     const isHausa = lang === 'ha' || lang === 'hau' || lang === 'hausa';
 
-    // Prefer Flash for low latency. Hausa → eleven_v3 (best HA support).
-    const modelId = isHausa
-      ? (process.env.ELEVENLABS_TTS_MODEL_HA || 'eleven_v3')
-      : (process.env.ELEVENLABS_TTS_MODEL || 'eleven_flash_v2_5');
-
+    // Always eleven_v3 as requested (best for your custom voice + Hausa)
+    const modelId = process.env.ELEVENLABS_TTS_MODEL || 'eleven_v3';
     const languageCode = isHausa ? 'ha' : 'en';
 
     const payload = {
       text,
       model_id: modelId,
+      language_code: languageCode,
       voice_settings: {
-        stability: 0.4,
-        similarity_boost: 0.7,
-        style: 0,
+        stability: 0.45,
+        similarity_boost: 0.8,
+        style: 0.1,
         use_speaker_boost: true,
       },
     };
-    // language_code on flash / v3
-    if (modelId !== 'eleven_multilingual_v2') {
-      payload.language_code = languageCode;
-    }
 
-    // Smaller/faster audio
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`;
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
     const elRes = await fetch(url, {
       method: 'POST',
       headers: {
@@ -75,11 +69,13 @@ export default async function handler(req, res) {
 
     if (!elRes.ok) {
       const errText = await elRes.text().catch(() => '');
-      console.error('ElevenLabs TTS error', elRes.status, errText);
+      console.error('ElevenLabs TTS error', elRes.status, errText, { voiceId, modelId });
       return res.status(502).json({
         error: 'ElevenLabs TTS failed',
         status: elRes.status,
         details: errText.slice(0, 500),
+        voiceId,
+        modelId,
       });
     }
 
@@ -87,6 +83,8 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Length', audioBuf.length);
+    res.setHeader('X-Voice-Id', voiceId);
+    res.setHeader('X-Model-Id', modelId);
     return res.status(200).send(audioBuf);
   } catch (err) {
     console.error('TTS handler error:', err);

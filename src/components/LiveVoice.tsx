@@ -43,11 +43,9 @@ async function transcribeWithElevenLabs(blob: Blob, language: VoiceLanguage): Pr
   return (data.text || '').trim()
 }
 
-/** Prefer short spoken answers in voice mode */
 function voiceFriendlyText(text: string, language: VoiceLanguage): string {
   let t = (text || '').replace(/\s+/g, ' ').trim()
   if (!t) return language === 'ha' ? 'Ban fahimta ba.' : 'Sorry, I did not catch that.'
-  // Strip markdown noise
   t = t
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]+`/g, ' ')
@@ -55,13 +53,47 @@ function voiceFriendlyText(text: string, language: VoiceLanguage): string {
     .replace(/[#*_>~]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-  // Cap length for faster TTS
-  if (t.length > 500) {
-    const cut = t.slice(0, 500)
+  if (t.length > 600) {
+    const cut = t.slice(0, 600)
     const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '))
     t = lastStop > 80 ? cut.slice(0, lastStop + 1) : cut + '…'
   }
   return t
+}
+
+/** Unlock audio on iOS — must run inside a user gesture (mic tap). */
+async function unlockAudioPlayback(
+  silentAudioRef: React.MutableRefObject<HTMLAudioElement | null>,
+  audioCtxRef: React.MutableRefObject<AudioContext | null>,
+) {
+  try {
+    if (!silentAudioRef.current) {
+      // tiny silent wav
+      const silent =
+        'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
+      const a = new Audio(silent)
+      a.volume = 0.01
+      silentAudioRef.current = a
+      await a.play().catch(() => {})
+      a.pause()
+    } else {
+      await silentAudioRef.current.play().catch(() => {})
+      silentAudioRef.current.pause()
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext
+    if (Ctx) {
+      if (!audioCtxRef.current) audioCtxRef.current = new Ctx()
+      if (audioCtxRef.current.state === 'suspended') {
+        await audioCtxRef.current.resume()
+      }
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 async function speakWithElevenLabs(
@@ -76,7 +108,12 @@ async function speakWithElevenLabs(
     const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: spoken, language }),
+      body: JSON.stringify({
+        text: spoken,
+        language,
+        // Explicit voice every time — never drift
+        voice_id: 'rPlZjuLXpONhaMouRFww',
+      }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -94,6 +131,8 @@ async function speakWithElevenLabs(
       }
     }
     const audio = new Audio(url)
+    audio.setAttribute('playsinline', 'true')
+    ;(audio as any).playsInline = true
     audioRef.current = audio
     audio.onended = () => {
       URL.revokeObjectURL(url)
@@ -101,21 +140,23 @@ async function speakWithElevenLabs(
     }
     audio.onerror = () => {
       URL.revokeObjectURL(url)
+      onError?.('Audio playback failed')
       onEnd()
     }
-    await audio.play()
+    try {
+      await audio.play()
+    } catch (playErr: any) {
+      // iOS autoplay block — tell user to tap mic once more
+      const msg =
+        playErr?.name === 'NotAllowedError' || /not allowed|user agent|permission/i.test(String(playErr?.message))
+          ? 'Tap the mic once to allow sound, then try again.'
+          : playErr?.message || 'Could not play audio'
+      onError?.(msg)
+      URL.revokeObjectURL(url)
+      onEnd()
+    }
   } catch (e: any) {
     onError?.(e?.message || 'Could not play voice')
-    // Browser fallback so user still hears something
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel()
-      const utter = new SpeechSynthesisUtterance(spoken)
-      utter.lang = language === 'ha' ? 'ha' : 'en-US'
-      utter.onend = onEnd
-      utter.onerror = onEnd
-      window.speechSynthesis.speak(utter)
-      return
-    }
     onEnd()
   }
 }
@@ -141,6 +182,7 @@ export default function LiveVoice({
   const phaseRef = useRef<Phase>('idle')
   const busyRef = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null)
   const languageRef = useRef<VoiceLanguage>(preferredLanguage)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
@@ -148,6 +190,7 @@ export default function LiveVoice({
   const speechSeenRef = useRef(false)
   const rafRef = useRef<number | null>(null)
   const continuousRef = useRef(true)
+  const audioUnlockedRef = useRef(false)
 
   useEffect(() => {
     phaseRef.current = phase
@@ -178,7 +221,6 @@ export default function LiveVoice({
       }
       try {
         audioRef.current?.pause()
-        window.speechSynthesis?.cancel()
       } catch {
         /* ignore */
       }
@@ -228,13 +270,12 @@ export default function LiveVoice({
           busyRef.current = false
           setPhase('idle')
           setCaption('')
-          // Continuous conversation: auto listen again
           if (continuousRef.current) {
             window.setTimeout(() => {
               if (!busyRef.current && phaseRef.current === 'idle') {
                 void startListeningRef.current?.()
               }
-            }, 400)
+            }, 450)
           }
         },
         (msg) => setError(msg),
@@ -254,9 +295,17 @@ export default function LiveVoice({
     setError(null)
     setCaption('')
     setReply('')
+
+    // Critical for iPhone: unlock audio inside this tap gesture
+    if (!audioUnlockedRef.current) {
+      await unlockAudioPlayback(silentAudioRef, audioCtxRef)
+      audioUnlockedRef.current = true
+    } else {
+      await unlockAudioPlayback(silentAudioRef, audioCtxRef)
+    }
+
     try {
       audioRef.current?.pause()
-      window.speechSynthesis?.cancel()
     } catch {
       /* ignore */
     }
@@ -271,10 +320,12 @@ export default function LiveVoice({
       })
       streamRef.current = stream
 
-      // Silence detection via Web Audio
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+        const ctx =
+          audioCtxRef.current ||
+          new (window.AudioContext || (window as any).webkitAudioContext)()
         audioCtxRef.current = ctx
+        if (ctx.state === 'suspended') await ctx.resume()
         const source = ctx.createMediaStreamSource(stream)
         const analyser = ctx.createAnalyser()
         analyser.fftSize = 512
@@ -301,7 +352,6 @@ export default function LiveVoice({
             }
           } else if (speechSeenRef.current && !silenceTimerRef.current) {
             silenceTimerRef.current = window.setTimeout(() => {
-              // User stopped talking → auto send
               stopListening()
             }, SILENCE_MS)
           }
@@ -329,12 +379,6 @@ export default function LiveVoice({
         stopSilenceWatch()
         stream.getTracks().forEach((t) => t.stop())
         streamRef.current = null
-        try {
-          await audioCtxRef.current?.close()
-        } catch {
-          /* ignore */
-        }
-        audioCtxRef.current = null
 
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
         chunksRef.current = []
@@ -367,7 +411,6 @@ export default function LiveVoice({
       rec.start(250)
       setPhase('listening')
 
-      // Safety: max 20s recording
       window.setTimeout(() => {
         if (phaseRef.current === 'listening') stopListening()
       }, 20000)
@@ -433,7 +476,6 @@ export default function LiveVoice({
               mediaRecRef.current?.stop()
               streamRef.current?.getTracks().forEach((t) => t.stop())
               audioRef.current?.pause()
-              window.speechSynthesis?.cancel()
             } catch {
               /* ignore */
             }
