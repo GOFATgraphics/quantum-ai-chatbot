@@ -9,6 +9,8 @@ export type PendingFile = {
   dataUrl?: string
 }
 
+export type VoiceLanguage = 'en' | 'ha'
+
 type Props = {
   value: string
   onChange: (v: string) => void
@@ -21,6 +23,7 @@ type Props = {
   pendingFiles?: PendingFile[]
   onFilesChange?: (files: PendingFile[]) => void
   onFocusChange?: (focused: boolean) => void
+  language?: VoiceLanguage
 }
 
 function readAsDataURL(file: File): Promise<string> {
@@ -32,51 +35,47 @@ function readAsDataURL(file: File): Promise<string> {
   })
 }
 
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer()
+  let binary = ''
+  const bytes = new Uint8Array(buf)
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
 export default function ChatInput({
   value, onChange, onSend, onStop, onSpeak, isLoading, dark, errorHint,
-  pendingFiles = [], onFilesChange, onFocusChange,
+  pendingFiles = [], onFilesChange, onFocusChange, language = 'en',
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [listening, setListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const [focused, setFocused] = useState(false)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
-  const baseValueRef = useRef('')
+  const [dictating, setDictating] = useState(false)
+  const mediaRecRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const baseValueRef = useRef('')
 
   useEffect(() => {
-    const SR = typeof window !== 'undefined'
-      ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      : null
-    setSpeechSupported(!!SR)
-    if (!SR) return
-    const rec: SpeechRecognition = new SR()
-    rec.continuous = false
-    rec.interimResults = true
-    rec.lang = typeof navigator !== 'undefined' ? navigator.language || 'en-US' : 'en-US'
-    rec.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = ''
-      let finalText = ''
-      const start = (event as SpeechRecognitionEvent & { resultIndex?: number }).resultIndex ?? 0
-      for (let i = start; i < event.results.length; i++) {
-        const piece = event.results[i][0]?.transcript || ''
-        if (event.results[i].isFinal) finalText += piece
-        else interim += piece
-      }
-      const next = (baseValueRef.current + ' ' + (finalText || interim)).replace(/\s+/g, ' ').trimStart()
-      onChange(next)
-      if (finalText) {
-        baseValueRef.current = (baseValueRef.current + ' ' + finalText).replace(/\s+/g, ' ').trim()
-      }
-    }
-    rec.onerror = () => setListening(false)
-    rec.onend = () => setListening(false)
-    recognitionRef.current = rec
+    setSpeechSupported(
+      typeof window !== 'undefined' &&
+        !!navigator.mediaDevices?.getUserMedia &&
+        typeof MediaRecorder !== 'undefined',
+    )
     return () => {
-      try { rec.abort() } catch { /* ignore */ }
-      recognitionRef.current = null
+      try {
+        mediaRecRef.current?.stop()
+      } catch {
+        /* ignore */
+      }
+      streamRef.current?.getTracks().forEach((t) => t.stop())
     }
-  }, [onChange])
+  }, [])
 
   useEffect(() => {
     const el = textareaRef.current
@@ -90,16 +89,73 @@ export default function ChatInput({
     onFocusChange?.(next)
   }
 
-  const toggleListen = () => {
-    const rec = recognitionRef.current
-    if (!rec || isLoading) return
+  const stopDictation = () => {
+    try {
+      if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
+        mediaRecRef.current.stop()
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const toggleListen = async () => {
+    if (isLoading || dictating) return
     if (listening) {
-      try { rec.stop() } catch { /* ignore */ }
-      setListening(false)
+      stopDictation()
       return
     }
     baseValueRef.current = value
-    try { rec.start(); setListening(true) } catch { setListening(false) }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const mime =
+        MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/webm')
+            ? 'audio/webm'
+            : ''
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
+      chunksRef.current = []
+      rec.ondataavailable = (e) => {
+        if (e.data?.size) chunksRef.current.push(e.data)
+      }
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        streamRef.current = null
+        setListening(false)
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        chunksRef.current = []
+        if (blob.size < 400) return
+        setDictating(true)
+        try {
+          const audioBase64 = await blobToBase64(blob)
+          const res = await fetch('/api/stt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              audioBase64,
+              mimeType: blob.type || 'audio/webm',
+              language,
+            }),
+          })
+          const data = await res.json().catch(() => ({}))
+          if (res.ok && data.text) {
+            const next = (baseValueRef.current + ' ' + data.text).replace(/\s+/g, ' ').trim()
+            onChange(next)
+          }
+        } catch {
+          /* ignore */
+        } finally {
+          setDictating(false)
+        }
+      }
+      mediaRecRef.current = rec
+      rec.start()
+      setListening(true)
+    } catch {
+      setListening(false)
+    }
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -142,6 +198,16 @@ export default function ChatInput({
   }
 
   const toolBtn = `glass-btn ${dark ? 'text-slate-200' : 'text-slate-600'}`
+  const placeholder =
+    listening
+      ? language === 'ha'
+        ? 'Ina saurare…'
+        : 'Listening…'
+      : dictating
+        ? language === 'ha'
+          ? 'Ana fassara…'
+          : 'Transcribing…'
+        : 'Ask anything'
 
   return (
     <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
@@ -213,7 +279,6 @@ export default function ChatInput({
                 onKeyDown={onKeyDown}
                 onFocus={() => {
                   setComposerFocus(true)
-                  // Shell tracks visualViewport — do not scrollIntoView (hides the bar under keyboard)
                   const pin = () => {
                     window.scrollTo(0, 0)
                     document.documentElement.scrollTop = 0
@@ -226,7 +291,7 @@ export default function ChatInput({
                 }}
                 onBlur={() => setComposerFocus(false)}
                 rows={1}
-                placeholder={listening ? 'Listening…' : 'Ask anything'}
+                placeholder={placeholder}
                 className={`w-full resize-none bg-transparent border-0 outline-none text-[16px] leading-6 min-h-[28px] max-h-[140px] px-1 py-1.5 ${
                   dark ? 'text-slate-50 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
                 }`}
@@ -237,9 +302,22 @@ export default function ChatInput({
                 <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={onPickFiles} disabled={isLoading} title="Attach files" className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${toolBtn}`} aria-label="Add attachment">
                   <Plus className="w-[18px] h-[18px]" />
                 </motion.button>
-                <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={toggleListen} disabled={!speechSupported || isLoading} title={listening ? 'Stop dictation' : 'Dictate with mic'} className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${
-                  listening ? (dark ? 'bg-rose-500/25 text-rose-200 ring-1 ring-rose-400/40' : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200') : toolBtn
-                }`} aria-label={listening ? 'Stop listening' : 'Speech to text'} aria-pressed={listening}>
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => void toggleListen()}
+                  disabled={!speechSupported || isLoading || dictating}
+                  title={listening ? 'Stop dictation' : 'Dictate with mic'}
+                  className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${
+                    listening || dictating
+                      ? dark
+                        ? 'bg-rose-500/25 text-rose-200 ring-1 ring-rose-400/40'
+                        : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
+                      : toolBtn
+                  }`}
+                  aria-label={listening ? 'Stop listening' : 'Speech to text'}
+                  aria-pressed={listening}
+                >
                   {listening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
                 </motion.button>
               </div>
