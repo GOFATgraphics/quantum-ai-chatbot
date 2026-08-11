@@ -1,12 +1,12 @@
 {
   "name": "quantum-ai-chatbot",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.8",
   "type": "module",
   "scripts": {
-    "inflate-app": "node scripts/inflate-app.cjs",
-    "predev": "node scripts/inflate-app.cjs",
-    "prebuild": "node scripts/inflate-app.cjs",
+    "inflate-app": "node scripts/inflate-app.cjs || true",
+    "predev": "node scripts/inflate-app.cjs || true",
+    "prebuild": "node scripts/inflate-app.cjs || true",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
