@@ -43,23 +43,47 @@ async function transcribeWithElevenLabs(blob: Blob, language: VoiceLanguage): Pr
   return (data.text || '').trim()
 }
 
+/** Prefer short spoken answers in voice mode */
+function voiceFriendlyText(text: string, language: VoiceLanguage): string {
+  let t = (text || '').replace(/\s+/g, ' ').trim()
+  if (!t) return language === 'ha' ? 'Ban fahimta ba.' : 'Sorry, I did not catch that.'
+  // Strip markdown noise
+  t = t
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]+`/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#*_>~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  // Cap length for faster TTS
+  if (t.length > 500) {
+    const cut = t.slice(0, 500)
+    const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '))
+    t = lastStop > 80 ? cut.slice(0, lastStop + 1) : cut + '…'
+  }
+  return t
+}
+
 async function speakWithElevenLabs(
   text: string,
   language: VoiceLanguage,
   audioRef: React.MutableRefObject<HTMLAudioElement | null>,
   onEnd: () => void,
+  onError?: (msg: string) => void,
 ) {
+  const spoken = voiceFriendlyText(text, language)
   try {
     const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, language }),
+      body: JSON.stringify({ text: spoken, language }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      throw new Error(data.error || 'TTS failed')
+      throw new Error(data.error || data.details || 'TTS failed')
     }
     const buf = await res.arrayBuffer()
+    if (!buf.byteLength) throw new Error('Empty audio')
     const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }))
     if (audioRef.current) {
       try {
@@ -80,10 +104,12 @@ async function speakWithElevenLabs(
       onEnd()
     }
     await audio.play()
-  } catch (e) {
+  } catch (e: any) {
+    onError?.(e?.message || 'Could not play voice')
+    // Browser fallback so user still hears something
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel()
-      const utter = new SpeechSynthesisUtterance(text)
+      const utter = new SpeechSynthesisUtterance(spoken)
       utter.lang = language === 'ha' ? 'ha' : 'en-US'
       utter.onend = onEnd
       utter.onerror = onEnd
@@ -115,10 +141,21 @@ export default function LiveVoice({
   const phaseRef = useRef<Phase>('idle')
   const busyRef = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const languageRef = useRef<VoiceLanguage>(preferredLanguage)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const silenceTimerRef = useRef<number | null>(null)
+  const speechSeenRef = useRef(false)
+  const rafRef = useRef<number | null>(null)
+  const continuousRef = useRef(true)
 
   useEffect(() => {
     phaseRef.current = phase
   }, [phase])
+
+  useEffect(() => {
+    languageRef.current = language
+  }, [language])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -132,12 +169,42 @@ export default function LiveVoice({
         /* ignore */
       }
       streamRef.current?.getTracks().forEach((t) => t.stop())
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current)
+      try {
+        audioCtxRef.current?.close()
+      } catch {
+        /* ignore */
+      }
       try {
         audioRef.current?.pause()
         window.speechSynthesis?.cancel()
       } catch {
         /* ignore */
       }
+    }
+  }, [])
+
+  const stopSilenceWatch = () => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+    if (silenceTimerRef.current) {
+      window.clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+    speechSeenRef.current = false
+  }
+
+  const stopListening = useCallback(() => {
+    stopSilenceWatch()
+    try {
+      if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
+        mediaRecRef.current.stop()
+      }
+    } catch {
+      /* ignore */
     }
   }, [])
 
@@ -154,14 +221,23 @@ export default function LiveVoice({
       setReply(clean)
       setPhase('speaking')
       await speakWithElevenLabs(
-        clean || (language === 'ha' ? 'Ban fahimta ba.' : 'Sorry, I did not catch that.'),
-        language,
+        clean,
+        languageRef.current,
         audioRef,
         () => {
           busyRef.current = false
           setPhase('idle')
           setCaption('')
+          // Continuous conversation: auto listen again
+          if (continuousRef.current) {
+            window.setTimeout(() => {
+              if (!busyRef.current && phaseRef.current === 'idle') {
+                void startListeningRef.current?.()
+              }
+            }, 400)
+          }
         },
+        (msg) => setError(msg),
       )
     } catch (e: any) {
       setError(e?.message || 'Something went wrong')
@@ -170,8 +246,11 @@ export default function LiveVoice({
     }
   }
 
+  const startListeningRef = useRef<(() => Promise<void>) | null>(null)
+
   const startListening = useCallback(async () => {
     if (busyRef.current) return
+    if (phaseRef.current === 'listening') return
     setError(null)
     setCaption('')
     setReply('')
@@ -183,35 +262,99 @@ export default function LiveVoice({
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
       streamRef.current = stream
+
+      // Silence detection via Web Audio
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+        audioCtxRef.current = ctx
+        const source = ctx.createMediaStreamSource(stream)
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 512
+        source.connect(analyser)
+        analyserRef.current = analyser
+        speechSeenRef.current = false
+
+        const data = new Uint8Array(analyser.frequencyBinCount)
+        const SILENCE_MS = 1100
+        const SPEECH_THRESHOLD = 12
+
+        const tick = () => {
+          if (phaseRef.current !== 'listening') return
+          analyser.getByteFrequencyData(data)
+          let sum = 0
+          for (let i = 0; i < data.length; i++) sum += data[i]
+          const avg = sum / data.length
+
+          if (avg > SPEECH_THRESHOLD) {
+            speechSeenRef.current = true
+            if (silenceTimerRef.current) {
+              window.clearTimeout(silenceTimerRef.current)
+              silenceTimerRef.current = null
+            }
+          } else if (speechSeenRef.current && !silenceTimerRef.current) {
+            silenceTimerRef.current = window.setTimeout(() => {
+              // User stopped talking → auto send
+              stopListening()
+            }, SILENCE_MS)
+          }
+          rafRef.current = requestAnimationFrame(tick)
+        }
+        rafRef.current = requestAnimationFrame(tick)
+      } catch {
+        /* analyser optional */
+      }
+
       const mime =
         MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
           : MediaRecorder.isTypeSupported('audio/webm')
             ? 'audio/webm'
-            : ''
+            : MediaRecorder.isTypeSupported('audio/mp4')
+              ? 'audio/mp4'
+              : ''
       const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
       chunksRef.current = []
       rec.ondataavailable = (e) => {
         if (e.data?.size) chunksRef.current.push(e.data)
       }
       rec.onstop = async () => {
+        stopSilenceWatch()
         stream.getTracks().forEach((t) => t.stop())
         streamRef.current = null
+        try {
+          await audioCtxRef.current?.close()
+        } catch {
+          /* ignore */
+        }
+        audioCtxRef.current = null
+
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
         chunksRef.current = []
-        if (blob.size < 500) {
+        if (blob.size < 400) {
           setPhase('idle')
-          setError(language === 'ha' ? 'Ba a ji magana ba. Sake gwadawa.' : 'No speech detected. Try again.')
+          setError(
+            languageRef.current === 'ha'
+              ? 'Ba a ji magana ba. Sake gwadawa.'
+              : 'No speech detected. Try again.',
+          )
           return
         }
         setPhase('thinking')
         try {
-          const text = await transcribeWithElevenLabs(blob, language)
+          const text = await transcribeWithElevenLabs(blob, languageRef.current)
           if (!text) {
             setPhase('idle')
-            setError(language === 'ha' ? 'Ba a gane magana ba.' : 'Could not understand speech.')
+            setError(
+              languageRef.current === 'ha' ? 'Ba a gane magana ba.' : 'Could not understand speech.',
+            )
             return
           }
           void handleTurn(text)
@@ -221,8 +364,13 @@ export default function LiveVoice({
         }
       }
       mediaRecRef.current = rec
-      rec.start()
+      rec.start(250)
       setPhase('listening')
+
+      // Safety: max 20s recording
+      window.setTimeout(() => {
+        if (phaseRef.current === 'listening') stopListening()
+      }, 20000)
     } catch (e: any) {
       setSupported(false)
       setError(
@@ -233,17 +381,9 @@ export default function LiveVoice({
       setPhase('idle')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [language])
+  }, [stopListening])
 
-  const stopListening = useCallback(() => {
-    try {
-      if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
-        mediaRecRef.current.stop()
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [])
+  startListeningRef.current = startListening
 
   const changeLanguage = (l: VoiceLanguage) => {
     setLanguage(l)
@@ -258,8 +398,8 @@ export default function LiveVoice({
   const statusLabel =
     phase === 'listening'
       ? language === 'ha'
-        ? 'Ina saurare…'
-        : 'Listening…'
+        ? 'Ina saurare… yi magana'
+        : 'Listening… speak now'
       : phase === 'thinking'
         ? language === 'ha'
           ? 'Ina tunani…'
@@ -269,8 +409,8 @@ export default function LiveVoice({
             ? 'Ina magana…'
             : 'Speaking…'
           : language === 'ha'
-            ? `Sannu${firstName && firstName !== 'there' ? ` ${firstName}` : ''} — danna mic don magana`
-            : `Hi${firstName && firstName !== 'there' ? ` ${firstName}` : ''} — tap the mic to talk`
+            ? `Sannu${firstName && firstName !== 'there' ? ` ${firstName}` : ''} — danna mic`
+            : `Hi${firstName && firstName !== 'there' ? ` ${firstName}` : ''} — tap mic to talk`
 
   return (
     <motion.div
@@ -288,6 +428,7 @@ export default function LiveVoice({
         <button
           type="button"
           onClick={() => {
+            continuousRef.current = false
             try {
               mediaRecRef.current?.stop()
               streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -365,7 +506,6 @@ export default function LiveVoice({
           <p className={`mt-3 text-sm text-center ${dark ? 'text-rose-300' : 'text-rose-600'}`}>{error}</p>
         )}
 
-        {/* Language picker only */}
         <div
           className={`mt-6 flex items-center gap-2 p-1 rounded-full ${
             dark ? 'bg-white/10' : 'bg-white/80 shadow-sm ring-1 ring-black/[0.04]'
@@ -410,6 +550,7 @@ export default function LiveVoice({
           type="button"
           disabled={!supported || phase === 'thinking' || phase === 'speaking'}
           onClick={() => {
+            continuousRef.current = true
             if (phase === 'listening') stopListening()
             else void startListening()
           }}
@@ -424,14 +565,14 @@ export default function LiveVoice({
         >
           {phase === 'listening' ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
         </button>
-        <p className={`text-[12px] ${dark ? 'text-white/45' : 'text-slate-400'}`}>
+        <p className={`text-[12px] text-center max-w-xs ${dark ? 'text-white/45' : 'text-slate-400'}`}>
           {phase === 'listening'
             ? language === 'ha'
-              ? 'Danna don aika'
-              : 'Tap to send'
+              ? 'Yi magana — idan ka tsaya za a aika ta atomatik'
+              : 'Speak — stops & sends after you pause'
             : language === 'ha'
-              ? 'Danna don magana'
-              : 'Tap to speak'}
+              ? 'Danna mic, yi magana, saurari amsa'
+              : 'Tap mic, speak, then AI replies out loud'}
         </p>
       </div>
     </motion.div>
