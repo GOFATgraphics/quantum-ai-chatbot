@@ -155,7 +155,7 @@ function extractText(contentBlocks) {
 
 function toAnthropicContent(content) {
   const str = String(content || '');
-  const imgRe = /!\[([^\]]*\)\]\((data:image\/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+))\)/g;
+  const imgRe = /!\[([^\]]*)\]\((data:image\/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+))\)/g;
   const parts = [];
   let last = 0;
   let m;
@@ -200,7 +200,7 @@ const OPERATOR_SYSTEM_PROMPT = `You are **Quantumy**, an AI workspace operator. 
 
 You read and write documents, spreadsheets, images, and screenshots. You act on Gmail, Drive, Sheets, Calendar, and connected tools. You can search the live web with web_search and read specific pages with web_fetch when you need current information.
 
-**Confirmation rule:** Reversible actions (read, search, draft, analyze, create local drafts) → do immediately. Irreversible/external actions (send email, trash mail, invite calendar attendees, share externally) → summarize exactly what you will do and wait for explicit confirmation. Creating a calendar event without attendees, creating a Doc/Sheet, or updating a sheet the user owns is fine after a clear request — still confirm if attendees or external sharing are involved.
+**Confirmation rule:** Reversible actions (read, search, draft, analyze, create local drafts, archive, mark read) → do immediately when clearly requested. Irreversible/external actions (send email, reply, forward, trash mail, invite calendar attendees, share externally) → summarize exactly what you will do and wait for explicit confirmation. Creating a calendar event without attendees, creating a Doc/Sheet, or updating a sheet the user owns is fine after a clear request — still confirm if attendees or external sharing are involved.
 
 Lead with outcomes. Never narrate internal steps. Clean Markdown. No pipe tables. When you use web_search or web_fetch, cite key sources with links.
 
@@ -218,7 +218,11 @@ function buildSystemPrompt({ connected, memory, project, firstName, think, deepS
   const toolLines = [];
   toolLines.push('- web_search (always available — current events, prices, news, time-sensitive facts)');
   toolLines.push('- web_fetch (always available — read a specific URL or page in full)');
-  if (connected.gmail) toolLines.push('- search_gmail / send_email / create_email_draft / modify_gmail (archive, star, trash)');
+  if (connected.gmail) {
+    toolLines.push('- search_gmail / get_gmail_message / send_email / create_email_draft');
+    toolLines.push('- reply_email / forward_email (confirm before sending)');
+    toolLines.push('- modify_gmail (archive, star, read/unread, trash) / list_gmail_labels / bulk_archive_gmail');
+  }
   if (connected.drive) toolLines.push('- search_drive');
   if (connected.docs) toolLines.push('- read_google_doc / create_google_doc / append_google_doc');
   if (connected.sheets) toolLines.push('- search_sheets / read_sheet / create_spreadsheet / update_sheet');
@@ -245,10 +249,11 @@ ${nameLine}
 ${modeBlock}## Connected tools (runtime)\n${toolLines.join('\n')}\n${missingLine}
 
 ## Email tools
-- If send_email is listed, Gmail is CONNECTED with send permission.
-- Sending is irreversible: summarize To, Subject, Body and get confirmation before calling send_email.
-- For draft only: call create_email_draft.
-- modify_gmail: archive/star are fine when asked; trash requires confirmation.
+- search_gmail first to get message_id / threadId.
+- send_email / reply_email / forward_email are irreversible: summarize and get confirmation before calling.
+- create_email_draft is safe (no send).
+- modify_gmail: archive / star / read / unread are fine when asked; trash requires confirmation.
+- bulk_archive_gmail: confirm which messages first (max 50 ids).
 
 ## Calendar
 - create_calendar_event without attendees: OK after a clear request.
