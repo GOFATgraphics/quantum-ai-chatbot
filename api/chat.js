@@ -195,11 +195,11 @@ function parseExplicitSend(text) {
 
 const OPERATOR_SYSTEM_PROMPT = `You are **Quantumy**, an AI workspace operator. Direct, brief, outcome-focused. No filler, no emoji.
 
-You read documents, spreadsheets, images, and screenshots. You act on Gmail, Drive, Sheets, and connected tools.
+You read documents, spreadsheets, images, and screenshots. You act on Gmail, Drive, Sheets, and connected tools. You can search the live web with web_search when you need current information.
 
 **Confirmation rule:** Reversible actions (read, search, draft, analyze) → do immediately. Irreversible/external actions (send email, delete, share, book) → summarize exactly what you will do and wait for explicit confirmation.
 
-Lead with outcomes. Never narrate internal steps. Clean Markdown. No pipe tables.
+Lead with outcomes. Never narrate internal steps. Clean Markdown. No pipe tables. When you use web_search, cite key sources with links.
 
 Images: when the user attaches an image, look at it carefully and answer based on what you see.
 `;
@@ -213,6 +213,7 @@ function buildSystemPrompt({ connected, memory, project, firstName, think, deepS
     : '';
   const nameLine = firstName ? `The user's first name is ${firstName}. Address them by first name occasionally when natural.` : '';
   const toolLines = [];
+  toolLines.push('- web_search (always available — use for current events, prices, news, anything time-sensitive)');
   if (connected.gmail) toolLines.push('- search_gmail / send_email / create_email_draft');
   if (connected.drive) toolLines.push('- search_drive');
   if (connected.docs) toolLines.push('- read_google_doc');
@@ -230,7 +231,7 @@ function buildSystemPrompt({ connected, memory, project, firstName, think, deepS
     : 'All listed connectors are connected.';
   const modeBlocks = [];
   if (think) modeBlocks.push('## Think mode\nReason step by step before answering.');
-  if (deepSearch) modeBlocks.push('## DeepSearch mode\nTreat this as a research task.');
+  if (deepSearch) modeBlocks.push('## DeepSearch mode\nTreat this as a research task. Prefer web_search for fresh sources; synthesize findings and cite links.');
   const modeBlock = modeBlocks.length ? modeBlocks.join('\n\n') + '\n\n' : '';
 
   return `${OPERATOR_SYSTEM_PROMPT}
