@@ -12,8 +12,8 @@ function stripMarkdown(text: string) {
   return text
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]+`/g, ' ')
-    .replace(/![[^]]*]([^)]+)/g, ' ')
-    .replace(/[([^]]+)]([^)]+)/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/[#*_>~]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -85,7 +85,6 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
       })
 
       if (!res.ok) {
-        // Browser fallback
         if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel()
           const u = new SpeechSynthesisUtterance(plain)
