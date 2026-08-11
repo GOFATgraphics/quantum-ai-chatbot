@@ -10,25 +10,25 @@ export const PROVIDER_SCOPES = {
     'https://www.googleapis.com/auth/userinfo.profile',
   ],
   google_drive: [
-    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/drive',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
   ],
   google_docs: [
-    'https://www.googleapis.com/auth/documents.readonly',
-    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/documents',
+    'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
   ],
   google_sheets: [
-    'https://www.googleapis.com/auth/spreadsheets.readonly',
-    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
   ],
   google_calendar: [
-    'https://www.googleapis.com/auth/calendar.readonly',
-    'https://www.googleapis.com/auth/calendar.events.readonly',
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
   ],
@@ -127,6 +127,7 @@ export async function searchGmail(accessToken, query, maxResults = 10) {
       subject: getH('Subject'),
       from: getH('From'),
       date: getH('Date'),
+      labelIds: msg.labelIds || [],
       body: extractBody(msg.payload),
     });
   }
@@ -200,6 +201,33 @@ export async function createGmailDraft(accessToken, { to, subject, body, cc, bcc
   return { id: data.id, messageId: data.message?.id };
 }
 
+/** Modify Gmail message labels (archive, trash, star, custom labels). */
+export async function modifyGmailMessage(accessToken, messageId, { addLabelIds = [], removeLabelIds = [] } = {}) {
+  if (!messageId) throw new Error('messageId is required');
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addLabelIds, removeLabelIds }),
+    }
+  );
+  if (!res.ok) throw new Error(`Gmail modify failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return { id: data.id, labelIds: data.labelIds || [] };
+}
+
+export async function trashGmailMessage(accessToken, messageId) {
+  if (!messageId) throw new Error('messageId is required');
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/trash`,
+    { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) throw new Error(`Gmail trash failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return { id: data.id, labelIds: data.labelIds || [], trashed: true };
+}
+
 export async function searchDrive(accessToken, query, maxResults = 10) {
   const q = encodeURIComponent(query || "modifiedTime > '2020-01-01T00:00:00'");
   const fields = encodeURIComponent('files(id,name,mimeType,modifiedTime,webViewLink)');
@@ -207,7 +235,13 @@ export async function searchDrive(accessToken, query, maxResults = 10) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!res.ok) throw new Error(`Drive search failed: ${res.status} ${await res.text()}`);
   const data = await res.json();
-  return (data.files || []).map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, link: f.webViewLink }));
+  return (data.files || []).map((f) => ({
+    id: f.id,
+    name: f.name,
+    mimeType: f.mimeType,
+    modifiedTime: f.modifiedTime,
+    link: f.webViewLink,
+  }));
 }
 
 export async function readGoogleDoc(accessToken, documentId) {
@@ -236,6 +270,74 @@ export async function readGoogleDoc(accessToken, documentId) {
   return { title: doc.title || '', documentId: doc.documentId, text: chunks.join('').slice(0, 12000) };
 }
 
+/** Create a new Google Doc with optional initial text. */
+export async function createGoogleDoc(accessToken, { title, body }) {
+  const createRes = await fetch('https://docs.googleapis.com/v1/documents', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: title || 'Untitled' }),
+  });
+  if (!createRes.ok) throw new Error(`Docs create failed: ${createRes.status} ${await createRes.text()}`);
+  const doc = await createRes.json();
+  const documentId = doc.documentId;
+  if (body && String(body).trim()) {
+    const text = String(body);
+    const updateRes = await fetch(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{ insertText: { location: { index: 1 }, text } }],
+      }),
+    });
+    if (!updateRes.ok) {
+      // Doc exists but body insert failed — still return id
+      const t = await updateRes.text();
+      return {
+        documentId,
+        title: doc.title,
+        link: `https://docs.google.com/document/d/${documentId}/edit`,
+        bodyError: t.slice(0, 200),
+      };
+    }
+  }
+  return {
+    documentId,
+    title: doc.title || title,
+    link: `https://docs.google.com/document/d/${documentId}/edit`,
+  };
+}
+
+/** Append text to the end of an existing Google Doc. */
+export async function appendGoogleDocText(accessToken, documentId, text) {
+  if (!documentId) throw new Error('documentId is required');
+  if (!text) throw new Error('text is required');
+  // Get end index
+  const getRes = await fetch(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}?fields=body(content)`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!getRes.ok) throw new Error(`Docs get failed: ${getRes.status} ${await getRes.text()}`);
+  const doc = await getRes.json();
+  let endIndex = 1;
+  const content = doc.body?.content || [];
+  for (const el of content) {
+    if (typeof el.endIndex === 'number') endIndex = Math.max(endIndex, el.endIndex);
+  }
+  const insertAt = Math.max(1, endIndex - 1);
+  const updateRes = await fetch(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requests: [{ insertText: { location: { index: insertAt }, text: String(text) } }],
+    }),
+  });
+  if (!updateRes.ok) throw new Error(`Docs append failed: ${updateRes.status} ${await updateRes.text()}`);
+  return {
+    documentId,
+    link: `https://docs.google.com/document/d/${documentId}/edit`,
+    appended: true,
+  };
+}
+
 export async function searchSheets(accessToken, query, maxResults = 8) {
   const qParts = ["mimeType='application/vnd.google-apps.spreadsheet'", 'trashed=false'];
   if (query) qParts.push(`name contains '${String(query).replace(/'/g, "\\'")}'`);
@@ -245,7 +347,12 @@ export async function searchSheets(accessToken, query, maxResults = 8) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!res.ok) throw new Error(`Sheets search failed: ${res.status} ${await res.text()}`);
   const data = await res.json();
-  return (data.files || []).map((f) => ({ id: f.id, name: f.name, modifiedTime: f.modifiedTime, link: f.webViewLink }));
+  return (data.files || []).map((f) => ({
+    id: f.id,
+    name: f.name,
+    modifiedTime: f.modifiedTime,
+    link: f.webViewLink,
+  }));
 }
 
 export async function readSheetRange(accessToken, spreadsheetId, range = 'A1:Z30') {
@@ -254,6 +361,95 @@ export async function readSheetRange(accessToken, spreadsheetId, range = 'A1:Z30
   if (!res.ok) throw new Error(`Sheets read failed: ${res.status} ${await res.text()}`);
   const data = await res.json();
   return { spreadsheetId, range: data.range || range, values: (data.values || []).slice(0, 40) };
+}
+
+/** Create a new spreadsheet with optional header row and data rows. */
+export async function createSpreadsheet(accessToken, { title, headers, rows }) {
+  const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      properties: { title: title || 'Untitled spreadsheet' },
+    }),
+  });
+  if (!createRes.ok) throw new Error(`Sheets create failed: ${createRes.status} ${await createRes.text()}`);
+  const sheet = await createRes.json();
+  const spreadsheetId = sheet.spreadsheetId;
+  const values = [];
+  if (Array.isArray(headers) && headers.length) values.push(headers.map(String));
+  if (Array.isArray(rows)) {
+    for (const row of rows.slice(0, 500)) {
+      values.push((Array.isArray(row) ? row : [row]).map((c) => (c == null ? '' : String(c))));
+    }
+  }
+  if (values.length) {
+    const writeRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/A1:append?valueInputOption=USER_ENTERED`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values }),
+      }
+    );
+    if (!writeRes.ok) {
+      return {
+        spreadsheetId,
+        title: sheet.properties?.title,
+        link: sheet.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+        writeError: (await writeRes.text()).slice(0, 200),
+      };
+    }
+  }
+  return {
+    spreadsheetId,
+    title: sheet.properties?.title || title,
+    link: sheet.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+  };
+}
+
+/** Update or append values in a spreadsheet range. */
+export async function updateSheetValues(accessToken, { spreadsheetId, range, values, append }) {
+  if (!spreadsheetId) throw new Error('spreadsheetId is required');
+  if (!Array.isArray(values) || !values.length) throw new Error('values array is required');
+  const normalized = values.map((row) =>
+    (Array.isArray(row) ? row : [row]).map((c) => (c == null ? '' : String(c)))
+  );
+  const r = range || 'A1';
+  if (append) {
+    const res = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(r)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: normalized }),
+      }
+    );
+    if (!res.ok) throw new Error(`Sheets append failed: ${res.status} ${await res.text()}`);
+    const data = await res.json();
+    return {
+      spreadsheetId,
+      updatedRange: data.updates?.updatedRange,
+      updatedRows: data.updates?.updatedRows,
+      link: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+      appended: true,
+    };
+  }
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(r)}?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: normalized }),
+    }
+  );
+  if (!res.ok) throw new Error(`Sheets update failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return {
+    spreadsheetId,
+    updatedRange: data.updatedRange,
+    updatedRows: data.updatedRows,
+    link: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+  };
 }
 
 export async function listCalendarEvents(accessToken, { timeMin, timeMax, maxResults = 15, query } = {}) {
@@ -281,4 +477,61 @@ export async function listCalendarEvents(accessToken, { timeMin, timeMax, maxRes
     htmlLink: ev.htmlLink || '',
     status: ev.status || '',
   }));
+}
+
+/** Create a Google Calendar event on primary calendar. */
+export async function createCalendarEvent(accessToken, {
+  summary,
+  description,
+  location,
+  start,
+  end,
+  attendees,
+  allDay,
+  timeZone,
+}) {
+  if (!summary) throw new Error('summary is required');
+  if (!start) throw new Error('start is required (ISO date or datetime)');
+  const tz = timeZone || 'UTC';
+  let startObj;
+  let endObj;
+  if (allDay) {
+    const startDate = String(start).slice(0, 10);
+    const endDate = end ? String(end).slice(0, 10) : startDate;
+    startObj = { date: startDate };
+    endObj = { date: endDate };
+  } else {
+    startObj = { dateTime: start, timeZone: tz };
+    endObj = {
+      dateTime: end || new Date(new Date(start).getTime() + 60 * 60 * 1000).toISOString(),
+      timeZone: tz,
+    };
+  }
+  const body = {
+    summary: String(summary),
+    description: description ? String(description) : undefined,
+    location: location ? String(location) : undefined,
+    start: startObj,
+    end: endObj,
+  };
+  if (Array.isArray(attendees) && attendees.length) {
+    body.attendees = attendees
+      .map((a) => (typeof a === 'string' ? { email: a } : a))
+      .filter((a) => a?.email);
+  }
+  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Calendar create failed: ${res.status} ${await res.text()}`);
+  const ev = await res.json();
+  return {
+    id: ev.id,
+    summary: ev.summary,
+    start: ev.start?.dateTime || ev.start?.date,
+    end: ev.end?.dateTime || ev.end?.date,
+    htmlLink: ev.htmlLink,
+    status: ev.status,
+  };
 }
