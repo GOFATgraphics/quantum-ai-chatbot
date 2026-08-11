@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Copy, Check, ThumbsUp, ThumbsDown, Volume2, Share2, RotateCcw } from 'lucide-react'
+import { Copy, Check, ThumbsUp, ThumbsDown, Volume2, VolumeX, Share2, RotateCcw, Loader2 } from 'lucide-react'
 
 type Props = {
   content: string
@@ -8,9 +8,23 @@ type Props = {
   onRegenerate?: () => void
 }
 
+function stripMarkdown(text: string) {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]+`/g, ' ')
+    .replace(/![[^]]*]([^)]+)/g, ' ')
+    .replace(/[([^]]+)]([^)]+)/g, '$1')
+    .replace(/[#*_>~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export default function MessageActions({ content, dark, onRegenerate }: Props) {
   const [copied, setCopied] = useState(false)
   const [liked, setLiked] = useState<'up' | 'down' | null>(null)
+  const [speaking, setSpeaking] = useState(false)
+  const [loadingSpeak, setLoadingSpeak] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const muted = dark
     ? 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.08]'
@@ -29,12 +43,84 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
     }
   }
 
-  const speak = () => {
-    if (!('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(content.replace(/[#*_`]/g, ''))
-    u.rate = 1
-    window.speechSynthesis.speak(u)
+  const stopSpeak = () => {
+    try {
+      audioRef.current?.pause()
+      if (audioRef.current?.src) URL.revokeObjectURL(audioRef.current.src)
+    } catch {
+      /* ignore */
+    }
+    audioRef.current = null
+    try {
+      window.speechSynthesis?.cancel()
+    } catch {
+      /* ignore */
+    }
+    setSpeaking(false)
+    setLoadingSpeak(false)
+  }
+
+  const speak = async () => {
+    if (speaking || loadingSpeak) {
+      stopSpeak()
+      return
+    }
+    const plain = stripMarkdown(content)
+    if (!plain) return
+
+    setLoadingSpeak(true)
+    try {
+      let language = 'en'
+      try {
+        const saved = localStorage.getItem('quantumy-language')
+        if (saved === 'ha' || saved === 'en') language = saved
+      } catch {
+        /* ignore */
+      }
+
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: plain.slice(0, 4000), language }),
+      })
+
+      if (!res.ok) {
+        // Browser fallback
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel()
+          const u = new SpeechSynthesisUtterance(plain)
+          u.lang = language === 'ha' ? 'ha' : 'en-US'
+          u.onend = () => setSpeaking(false)
+          u.onerror = () => setSpeaking(false)
+          setLoadingSpeak(false)
+          setSpeaking(true)
+          window.speechSynthesis.speak(u)
+          return
+        }
+        throw new Error('TTS failed')
+      }
+
+      const buf = await res.arrayBuffer()
+      const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }))
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => {
+        URL.revokeObjectURL(url)
+        setSpeaking(false)
+        audioRef.current = null
+      }
+      audio.onerror = () => {
+        URL.revokeObjectURL(url)
+        setSpeaking(false)
+        audioRef.current = null
+      }
+      setLoadingSpeak(false)
+      setSpeaking(true)
+      await audio.play()
+    } catch {
+      setLoadingSpeak(false)
+      setSpeaking(false)
+    }
   }
 
   const share = async () => {
@@ -102,8 +188,20 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
       <button type="button" onClick={share} className={`p-1.5 rounded-full transition ${muted}`} title="Share">
         <Share2 className="w-3.5 h-3.5" />
       </button>
-      <button type="button" onClick={speak} className={`p-1.5 rounded-full transition ${muted}`} title="Read aloud">
-        <Volume2 className="w-3.5 h-3.5" />
+      <button
+        type="button"
+        onClick={() => void speak()}
+        className={`p-1.5 rounded-full transition ${speaking || loadingSpeak ? active : muted}`}
+        title={speaking ? 'Stop' : 'Read aloud'}
+        aria-label={speaking ? 'Stop reading' : 'Read aloud'}
+      >
+        {loadingSpeak ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : speaking ? (
+          <VolumeX className="w-3.5 h-3.5" />
+        ) : (
+          <Volume2 className="w-3.5 h-3.5" />
+        )}
       </button>
       <span className={`w-px h-3 mx-0.5 ${dark ? 'bg-white/10' : 'bg-black/8'}`} />
       <motion.button
