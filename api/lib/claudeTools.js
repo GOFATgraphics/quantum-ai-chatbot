@@ -18,6 +18,21 @@ import {
   searchOutlook,
   searchExcelFiles,
 } from './microsoft.js';
+import { runWebSearch } from './webSearch.js';
+
+export const WEB_SEARCH_TOOL = {
+  name: 'web_search',
+  description:
+    'Search the live web for current information, news, facts, prices, or anything that may have changed after training data. Use when the user asks about recent events, needs up-to-date data, or when your knowledge may be stale. Prefer this over guessing.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search query' },
+      max_results: { type: 'number', description: '1-8, default 5' },
+    },
+    required: ['query'],
+  },
+};
 
 export const GMAIL_TOOL = {
   name: 'search_gmail',
@@ -302,6 +317,22 @@ export async function runTool(block, user) {
       await admin.from('user_memory').insert({ user_id: user.id, fact, category: input.category || 'general', source: 'chat' });
       return { type: 'tool_result', tool_use_id: id, content: `Saved memory: ${fact}` };
     }
+    if (name === 'web_search') {
+      const q = String(input.query || '').trim();
+      if (!q) return { type: 'tool_result', tool_use_id: id, content: 'Empty search query.', is_error: true };
+      const max = Math.min(8, Math.max(1, Number(input.max_results) || 5));
+      const out = await runWebSearch(q, max);
+      return {
+        type: 'tool_result',
+        tool_use_id: id,
+        content: JSON.stringify({
+          provider: out.provider,
+          answer: out.answer || null,
+          results: out.results || [],
+          error: out.error || null,
+        }),
+      };
+    }
     return { type: 'tool_result', tool_use_id: id, content: `Unknown tool: ${name}`, is_error: true };
   } catch (e) {
     return { type: 'tool_result', tool_use_id: id, content: `Tool error: ${e.message}`, is_error: true };
@@ -310,7 +341,8 @@ export async function runTool(block, user) {
 
 export async function loadConnectorsAndTools(user) {
   const connected = { gmail: false, drive: false, docs: false, sheets: false, calendar: false, outlook: false, excel: false };
-  const tools = [SAVE_MEMORY_TOOL];
+  // web_search is always available (no connector required)
+  const tools = [WEB_SEARCH_TOOL, SAVE_MEMORY_TOOL];
   if (!user) return { connected, tools };
   if (await getValidToken(user.id, 'gmail')) {
     connected.gmail = true;
