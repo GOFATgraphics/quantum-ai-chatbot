@@ -12,7 +12,7 @@ import Logo from './components/Logo'
 import MessageList, { type ChatMessage } from './components/MessageList'
 import EmptyState from './components/EmptyState'
 import ChatInput, { type PendingFile } from './components/ChatInput'
-import LiveVoice, { type VoiceGender, type VoiceLanguage } from './components/LiveVoice'
+import LiveVoice, { type VoiceLanguage } from './components/LiveVoice'
 import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
 
@@ -89,13 +89,6 @@ export default function App() {
   const [showLiveVoice, setShowLiveVoice] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [composerFocused, setComposerFocused] = useState(false)
-  const [voiceGender, setVoiceGender] = useState<VoiceGender>(() => {
-    try {
-      const v = localStorage.getItem('quantumy-voice')
-      if (v === 'male' || v === 'female') return v
-    } catch { /* ignore */ }
-    return 'female'
-  })
   const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage>(() => {
     try {
       const v = localStorage.getItem('quantumy-language')
@@ -209,10 +202,6 @@ export default function App() {
     } finally { setDeletingId(null) }
   }
 
-  const scrollToBottom = useCallback((smooth = true) => {
-    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' })
-  }, [])
-
   const streamAI = async (userMessage: string, history: ChatMessage[], assistantId: string) => {
     const model = selectedModelRef.current
     const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'text/event-stream' }
@@ -299,7 +288,7 @@ export default function App() {
       const history = messagesRef.current.slice(-12).map((m) => ({ role: m.role, content: m.content }))
       const response = await fetch('/api/chat', {
         method: 'POST',
-      headers,
+        headers,
         body: JSON.stringify({
           messages: [...history, { role: 'user', content: userMessage }],
           firstName,
@@ -513,7 +502,7 @@ export default function App() {
       </AnimatePresence>
       <AnimatePresence>
         {showLiveVoice && (
-          <LiveVoice dark={dark} firstName={firstName} preferredVoice={voiceGender} onVoiceChange={setVoiceGender} preferredLanguage={voiceLanguage} onLanguageChange={setVoiceLanguage} onClose={() => setShowLiveVoice(false)} onAsk={askForVoice} />
+          <LiveVoice dark={dark} firstName={firstName} preferredLanguage={voiceLanguage} onLanguageChange={setVoiceLanguage} onClose={() => setShowLiveVoice(false)} onAsk={askForVoice} />
         )}
       </AnimatePresence>
     </div>
