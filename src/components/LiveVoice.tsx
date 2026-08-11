@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Mic, MicOff, Languages } from 'lucide-react'
+import { X, Languages } from 'lucide-react'
 import Logo from './Logo'
 
 export type VoiceLanguage = 'en' | 'ha'
@@ -61,14 +61,12 @@ function voiceFriendlyText(text: string, language: VoiceLanguage): string {
   return t
 }
 
-/** Unlock audio on iOS — must run inside a user gesture (mic tap). */
 async function unlockAudioPlayback(
   silentAudioRef: React.MutableRefObject<HTMLAudioElement | null>,
   audioCtxRef: React.MutableRefObject<AudioContext | null>,
 ) {
   try {
     if (!silentAudioRef.current) {
-      // tiny silent wav
       const silent =
         'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
       const a = new Audio(silent)
@@ -111,7 +109,6 @@ async function speakWithElevenLabs(
       body: JSON.stringify({
         text: spoken,
         language,
-        // Explicit voice every time — never drift
         voice_id: 'rPlZjuLXpONhaMouRFww',
       }),
     })
@@ -146,10 +143,11 @@ async function speakWithElevenLabs(
     try {
       await audio.play()
     } catch (playErr: any) {
-      // iOS autoplay block — tell user to tap mic once more
       const msg =
         playErr?.name === 'NotAllowedError' || /not allowed|user agent|permission/i.test(String(playErr?.message))
-          ? 'Tap the mic once to allow sound, then try again.'
+          ? language === 'ha'
+            ? 'Danna kusan duk wani wuri don ba da izinin sauti.'
+            : 'Tap anywhere on the screen to allow sound.'
           : playErr?.message || 'Could not play audio'
       onError?.(msg)
       URL.revokeObjectURL(url)
@@ -190,7 +188,8 @@ export default function LiveVoice({
   const speechSeenRef = useRef(false)
   const rafRef = useRef<number | null>(null)
   const continuousRef = useRef(true)
-  const audioUnlockedRef = useRef(false)
+  const startListeningRef = useRef<(() => Promise<void>) | null>(null)
+  const maxListenTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     phaseRef.current = phase
@@ -199,33 +198,6 @@ export default function LiveVoice({
   useEffect(() => {
     languageRef.current = language
   }, [language])
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      setSupported(false)
-      setError('Microphone is not supported in this browser.')
-    }
-    return () => {
-      try {
-        mediaRecRef.current?.stop()
-      } catch {
-        /* ignore */
-      }
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current)
-      try {
-        audioCtxRef.current?.close()
-      } catch {
-        /* ignore */
-      }
-      try {
-        audioRef.current?.pause()
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [])
 
   const stopSilenceWatch = () => {
     if (rafRef.current) {
@@ -241,6 +213,10 @@ export default function LiveVoice({
 
   const stopListening = useCallback(() => {
     stopSilenceWatch()
+    if (maxListenTimerRef.current) {
+      window.clearTimeout(maxListenTimerRef.current)
+      maxListenTimerRef.current = null
+    }
     try {
       if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
         mediaRecRef.current.stop()
@@ -248,6 +224,16 @@ export default function LiveVoice({
     } catch {
       /* ignore */
     }
+  }, [])
+
+  const scheduleListen = useCallback((delay = 350) => {
+    if (!continuousRef.current) return
+    window.setTimeout(() => {
+      if (!continuousRef.current) return
+      if (busyRef.current) return
+      if (phaseRef.current === 'listening' || phaseRef.current === 'thinking' || phaseRef.current === 'speaking') return
+      void startListeningRef.current?.()
+    }, delay)
   }, [])
 
   const handleTurn = async (text: string) => {
@@ -270,13 +256,7 @@ export default function LiveVoice({
           busyRef.current = false
           setPhase('idle')
           setCaption('')
-          if (continuousRef.current) {
-            window.setTimeout(() => {
-              if (!busyRef.current && phaseRef.current === 'idle') {
-                void startListeningRef.current?.()
-              }
-            }, 450)
-          }
+          scheduleListen(400)
         },
         (msg) => setError(msg),
       )
@@ -284,25 +264,17 @@ export default function LiveVoice({
       setError(e?.message || 'Something went wrong')
       busyRef.current = false
       setPhase('idle')
+      scheduleListen(900)
     }
   }
 
-  const startListeningRef = useRef<(() => Promise<void>) | null>(null)
-
   const startListening = useCallback(async () => {
+    if (!continuousRef.current) return
     if (busyRef.current) return
     if (phaseRef.current === 'listening') return
     setError(null)
-    setCaption('')
-    setReply('')
 
-    // Critical for iPhone: unlock audio inside this tap gesture
-    if (!audioUnlockedRef.current) {
-      await unlockAudioPlayback(silentAudioRef, audioCtxRef)
-      audioUnlockedRef.current = true
-    } else {
-      await unlockAudioPlayback(silentAudioRef, audioCtxRef)
-    }
+    await unlockAudioPlayback(silentAudioRef, audioCtxRef)
 
     try {
       audioRef.current?.pause()
@@ -334,8 +306,8 @@ export default function LiveVoice({
         speechSeenRef.current = false
 
         const data = new Uint8Array(analyser.frequencyBinCount)
-        const SILENCE_MS = 1100
-        const SPEECH_THRESHOLD = 12
+        const SILENCE_MS = 1000
+        const SPEECH_THRESHOLD = 11
 
         const tick = () => {
           if (phaseRef.current !== 'listening') return
@@ -377,6 +349,10 @@ export default function LiveVoice({
       }
       rec.onstop = async () => {
         stopSilenceWatch()
+        if (maxListenTimerRef.current) {
+          window.clearTimeout(maxListenTimerRef.current)
+          maxListenTimerRef.current = null
+        }
         stream.getTracks().forEach((t) => t.stop())
         streamRef.current = null
 
@@ -384,11 +360,8 @@ export default function LiveVoice({
         chunksRef.current = []
         if (blob.size < 400) {
           setPhase('idle')
-          setError(
-            languageRef.current === 'ha'
-              ? 'Ba a ji magana ba. Sake gwadawa.'
-              : 'No speech detected. Try again.',
-          )
+          // Keep listening — no speech yet
+          scheduleListen(300)
           return
         }
         setPhase('thinking')
@@ -396,37 +369,74 @@ export default function LiveVoice({
           const text = await transcribeWithElevenLabs(blob, languageRef.current)
           if (!text) {
             setPhase('idle')
-            setError(
-              languageRef.current === 'ha' ? 'Ba a gane magana ba.' : 'Could not understand speech.',
-            )
+            scheduleListen(400)
             return
           }
           void handleTurn(text)
         } catch (e: any) {
           setError(e?.message || 'Transcription failed')
           setPhase('idle')
+          scheduleListen(1000)
         }
       }
       mediaRecRef.current = rec
       rec.start(250)
       setPhase('listening')
 
-      window.setTimeout(() => {
+      maxListenTimerRef.current = window.setTimeout(() => {
         if (phaseRef.current === 'listening') stopListening()
-      }, 20000)
+      }, 18000)
     } catch (e: any) {
       setSupported(false)
       setError(
         e?.name === 'NotAllowedError'
-          ? 'Microphone permission denied.'
-          : 'Could not start microphone',
+          ? languageRef.current === 'ha'
+            ? 'Ba a ba da izinin makirufo ba.'
+            : 'Microphone permission denied.'
+          : languageRef.current === 'ha'
+            ? 'Ba a iya kunna makirufo ba.'
+            : 'Could not start microphone',
       )
       setPhase('idle')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopListening])
+  }, [stopListening, scheduleListen])
 
   startListeningRef.current = startListening
+
+  // Auto-start as soon as Live Voice opens (user already tapped Speak)
+  useEffect(() => {
+    continuousRef.current = true
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setSupported(false)
+      setError('Microphone is not supported in this browser.')
+      return
+    }
+    void startListening()
+    return () => {
+      continuousRef.current = false
+      try {
+        mediaRecRef.current?.stop()
+      } catch {
+        /* ignore */
+      }
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current)
+      if (maxListenTimerRef.current) window.clearTimeout(maxListenTimerRef.current)
+      try {
+        audioCtxRef.current?.close()
+      } catch {
+        /* ignore */
+      }
+      try {
+        audioRef.current?.pause()
+      } catch {
+        /* ignore */
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const changeLanguage = (l: VoiceLanguage) => {
     setLanguage(l)
@@ -435,6 +445,14 @@ export default function LiveVoice({
       localStorage.setItem('quantumy-language', l)
     } catch {
       /* ignore */
+    }
+  }
+
+  // Tap screen to re-unlock audio on iOS if needed
+  const onScreenTap = () => {
+    void unlockAudioPlayback(silentAudioRef, audioCtxRef)
+    if (supported && phase === 'idle' && !busyRef.current) {
+      scheduleListen(100)
     }
   }
 
@@ -452,8 +470,8 @@ export default function LiveVoice({
             ? 'Ina magana…'
             : 'Speaking…'
           : language === 'ha'
-            ? `Sannu${firstName && firstName !== 'there' ? ` ${firstName}` : ''} — danna mic`
-            : `Hi${firstName && firstName !== 'there' ? ` ${firstName}` : ''} — tap mic to talk`
+            ? `Sannu${firstName && firstName !== 'there' ? ` ${firstName}` : ''}…`
+            : `Hi${firstName && firstName !== 'there' ? ` ${firstName}` : ''}…`
 
   return (
     <motion.div
@@ -466,11 +484,13 @@ export default function LiveVoice({
           ? 'radial-gradient(ellipse at 50% 30%, #1e1b4b 0%, #0a0a0f 55%, #050508 100%)'
           : 'radial-gradient(ellipse at 50% 30%, #e0e7ff 0%, #eef2ff 45%, #f8fafc 100%)',
       }}
+      onClick={onScreenTap}
     >
       <div className="pt-[env(safe-area-inset-top)] px-4 h-14 flex items-center justify-between shrink-0">
         <button
           type="button"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation()
             continuousRef.current = false
             try {
               mediaRecRef.current?.stop()
@@ -499,17 +519,19 @@ export default function LiveVoice({
           <motion.div
             animate={
               phase === 'listening'
-                ? { scale: [1, 1.12, 1], opacity: [0.35, 0.55, 0.35] }
+                ? { scale: [1, 1.14, 1], opacity: [0.35, 0.6, 0.35] }
                 : phase === 'speaking'
-                  ? { scale: [1, 1.08, 1], opacity: [0.3, 0.5, 0.3] }
-                  : { scale: 1, opacity: 0.25 }
+                  ? { scale: [1, 1.1, 1], opacity: [0.3, 0.55, 0.3] }
+                  : phase === 'thinking'
+                    ? { scale: [1, 1.05, 1], opacity: [0.3, 0.45, 0.3] }
+                    : { scale: 1, opacity: 0.25 }
             }
-            transition={{ duration: phase === 'idle' ? 3 : 1.4, repeat: Infinity, ease: 'easeInOut' }}
+            transition={{ duration: phase === 'idle' ? 3 : 1.2, repeat: Infinity, ease: 'easeInOut' }}
             className={`absolute inset-0 -m-10 rounded-full blur-2xl ${
               phase === 'listening'
-                ? 'bg-rose-400/40'
+                ? 'bg-rose-400/45'
                 : phase === 'speaking'
-                  ? 'bg-indigo-400/40'
+                  ? 'bg-indigo-400/45'
                   : dark
                     ? 'bg-indigo-500/30'
                     : 'bg-violet-400/30'
@@ -552,6 +574,7 @@ export default function LiveVoice({
           className={`mt-6 flex items-center gap-2 p-1 rounded-full ${
             dark ? 'bg-white/10' : 'bg-white/80 shadow-sm ring-1 ring-black/[0.04]'
           }`}
+          onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
@@ -587,34 +610,11 @@ export default function LiveVoice({
         </div>
       </div>
 
-      <div className="pb-[max(1.5rem,env(safe-area-inset-bottom))] flex flex-col items-center gap-3">
-        <button
-          type="button"
-          disabled={!supported || phase === 'thinking' || phase === 'speaking'}
-          onClick={() => {
-            continuousRef.current = true
-            if (phase === 'listening') stopListening()
-            else void startListening()
-          }}
-          className={`w-[72px] h-[72px] rounded-full flex items-center justify-center transition shadow-lg disabled:opacity-40 ${
-            phase === 'listening'
-              ? 'bg-rose-500 text-white shadow-rose-500/30'
-              : dark
-                ? 'bg-white text-slate-900'
-                : 'bg-slate-900 text-white shadow-slate-900/25'
-          }`}
-          aria-label={phase === 'listening' ? 'Stop listening' : 'Start talking'}
-        >
-          {phase === 'listening' ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
-        </button>
+      <div className="pb-[max(1.5rem,env(safe-area-inset-bottom))] flex flex-col items-center gap-2 px-6">
         <p className={`text-[12px] text-center max-w-xs ${dark ? 'text-white/45' : 'text-slate-400'}`}>
-          {phase === 'listening'
-            ? language === 'ha'
-              ? 'Yi magana — idan ka tsaya za a aika ta atomatik'
-              : 'Speak — stops & sends after you pause'
-            : language === 'ha'
-              ? 'Danna mic, yi magana, saurari amsa'
-              : 'Tap mic, speak, then AI replies out loud'}
+          {language === 'ha'
+            ? 'Yi magana kai tsaye — ba a bukatar mic. Rufe da ×'
+            : 'Just speak — no mic button. Close with ×'}
         </p>
       </div>
     </motion.div>
