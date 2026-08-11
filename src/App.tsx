@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, Loader2, PenLine, ChevronDown, Check, Sun, Moon } from 'lucide-react'
+import { Menu, Loader2, PenLine, ChevronDown, Sun, Moon } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage, type Project, makeChatTitle } from './lib/supabase'
 import { useTheme } from './lib/theme'
 import Auth from './components/Auth'
@@ -105,7 +105,6 @@ export default function App() {
   const messagesRef = useRef<ChatMessage[]>([])
   const currentConversationIdRef = useRef<string | null>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
 
   useEffect(() => { messagesRef.current = messages }, [messages])
   useEffect(() => { currentConversationIdRef.current = currentConversationId }, [currentConversationId])
