@@ -52,6 +52,7 @@ function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; v
 
 function UserBubble({ content, dark }: { content: string; dark: boolean }) {
   const [expanded, setExpanded] = useState(false)
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null)
   const segments = parseUserContent(content)
 
   const textOnly = segments
@@ -71,20 +72,19 @@ function UserBubble({ content, dark }: { content: string; dark: boolean }) {
         {segments.map((seg, i) => {
           if (seg.type === 'image') {
             return (
-              <a
+              <button
                 key={i}
-                href={seg.value}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block overflow-hidden rounded-xl -mx-1"
+                type="button"
+                onClick={() => setLightbox({ src: seg.value, alt: seg.alt || 'Attached image' })}
+                className="block overflow-hidden rounded-xl -mx-1 text-left w-full"
               >
                 <img
                   src={seg.value}
                   alt={seg.alt || 'Attached image'}
-                  className="max-w-full max-h-[280px] object-contain rounded-xl"
+                  className="max-w-full max-h-[280px] object-contain rounded-xl cursor-zoom-in"
                   loading="lazy"
                 />
-              </a>
+              </button>
             )
           }
           if (seg.type === 'file') {
@@ -121,6 +121,30 @@ function UserBubble({ content, dark }: { content: string; dark: boolean }) {
         >
           {expanded ? 'Show less' : 'Show more'}
         </button>
+      )}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+        >
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/15 text-white text-xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
+          <img
+            src={lightbox.src}
+            alt={lightbox.alt}
+            className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   )
