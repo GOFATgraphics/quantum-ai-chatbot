@@ -1,11 +1,5 @@
-# Deploy note
+# Quantumy deploy note
 
-Production was failing with:
+Pro plan upgrade completed. Backend empty-response fixes (tool rounds 8/10, 300s maxDuration, status SSE, empty toolResults guard) are in place.
 
-```
-src/App.tsx: TS2322 Property 'onSuggestion' does not exist on type EmptyState Props
-```
-
-Fixed on main by removing the obsolete `onSuggestion` prop from `<EmptyState />` (chips removed).
-
-Build verified locally: `tsc -b && vite build` succeeds.
+Full App.tsx with stream keep-alive across tool_use is being restored next.
