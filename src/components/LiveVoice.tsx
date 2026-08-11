@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Mic, MicOff, User, UserRound, Languages } from 'lucide-react'
+import { X, Mic, MicOff, Languages } from 'lucide-react'
 import Logo from './Logo'
 
-export type VoiceGender = 'male' | 'female'
 export type VoiceLanguage = 'en' | 'ha'
 
 type Props = {
@@ -11,8 +10,6 @@ type Props = {
   firstName: string
   onClose: () => void
   onAsk: (text: string) => Promise<string>
-  preferredVoice?: VoiceGender
-  onVoiceChange?: (v: VoiceGender) => void
   preferredLanguage?: VoiceLanguage
   onLanguageChange?: (l: VoiceLanguage) => void
 }
@@ -48,7 +45,6 @@ async function transcribeWithElevenLabs(blob: Blob, language: VoiceLanguage): Pr
 
 async function speakWithElevenLabs(
   text: string,
-  gender: VoiceGender,
   language: VoiceLanguage,
   audioRef: React.MutableRefObject<HTMLAudioElement | null>,
   onEnd: () => void,
@@ -57,7 +53,7 @@ async function speakWithElevenLabs(
     const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice: gender, language }),
+      body: JSON.stringify({ text, language }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -85,7 +81,6 @@ async function speakWithElevenLabs(
     }
     await audio.play()
   } catch (e) {
-    // Browser fallback
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel()
       const utter = new SpeechSynthesisUtterance(text)
@@ -104,15 +99,12 @@ export default function LiveVoice({
   firstName,
   onClose,
   onAsk,
-  preferredVoice = 'female',
-  onVoiceChange,
   preferredLanguage = 'en',
   onLanguageChange,
 }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [caption, setCaption] = useState('')
   const [reply, setReply] = useState('')
-  const [voice, setVoice] = useState<VoiceGender>(preferredVoice)
   const [language, setLanguage] = useState<VoiceLanguage>(preferredLanguage)
   const [error, setError] = useState<string | null>(null)
   const [supported, setSupported] = useState(true)
@@ -163,7 +155,6 @@ export default function LiveVoice({
       setPhase('speaking')
       await speakWithElevenLabs(
         clean || (language === 'ha' ? 'Ban fahimta ba.' : 'Sorry, I did not catch that.'),
-        voice,
         language,
         audioRef,
         () => {
@@ -242,7 +233,7 @@ export default function LiveVoice({
       setPhase('idle')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [language, voice])
+  }, [language])
 
   const stopListening = useCallback(() => {
     try {
@@ -253,16 +244,6 @@ export default function LiveVoice({
       /* ignore */
     }
   }, [])
-
-  const changeVoice = (g: VoiceGender) => {
-    setVoice(g)
-    onVoiceChange?.(g)
-    try {
-      localStorage.setItem('quantumy-voice', g)
-    } catch {
-      /* ignore */
-    }
-  }
 
   const changeLanguage = (l: VoiceLanguage) => {
     setLanguage(l)
@@ -384,7 +365,7 @@ export default function LiveVoice({
           <p className={`mt-3 text-sm text-center ${dark ? 'text-rose-300' : 'text-rose-600'}`}>{error}</p>
         )}
 
-        {/* Language picker */}
+        {/* Language picker only */}
         <div
           className={`mt-6 flex items-center gap-2 p-1 rounded-full ${
             dark ? 'bg-white/10' : 'bg-white/80 shadow-sm ring-1 ring-black/[0.04]'
@@ -420,46 +401,6 @@ export default function LiveVoice({
             }`}
           >
             Hausa
-          </button>
-        </div>
-
-        {/* Voice picker */}
-        <div
-          className={`mt-3 flex items-center gap-2 p-1 rounded-full ${
-            dark ? 'bg-white/10' : 'bg-white/80 shadow-sm ring-1 ring-black/[0.04]'
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => changeVoice('female')}
-            className={`h-10 px-4 rounded-full flex items-center gap-2 text-[13px] font-semibold transition ${
-              voice === 'female'
-                ? dark
-                  ? 'bg-white text-slate-900'
-                  : 'bg-slate-900 text-white'
-                : dark
-                  ? 'text-white/70'
-                  : 'text-slate-600'
-            }`}
-          >
-            <UserRound className="w-4 h-4" />
-            Woman
-          </button>
-          <button
-            type="button"
-            onClick={() => changeVoice('male')}
-            className={`h-10 px-4 rounded-full flex items-center gap-2 text-[13px] font-semibold transition ${
-              voice === 'male'
-                ? dark
-                  ? 'bg-white text-slate-900'
-                  : 'bg-slate-900 text-white'
-                : dark
-                  ? 'text-white/70'
-                  : 'text-slate-600'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            Man
           </button>
         </div>
       </div>

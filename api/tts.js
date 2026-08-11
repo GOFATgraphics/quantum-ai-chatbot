@@ -1,6 +1,7 @@
 /**
  * ElevenLabs Text-to-Speech proxy
- * POST { text, voice?, language? }
+ * POST { text, language? }
+ * Always uses the configured man voice (Hausa man by default).
  * Returns audio/mpeg stream
  */
 export default async function handler(req, res) {
@@ -24,29 +25,15 @@ export default async function handler(req, res) {
     if (!text) return res.status(400).json({ error: 'text is required' });
     if (text.length > 4000) return res.status(400).json({ error: 'text too long (max 4000 chars)' });
 
-    // Language: 'en' | 'ha' (Hausa). Hausa needs eleven_v3.
+    // Single man voice for all TTS (custom Hausa man)
+    const voiceId =
+      body?.voice_id ||
+      process.env.ELEVENLABS_VOICE_MALE ||
+      process.env.ELEVENLABS_VOICE_HAUSA_MALE ||
+      'rPlZjuLXpONhaMouRFww';
+
     const lang = (body?.language || 'en').toLowerCase();
     const isHausa = lang === 'ha' || lang === 'hau' || lang === 'hausa';
-
-    // Voices
-    // - Female default: Sarah
-    // - Male default: custom Hausa man voice (works for EN + HA)
-    // Override via body.voice_id or env vars.
-    const gender = body?.voice === 'male' ? 'male' : 'female';
-    const defaultFemale = process.env.ELEVENLABS_VOICE_FEMALE || 'EXAVITQu4vr4xnSDxMaL';
-    const defaultMale = process.env.ELEVENLABS_VOICE_MALE || 'rPlZjuLXpONhaMouRFww';
-    const hausaMale = process.env.ELEVENLABS_VOICE_HAUSA_MALE || 'rPlZjuLXpONhaMouRFww';
-    const hausaFemale = process.env.ELEVENLABS_VOICE_HAUSA_FEMALE || defaultFemale;
-
-    let voiceId = body?.voice_id;
-    if (!voiceId) {
-      if (isHausa) {
-        voiceId = gender === 'male' ? hausaMale : hausaFemale;
-      } else {
-        voiceId = gender === 'male' ? defaultMale : defaultFemale;
-      }
-    }
-
     const modelId = isHausa
       ? 'eleven_v3'
       : (process.env.ELEVENLABS_TTS_MODEL || 'eleven_multilingual_v2');
@@ -62,7 +49,6 @@ export default async function handler(req, res) {
         use_speaker_boost: true,
       },
     };
-    // language_code is supported on eleven_v3 / flash models (not multilingual_v2)
     if (modelId !== 'eleven_multilingual_v2') {
       payload.language_code = languageCode;
     }
