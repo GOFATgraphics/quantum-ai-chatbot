@@ -113,6 +113,53 @@ export default function App() {
     try { localStorage.setItem('quantumy-glass', glass ? '1' : '0') } catch {}
   }, [glass])
 
+  // Lock shell height to the *visible* viewport (above iOS keyboard)
+  useEffect(() => {
+    const root = document.documentElement
+    const apply = () => {
+      const vv = window.visualViewport
+      if (vv) {
+        root.style.setProperty('--app-vh', Math.round(vv.height) + 'px')
+        root.style.setProperty('--app-offset', Math.round(vv.offsetTop) + 'px')
+      } else {
+        root.style.setProperty('--app-vh', window.innerHeight + 'px')
+        root.style.setProperty('--app-offset', '0px')
+      }
+    }
+    apply()
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', apply)
+    vv?.addEventListener('scroll', apply)
+    window.addEventListener('resize', apply)
+    window.addEventListener('orientationchange', apply)
+    return () => {
+      vv?.removeEventListener('resize', apply)
+      vv?.removeEventListener('scroll', apply)
+      window.removeEventListener('resize', apply)
+      window.removeEventListener('orientationchange', apply)
+    }
+  }, [])
+
+  // Empty-chat scroll lock (CSS targets html.is-empty-chat)
+  useEffect(() => {
+    const empty = messages.length === 0 && !isLoading
+    document.documentElement.classList.toggle('is-empty-chat', empty)
+    return () => document.documentElement.classList.remove('is-empty-chat')
+  }, [messages.length, isLoading])
+
+  // Prevent body/page scroll while typing (iOS rubber-band)
+  useEffect(() => {
+    if (!composerFocused) return
+    const pin = () => {
+      window.scrollTo(0, 0)
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+    }
+    pin()
+    const id = window.setInterval(pin, 250)
+    return () => clearInterval(id)
+  }, [composerFocused])
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setAuthLoading(false) })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => { setSession(s); setAuthLoading(false) })
@@ -382,6 +429,7 @@ export default function App() {
   }
 
   const isEmpty = messages.length === 0 && !isLoading
+  const glowMode = isLoading ? 'thinking' : isEmpty ? 'idle' : 'idle'
 
   if (authLoading) {
     return (
@@ -421,6 +469,12 @@ export default function App() {
         )}
       </AnimatePresence>
       <div className={'chat-shell-locked flex-1 flex flex-col min-w-0 min-h-0 h-full relative overflow-hidden overscroll-none ' + (isEmpty ? 'chat-shell-empty ' : '') + (dark ? '' : 'bg-white')}>
+        {/* Ambient gradient orbs — pulse strongly while AI responds */}
+        <div className={'chat-glow chat-glow--' + glowMode} aria-hidden>
+          <div className="chat-glow-orb chat-glow-orb-a" />
+          <div className="chat-glow-orb chat-glow-orb-b" />
+          <div className="chat-glow-orb chat-glow-orb-c" />
+        </div>
         <header className={'glass-header shrink-0 pt-[env(safe-area-inset-top)] ' + (showModelMenu ? 'z-50' : 'z-30')}>
           <div className="h-14 grid grid-cols-[1fr_auto_1fr] items-center px-3 gap-2">
             <div className="flex items-center justify-start min-w-0">
