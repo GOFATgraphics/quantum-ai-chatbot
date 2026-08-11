@@ -5,6 +5,9 @@ import {
   runTool,
 } from './lib/claudeTools.js';
 
+/** Vercel serverless timeout — needs Pro plan for >60s */
+export const config = { maxDuration: 300 };
+
 const rateBuckets = new Map();
 function checkRateLimit(key) {
   const now = Date.now();
@@ -152,7 +155,7 @@ function extractText(contentBlocks) {
 
 function toAnthropicContent(content) {
   const str = String(content || '');
-  const imgRe = /!\[([^\]]*)\]\((data:image\/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+))\)/g;
+  const imgRe = /!\[([^\]]*\)\]\((data:image\/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+))\)/g;
   const parts = [];
   let last = 0;
   let m;
@@ -340,11 +343,12 @@ export default async function handler(req, res) {
       if (typeof res.flushHeaders === 'function') res.flushHeaders();
     }
 
-    for (let round = 0; round < 4; round++) {
+    const maxRounds = body?.deepSearch || body?.think ? 10 : 8;
+    for (let round = 0; round < maxRounds; round++) {
       let data;
       const maxTokens = (() => {
         const m = body?.model || '';
-        if (body?.think || m.includes('opus') || m.includes('fable')) return 8192;
+        if (body?.think || body?.deepSearch || m.includes('opus') || m.includes('fable')) return 8192;
         if (m.includes('haiku')) return 2048;
         return 4096;
       })();
@@ -365,11 +369,15 @@ export default async function handler(req, res) {
 
       const stop = data.stop_reason;
       const content = data.content || [];
+      const clientToolBlocks = content.filter((b) => b.type === 'tool_use');
 
-      if (stop !== 'tool_use') {
-        const textOut = (wantStream ? data.text : extractText(content)) || extractText(content) || 'Sorry, I could not generate a response.';
+      if (stop !== 'tool_use' || clientToolBlocks.length === 0) {
+        const textOut =
+          (wantStream ? data.text : extractText(content)) ||
+          extractText(content) ||
+          'Sorry, I could not generate a response.';
         if (wantStream) {
-          if (!data.text) sseWrite(res, { content: textOut });
+          if (!data.text || !String(data.text).trim()) sseWrite(res, { content: textOut });
           sseWrite(res, { done: true });
           res.write('data: [DONE]\n\n');
           return res.end();
@@ -378,19 +386,32 @@ export default async function handler(req, res) {
       }
 
       if (wantStream) {
-        try { sseWrite(res, { status: 'tool_use' }); } catch (_) {}
+        try {
+          const names = clientToolBlocks.map((b) => b.name).filter(Boolean);
+          sseWrite(res, { status: 'tool_use', tool: names[0] || 'tool', tools: names });
+        } catch (_) {}
       }
 
       anthropicMessages = [...anthropicMessages, { role: 'assistant', content }];
       const toolResults = [];
-      for (const block of content) {
-        if (block.type !== 'tool_use') continue;
+      for (const block of clientToolBlocks) {
         toolResults.push(await runTool(block, user));
+      }
+      if (toolResults.length === 0) {
+        const fallback = 'Tool step produced no results. Please try a more specific request.';
+        if (wantStream) {
+          sseWrite(res, { content: fallback });
+          sseWrite(res, { done: true });
+          res.write('data: [DONE]\n\n');
+          return res.end();
+        }
+        return res.status(200).json({ content: fallback });
       }
       anthropicMessages.push({ role: 'user', content: toolResults });
     }
 
-    const limitMsg = 'I tried to look that up but hit a limit. Please try a more specific question.';
+    const limitMsg =
+      'I ran out of tool steps on this request. Try a narrower query (e.g. emails with a person in the last 3–6 months), or turn on DeepSearch and ask again.';
     if (wantStream) {
       sseWrite(res, { content: limitMsg });
       sseWrite(res, { done: true });
