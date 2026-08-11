@@ -4,6 +4,9 @@
   "version": "1.0.7",
   "type": "module",
   "scripts": {
+    "inflate-app": "node scripts/inflate-app.cjs",
+    "predev": "node scripts/inflate-app.cjs",
+    "prebuild": "node scripts/inflate-app.cjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
