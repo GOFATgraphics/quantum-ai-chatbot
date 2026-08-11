@@ -35,6 +35,44 @@ function readAsDataURL(file: File): Promise<string> {
   })
 }
 
+/** Resize/compress image so vision payloads stay under Vercel/Anthropic limits */
+async function compressImageDataUrl(file: File, maxSide = 1280, quality = 0.82): Promise<{ dataUrl: string; type: string }> {
+  const raw = await readAsDataURL(file)
+  if (file.size < 350_000 && !file.type.includes('png')) {
+    return { dataUrl: raw, type: file.type || 'image/jpeg' }
+  }
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      let { width, height } = img
+      if (width > maxSide || height > maxSide) {
+        if (width >= height) {
+          height = Math.round((height * maxSide) / width)
+          width = maxSide
+        } else {
+          width = Math.round((width * maxSide) / height)
+          height = maxSide
+        }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        resolve({ dataUrl: raw, type: file.type || 'image/jpeg' })
+        return
+      }
+      ctx.drawImage(img, 0, 0, width, height)
+      const usePng = file.type === 'image/png' && file.size < 800_000
+      const outType = usePng ? 'image/png' : 'image/jpeg'
+      const dataUrl = usePng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', quality)
+      resolve({ dataUrl, type: outType })
+    }
+    img.onerror = () => resolve({ dataUrl: raw, type: file.type || 'image/jpeg' })
+    img.src = raw
+  })
+}
+
 async function blobToBase64(blob: Blob): Promise<string> {
   const buf = await blob.arrayBuffer()
   let binary = ''
@@ -173,11 +211,11 @@ export default function ChatInput({
     if (!list?.length || !onFilesChange) return
     const next: PendingFile[] = [...pendingFiles]
     for (const file of Array.from(list).slice(0, 5)) {
-      if (file.size > 4_000_000) continue
+      if (file.size > 8_000_000) continue
       if (file.type.startsWith('image/')) {
         try {
-          const dataUrl = await readAsDataURL(file)
-          next.push({ name: file.name, type: file.type, dataUrl })
+          const { dataUrl, type } = await compressImageDataUrl(file)
+          next.push({ name: file.name, type, dataUrl })
         } catch {
           next.push({ name: file.name, type: file.type, text: `[Image attached: ${file.name}]` })
         }
