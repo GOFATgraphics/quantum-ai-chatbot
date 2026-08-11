@@ -24,15 +24,29 @@ export default async function handler(req, res) {
     if (!text) return res.status(400).json({ error: 'text is required' });
     if (text.length > 4000) return res.status(400).json({ error: 'text too long (max 4000 chars)' });
 
-    // Voice: female Sarah / male Daniel (defaults). Override via body.voice_id or env.
-    const gender = body?.voice === 'male' ? 'male' : 'female';
-    const defaultFemale = process.env.ELEVENLABS_VOICE_FEMALE || 'EXAVITQu4vr4xnSDxMaL';
-    const defaultMale = process.env.ELEVENLABS_VOICE_MALE || 'onwK4e9ZLuTAKqWW03F9';
-    const voiceId = body?.voice_id || (gender === 'male' ? defaultMale : defaultFemale);
-
     // Language: 'en' | 'ha' (Hausa). Hausa needs eleven_v3.
     const lang = (body?.language || 'en').toLowerCase();
     const isHausa = lang === 'ha' || lang === 'hau' || lang === 'hausa';
+
+    // Voices
+    // - Female default: Sarah
+    // - Male default: custom Hausa man voice (works for EN + HA)
+    // Override via body.voice_id or env vars.
+    const gender = body?.voice === 'male' ? 'male' : 'female';
+    const defaultFemale = process.env.ELEVENLABS_VOICE_FEMALE || 'EXAVITQu4vr4xnSDxMaL';
+    const defaultMale = process.env.ELEVENLABS_VOICE_MALE || 'rPlZjuLXpONhaMouRFww';
+    const hausaMale = process.env.ELEVENLABS_VOICE_HAUSA_MALE || 'rPlZjuLXpONhaMouRFww';
+    const hausaFemale = process.env.ELEVENLABS_VOICE_HAUSA_FEMALE || defaultFemale;
+
+    let voiceId = body?.voice_id;
+    if (!voiceId) {
+      if (isHausa) {
+        voiceId = gender === 'male' ? hausaMale : hausaFemale;
+      } else {
+        voiceId = gender === 'male' ? defaultMale : defaultFemale;
+      }
+    }
+
     const modelId = isHausa
       ? 'eleven_v3'
       : (process.env.ELEVENLABS_TTS_MODEL || 'eleven_multilingual_v2');
