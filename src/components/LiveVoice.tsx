@@ -12,9 +12,29 @@ type Props = {
   onAsk: (text: string) => Promise<string>
   preferredLanguage?: VoiceLanguage
   onLanguageChange?: (l: VoiceLanguage) => void
+  /** Stream already granted on Speak tap (required for reliable iOS mic). */
+  initialStream?: MediaStream | null
 }
 
 type Phase = 'idle' | 'listening' | 'thinking' | 'speaking'
+
+function pickRecorderMime(): string {
+  // iOS prefers mp4/aac; Chrome prefers webm/opus
+  const candidates = [
+    'audio/mp4',
+    'audio/aac',
+    'audio/webm;codecs=opus',
+    'audio/webm',
+  ]
+  for (const m of candidates) {
+    try {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) return m
+    } catch {
+      /* ignore */
+    }
+  }
+  return ''
+}
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const buf = await blob.arrayBuffer()
@@ -61,7 +81,7 @@ function voiceFriendlyText(text: string, language: VoiceLanguage): string {
   return t
 }
 
-async function unlockAudioPlayback(
+async function unlockAudio(
   silentAudioRef: React.MutableRefObject<HTMLAudioElement | null>,
   audioCtxRef: React.MutableRefObject<AudioContext | null>,
 ) {
@@ -72,12 +92,9 @@ async function unlockAudioPlayback(
       const a = new Audio(silent)
       a.volume = 0.01
       silentAudioRef.current = a
-      await a.play().catch(() => {})
-      a.pause()
-    } else {
-      await silentAudioRef.current.play().catch(() => {})
-      silentAudioRef.current.pause()
     }
+    await silentAudioRef.current.play().catch(() => {})
+    silentAudioRef.current.pause()
   } catch {
     /* ignore */
   }
@@ -85,9 +102,7 @@ async function unlockAudioPlayback(
     const Ctx = window.AudioContext || (window as any).webkitAudioContext
     if (Ctx) {
       if (!audioCtxRef.current) audioCtxRef.current = new Ctx()
-      if (audioCtxRef.current.state === 'suspended') {
-        await audioCtxRef.current.resume()
-      }
+      if (audioCtxRef.current.state === 'suspended') await audioCtxRef.current.resume()
     }
   } catch {
     /* ignore */
@@ -143,13 +158,11 @@ async function speakWithElevenLabs(
     try {
       await audio.play()
     } catch (playErr: any) {
-      const msg =
-        playErr?.name === 'NotAllowedError' || /not allowed|user agent|permission/i.test(String(playErr?.message))
-          ? language === 'ha'
-            ? 'Danna kusan duk wani wuri don ba da izinin sauti.'
-            : 'Tap anywhere on the screen to allow sound.'
-          : playErr?.message || 'Could not play audio'
-      onError?.(msg)
+      onError?.(
+        language === 'ha'
+          ? 'Danna allo don ba da izinin sauti.'
+          : 'Tap the screen to allow sound.',
+      )
       URL.revokeObjectURL(url)
       onEnd()
     }
@@ -166,23 +179,23 @@ export default function LiveVoice({
   onAsk,
   preferredLanguage = 'en',
   onLanguageChange,
+  initialStream = null,
 }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [caption, setCaption] = useState('')
   const [reply, setReply] = useState('')
   const [language, setLanguage] = useState<VoiceLanguage>(preferredLanguage)
   const [error, setError] = useState<string | null>(null)
-  const [supported, setSupported] = useState(true)
 
   const mediaRecRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  const ownsStreamRef = useRef(false)
   const phaseRef = useRef<Phase>('idle')
   const busyRef = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const silentAudioRef = useRef<HTMLAudioElement | null>(null)
   const languageRef = useRef<VoiceLanguage>(preferredLanguage)
-  const analyserRef = useRef<AnalyserNode | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const silenceTimerRef = useRef<number | null>(null)
   const speechSeenRef = useRef(false)
@@ -190,11 +203,11 @@ export default function LiveVoice({
   const continuousRef = useRef(true)
   const startListeningRef = useRef<(() => Promise<void>) | null>(null)
   const maxListenTimerRef = useRef<number | null>(null)
+  const initialStreamRef = useRef(initialStream)
 
   useEffect(() => {
     phaseRef.current = phase
   }, [phase])
-
   useEffect(() => {
     languageRef.current = language
   }, [language])
@@ -226,12 +239,13 @@ export default function LiveVoice({
     }
   }, [])
 
-  const scheduleListen = useCallback((delay = 350) => {
+  const scheduleListen = useCallback((delay = 400) => {
     if (!continuousRef.current) return
     window.setTimeout(() => {
       if (!continuousRef.current) return
       if (busyRef.current) return
-      if (phaseRef.current === 'listening' || phaseRef.current === 'thinking' || phaseRef.current === 'speaking') return
+      if (phaseRef.current === 'listening' || phaseRef.current === 'thinking' || phaseRef.current === 'speaking')
+        return
       void startListeningRef.current?.()
     }, delay)
   }, [])
@@ -256,7 +270,7 @@ export default function LiveVoice({
           busyRef.current = false
           setPhase('idle')
           setCaption('')
-          scheduleListen(400)
+          scheduleListen(450)
         },
         (msg) => setError(msg),
       )
@@ -264,7 +278,7 @@ export default function LiveVoice({
       setError(e?.message || 'Something went wrong')
       busyRef.current = false
       setPhase('idle')
-      scheduleListen(900)
+      scheduleListen(1000)
     }
   }
 
@@ -273,8 +287,7 @@ export default function LiveVoice({
     if (busyRef.current) return
     if (phaseRef.current === 'listening') return
     setError(null)
-
-    await unlockAudioPlayback(silentAudioRef, audioCtxRef)
+    await unlockAudio(silentAudioRef, audioCtxRef)
 
     try {
       audioRef.current?.pause()
@@ -283,15 +296,31 @@ export default function LiveVoice({
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      })
-      streamRef.current = stream
+      let stream = streamRef.current
+      // Prefer live tracks from initial Speak gesture
+      if (!stream || stream.getTracks().every((t) => t.readyState === 'ended')) {
+        if (initialStreamRef.current && initialStreamRef.current.getTracks().some((t) => t.readyState === 'live')) {
+          stream = initialStreamRef.current
+          ownsStreamRef.current = false
+        } else {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          })
+          ownsStreamRef.current = true
+        }
+        streamRef.current = stream
+      }
 
+      // Ensure tracks are enabled
+      stream.getAudioTracks().forEach((t) => {
+        t.enabled = true
+      })
+
+      // Silence / speech detection
       try {
         const ctx =
           audioCtxRef.current ||
@@ -302,12 +331,11 @@ export default function LiveVoice({
         const analyser = ctx.createAnalyser()
         analyser.fftSize = 512
         source.connect(analyser)
-        analyserRef.current = analyser
         speechSeenRef.current = false
 
         const data = new Uint8Array(analyser.frequencyBinCount)
-        const SILENCE_MS = 1000
-        const SPEECH_THRESHOLD = 11
+        const SILENCE_MS = 900
+        const SPEECH_THRESHOLD = 8
 
         const tick = () => {
           if (phaseRef.current !== 'listening') return
@@ -323,29 +351,37 @@ export default function LiveVoice({
               silenceTimerRef.current = null
             }
           } else if (speechSeenRef.current && !silenceTimerRef.current) {
-            silenceTimerRef.current = window.setTimeout(() => {
-              stopListening()
-            }, SILENCE_MS)
+            silenceTimerRef.current = window.setTimeout(() => stopListening(), SILENCE_MS)
           }
           rafRef.current = requestAnimationFrame(tick)
         }
         rafRef.current = requestAnimationFrame(tick)
       } catch {
-        /* analyser optional */
+        /* analyser optional — fall back to max timer */
       }
 
-      const mime =
-        MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : MediaRecorder.isTypeSupported('audio/webm')
-            ? 'audio/webm'
-            : MediaRecorder.isTypeSupported('audio/mp4')
-              ? 'audio/mp4'
-              : ''
-      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
+      if (typeof MediaRecorder === 'undefined') {
+        setError('Recording is not supported on this browser.')
+        setPhase('idle')
+        return
+      }
+
+      const mime = pickRecorderMime()
+      let rec: MediaRecorder
+      try {
+        rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
+      } catch {
+        rec = new MediaRecorder(stream)
+      }
+
       chunksRef.current = []
       rec.ondataavailable = (e) => {
-        if (e.data?.size) chunksRef.current.push(e.data)
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      rec.onerror = () => {
+        setError('Recording error')
+        setPhase('idle')
+        scheduleListen(800)
       }
       rec.onstop = async () => {
         stopSilenceWatch()
@@ -353,23 +389,25 @@ export default function LiveVoice({
           window.clearTimeout(maxListenTimerRef.current)
           maxListenTimerRef.current = null
         }
-        stream.getTracks().forEach((t) => t.stop())
-        streamRef.current = null
 
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || mime || 'audio/webm' })
         chunksRef.current = []
-        if (blob.size < 400) {
+
+        // Keep stream for next turn (don't stop tracks unless we own a fresh one each time)
+        // On iOS reusing stream is more reliable
+
+        if (blob.size < 600) {
           setPhase('idle')
-          // Keep listening — no speech yet
-          scheduleListen(300)
+          scheduleListen(250)
           return
         }
+
         setPhase('thinking')
         try {
           const text = await transcribeWithElevenLabs(blob, languageRef.current)
           if (!text) {
             setPhase('idle')
-            scheduleListen(400)
+            scheduleListen(350)
             return
           }
           void handleTurn(text)
@@ -379,23 +417,27 @@ export default function LiveVoice({
           scheduleListen(1000)
         }
       }
+
       mediaRecRef.current = rec
-      rec.start(250)
+      // timeslice helps some browsers flush data; iOS may ignore it
+      try {
+        rec.start(200)
+      } catch {
+        rec.start()
+      }
       setPhase('listening')
 
+      // If no silence detection, still end after ~6s so we process something
       maxListenTimerRef.current = window.setTimeout(() => {
         if (phaseRef.current === 'listening') stopListening()
-      }, 18000)
+      }, 12000)
     } catch (e: any) {
-      setSupported(false)
       setError(
         e?.name === 'NotAllowedError'
           ? languageRef.current === 'ha'
-            ? 'Ba a ba da izinin makirufo ba.'
-            : 'Microphone permission denied.'
-          : languageRef.current === 'ha'
-            ? 'Ba a iya kunna makirufo ba.'
-            : 'Could not start microphone',
+            ? 'Ba a ba da izinin makirufo ba. Kunna shi a Settings.'
+            : 'Microphone permission denied. Enable it in Settings → Safari.'
+          : e?.message || 'Could not start microphone',
       )
       setPhase('idle')
     }
@@ -404,15 +446,14 @@ export default function LiveVoice({
 
   startListeningRef.current = startListening
 
-  // Auto-start as soon as Live Voice opens (user already tapped Speak)
   useEffect(() => {
     continuousRef.current = true
-    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      setSupported(false)
-      setError('Microphone is not supported in this browser.')
-      return
-    }
+    initialStreamRef.current = initialStream || null
+    if (initialStream) streamRef.current = initialStream
+
+    // Start immediately — mic was already granted on Speak tap
     void startListening()
+
     return () => {
       continuousRef.current = false
       try {
@@ -420,20 +461,14 @@ export default function LiveVoice({
       } catch {
         /* ignore */
       }
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current)
+      stopSilenceWatch()
       if (maxListenTimerRef.current) window.clearTimeout(maxListenTimerRef.current)
-      try {
-        audioCtxRef.current?.close()
-      } catch {
-        /* ignore */
-      }
       try {
         audioRef.current?.pause()
       } catch {
         /* ignore */
       }
+      // Parent closes and stops the initial stream
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -448,18 +483,15 @@ export default function LiveVoice({
     }
   }
 
-  // Tap screen to re-unlock audio on iOS if needed
   const onScreenTap = () => {
-    void unlockAudioPlayback(silentAudioRef, audioCtxRef)
-    if (supported && phase === 'idle' && !busyRef.current) {
-      scheduleListen(100)
-    }
+    void unlockAudio(silentAudioRef, audioCtxRef)
+    if (phase === 'idle' && !busyRef.current) scheduleListen(50)
   }
 
   const statusLabel =
     phase === 'listening'
       ? language === 'ha'
-        ? 'Ina saurare… yi magana'
+        ? 'Ina saurare… yi magana yanzu'
         : 'Listening… speak now'
       : phase === 'thinking'
         ? language === 'ha'
@@ -494,7 +526,6 @@ export default function LiveVoice({
             continuousRef.current = false
             try {
               mediaRecRef.current?.stop()
-              streamRef.current?.getTracks().forEach((t) => t.stop())
               audioRef.current?.pause()
             } catch {
               /* ignore */
@@ -519,17 +550,15 @@ export default function LiveVoice({
           <motion.div
             animate={
               phase === 'listening'
-                ? { scale: [1, 1.14, 1], opacity: [0.35, 0.6, 0.35] }
+                ? { scale: [1, 1.14, 1], opacity: [0.35, 0.65, 0.35] }
                 : phase === 'speaking'
                   ? { scale: [1, 1.1, 1], opacity: [0.3, 0.55, 0.3] }
-                  : phase === 'thinking'
-                    ? { scale: [1, 1.05, 1], opacity: [0.3, 0.45, 0.3] }
-                    : { scale: 1, opacity: 0.25 }
+                  : { scale: 1, opacity: 0.28 }
             }
-            transition={{ duration: phase === 'idle' ? 3 : 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
             className={`absolute inset-0 -m-10 rounded-full blur-2xl ${
               phase === 'listening'
-                ? 'bg-rose-400/45'
+                ? 'bg-rose-400/50'
                 : phase === 'speaking'
                   ? 'bg-indigo-400/45'
                   : dark
@@ -567,7 +596,7 @@ export default function LiveVoice({
         </AnimatePresence>
 
         {error && (
-          <p className={`mt-3 text-sm text-center ${dark ? 'text-rose-300' : 'text-rose-600'}`}>{error}</p>
+          <p className={`mt-3 text-sm text-center px-2 ${dark ? 'text-rose-300' : 'text-rose-600'}`}>{error}</p>
         )}
 
         <div
@@ -612,9 +641,13 @@ export default function LiveVoice({
 
       <div className="pb-[max(1.5rem,env(safe-area-inset-bottom))] flex flex-col items-center gap-2 px-6">
         <p className={`text-[12px] text-center max-w-xs ${dark ? 'text-white/45' : 'text-slate-400'}`}>
-          {language === 'ha'
-            ? 'Yi magana kai tsaye — ba a bukatar mic. Rufe da ×'
-            : 'Just speak — no mic button. Close with ×'}
+          {phase === 'listening'
+            ? language === 'ha'
+              ? 'Yi magana — idan ka tsaya, za a amsa da murya'
+              : 'Speak — pause and it answers with voice'
+            : language === 'ha'
+              ? 'Rufe da ×'
+              : 'Close with ×'}
         </p>
       </div>
     </motion.div>
