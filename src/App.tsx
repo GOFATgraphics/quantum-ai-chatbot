@@ -12,7 +12,7 @@ import Logo from './components/Logo'
 import MessageList, { type ChatMessage } from './components/MessageList'
 import EmptyState from './components/EmptyState'
 import ChatInput, { type PendingFile } from './components/ChatInput'
-import LiveVoice, { type VoiceGender } from './components/LiveVoice'
+import LiveVoice, { type VoiceGender, type VoiceLanguage } from './components/LiveVoice'
 import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
 
@@ -95,6 +95,13 @@ export default function App() {
       if (v === 'male' || v === 'female') return v
     } catch { /* ignore */ }
     return 'female'
+  })
+  const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage>(() => {
+    try {
+      const v = localStorage.getItem('quantumy-language')
+      if (v === 'en' || v === 'ha') return v
+    } catch { /* ignore */ }
+    return 'en'
   })
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [lastUserPrompt, setLastUserPrompt] = useState('')
@@ -213,7 +220,6 @@ export default function App() {
     abortRef.current?.abort()
     const ac = new AbortController()
     abortRef.current = ac
-    // Keep image data URLs so the API can convert them to Anthropic vision blocks
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers,
@@ -293,7 +299,7 @@ export default function App() {
       const history = messagesRef.current.slice(-12).map((m) => ({ role: m.role, content: m.content }))
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers,
+      headers,
         body: JSON.stringify({
           messages: [...history, { role: 'user', content: userMessage }],
           firstName,
@@ -481,7 +487,7 @@ export default function App() {
             </main>
           )}
           <div className="shrink-0">
-            <ChatInput value={input} onChange={setInput} onSend={() => handleSend()} onStop={handleStop} onSpeak={() => setShowLiveVoice(true)} isLoading={isLoading} dark={dark} errorHint={errorHint} pendingFiles={pendingFiles} onFilesChange={setPendingFiles} onFocusChange={setComposerFocused} />
+            <ChatInput value={input} onChange={setInput} onSend={() => handleSend()} onStop={handleStop} onSpeak={() => setShowLiveVoice(true)} language={voiceLanguage} isLoading={isLoading} dark={dark} errorHint={errorHint} pendingFiles={pendingFiles} onFilesChange={setPendingFiles} onFocusChange={setComposerFocused} />
           </div>
         </div>
         <InstallPWA dark={dark} />
@@ -507,7 +513,7 @@ export default function App() {
       </AnimatePresence>
       <AnimatePresence>
         {showLiveVoice && (
-          <LiveVoice dark={dark} firstName={firstName} preferredVoice={voiceGender} onVoiceChange={setVoiceGender} onClose={() => setShowLiveVoice(false)} onAsk={askForVoice} />
+          <LiveVoice dark={dark} firstName={firstName} preferredVoice={voiceGender} onVoiceChange={setVoiceGender} preferredLanguage={voiceLanguage} onLanguageChange={setVoiceLanguage} onClose={() => setShowLiveVoice(false)} onAsk={askForVoice} />
         )}
       </AnimatePresence>
     </div>
