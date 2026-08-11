@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Mic, MicOff, User, UserRound } from 'lucide-react'
+import { X, Mic, MicOff, User, UserRound, Languages } from 'lucide-react'
 import Logo from './Logo'
 
 export type VoiceGender = 'male' | 'female'
+export type VoiceLanguage = 'en' | 'ha'
 
 type Props = {
   dark: boolean
@@ -12,52 +13,90 @@ type Props = {
   onAsk: (text: string) => Promise<string>
   preferredVoice?: VoiceGender
   onVoiceChange?: (v: VoiceGender) => void
+  preferredLanguage?: VoiceLanguage
+  onLanguageChange?: (l: VoiceLanguage) => void
 }
 
 type Phase = 'idle' | 'listening' | 'thinking' | 'speaking'
 
-function pickVoice(gender: VoiceGender): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null
-  const voices = window.speechSynthesis.getVoices()
-  if (!voices.length) return null
-
-  const en = voices.filter((v) => /en(-|_|$)/i.test(v.lang))
-  const pool = en.length ? en : voices
-
-  const femaleHints = /female|woman|girl|samantha|karen|moira|tessa|fiona|victoria|zira|susan|emma|amy|joanna|ivy|salli|kimberly|kendra|olivia|ava|aria|jenny|natural/i
-  const maleHints = /male|man|boy|daniel|james|alex|fred|tom|david|mark|matthew|justin|joey|brian|guy|eric|ryan|arthur|thomas|aaron/i
-
-  if (gender === 'female') {
-    const hit =
-      pool.find((v) => femaleHints.test(v.name)) ||
-      pool.find((v) => /google uk english female|microsoft zira|samantha/i.test(v.name)) ||
-      pool.find((v) => v.name.toLowerCase().includes('female'))
-    return hit || pool[0] || null
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer()
+  let binary = ''
+  const bytes = new Uint8Array(buf)
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
   }
-
-  const hit =
-    pool.find((v) => maleHints.test(v.name) && !femaleHints.test(v.name)) ||
-    pool.find((v) => /google uk english male|microsoft david|daniel|alex/i.test(v.name)) ||
-    pool.find((v) => v.name.toLowerCase().includes('male'))
-  return hit || pool[Math.min(1, pool.length - 1)] || pool[0] || null
+  return btoa(binary)
 }
 
-function speakText(text: string, gender: VoiceGender, onEnd: () => void) {
-  if (typeof window === 'undefined' || !window.speechSynthesis) {
+async function transcribeWithElevenLabs(blob: Blob, language: VoiceLanguage): Promise<string> {
+  const audioBase64 = await blobToBase64(blob)
+  const res = await fetch('/api/stt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      audioBase64,
+      mimeType: blob.type || 'audio/webm',
+      language,
+    }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || data.message || 'Speech recognition failed')
+  return (data.text || '').trim()
+}
+
+async function speakWithElevenLabs(
+  text: string,
+  gender: VoiceGender,
+  language: VoiceLanguage,
+  audioRef: React.MutableRefObject<HTMLAudioElement | null>,
+  onEnd: () => void,
+) {
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice: gender, language }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || 'TTS failed')
+    }
+    const buf = await res.arrayBuffer()
+    const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }))
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause()
+        URL.revokeObjectURL(audioRef.current.src)
+      } catch {
+        /* ignore */
+      }
+    }
+    const audio = new Audio(url)
+    audioRef.current = audio
+    audio.onended = () => {
+      URL.revokeObjectURL(url)
+      onEnd()
+    }
+    audio.onerror = () => {
+      URL.revokeObjectURL(url)
+      onEnd()
+    }
+    await audio.play()
+  } catch (e) {
+    // Browser fallback
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel()
+      const utter = new SpeechSynthesisUtterance(text)
+      utter.lang = language === 'ha' ? 'ha' : 'en-US'
+      utter.onend = onEnd
+      utter.onerror = onEnd
+      window.speechSynthesis.speak(utter)
+      return
+    }
     onEnd()
-    return null
   }
-  window.speechSynthesis.cancel()
-  const utter = new SpeechSynthesisUtterance(text)
-  const voice = pickVoice(gender)
-  if (voice) utter.voice = voice
-  utter.rate = 1.02
-  utter.pitch = gender === 'female' ? 1.05 : 0.95
-  utter.volume = 1
-  utter.onend = onEnd
-  utter.onerror = onEnd
-  window.speechSynthesis.speak(utter)
-  return utter
 }
 
 export default function LiveVoice({
@@ -67,97 +106,47 @@ export default function LiveVoice({
   onAsk,
   preferredVoice = 'female',
   onVoiceChange,
+  preferredLanguage = 'en',
+  onLanguageChange,
 }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [caption, setCaption] = useState('')
   const [reply, setReply] = useState('')
   const [voice, setVoice] = useState<VoiceGender>(preferredVoice)
+  const [language, setLanguage] = useState<VoiceLanguage>(preferredLanguage)
   const [error, setError] = useState<string | null>(null)
   const [supported, setSupported] = useState(true)
 
-  const recRef = useRef<SpeechRecognition | null>(null)
-  const baseRef = useRef('')
+  const mediaRecRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
   const phaseRef = useRef<Phase>('idle')
   const busyRef = useRef(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     phaseRef.current = phase
   }, [phase])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const load = () => window.speechSynthesis?.getVoices()
-    load()
-    window.speechSynthesis?.addEventListener?.('voiceschanged', load)
-    return () => window.speechSynthesis?.removeEventListener?.('voiceschanged', load)
-  }, [])
-
-  useEffect(() => {
-    const SR =
-      typeof window !== 'undefined'
-        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-        : null
-    if (!SR) {
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setSupported(false)
-      setError('Voice is not supported in this browser. Try Safari or Chrome.')
-      return
+      setError('Microphone is not supported in this browser.')
     }
-
-    const rec: SpeechRecognition = new SR()
-    rec.continuous = false
-    rec.interimResults = true
-    rec.lang = typeof navigator !== 'undefined' ? navigator.language || 'en-US' : 'en-US'
-
-    rec.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = ''
-      let finalText = ''
-      const start = (event as SpeechRecognitionEvent & { resultIndex?: number }).resultIndex ?? 0
-      for (let i = start; i < event.results.length; i++) {
-        const piece = event.results[i][0]?.transcript || ''
-        if (event.results[i].isFinal) finalText += piece
-        else interim += piece
-      }
-      const shown = (baseRef.current + ' ' + (finalText || interim)).replace(/\s+/g, ' ').trim()
-      setCaption(shown)
-      if (finalText) {
-        baseRef.current = (baseRef.current + ' ' + finalText).replace(/\s+/g, ' ').trim()
-      }
-    }
-
-    rec.onerror = (e: any) => {
-      if (e?.error === 'aborted' || e?.error === 'no-speech') {
-        if (phaseRef.current === 'listening') setPhase('idle')
-        return
-      }
-      setError(e?.error === 'not-allowed' ? 'Microphone permission denied.' : 'Voice error. Try again.')
-      setPhase('idle')
-    }
-
-    rec.onend = () => {
-      if (phaseRef.current !== 'listening') return
-      const text = baseRef.current.trim()
-      if (!text || busyRef.current) {
-        setPhase('idle')
-        return
-      }
-      void handleTurn(text)
-    }
-
-    recRef.current = rec
     return () => {
       try {
-        rec.abort()
+        mediaRecRef.current?.stop()
       } catch {
         /* ignore */
       }
-      recRef.current = null
+      streamRef.current?.getTracks().forEach((t) => t.stop())
       try {
+        audioRef.current?.pause()
         window.speechSynthesis?.cancel()
       } catch {
         /* ignore */
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleTurn = async (text: string) => {
@@ -166,17 +155,23 @@ export default function LiveVoice({
     setPhase('thinking')
     setError(null)
     setReply('')
+    setCaption(text)
     try {
       const answer = await onAsk(text)
       const clean = (answer || '').replace(/\s+/g, ' ').trim()
       setReply(clean)
       setPhase('speaking')
-      speakText(clean || 'Sorry, I did not catch that.', voice, () => {
-        busyRef.current = false
-        setPhase('idle')
-        baseRef.current = ''
-        setCaption('')
-      })
+      await speakWithElevenLabs(
+        clean || (language === 'ha' ? 'Ban fahimta ba.' : 'Sorry, I did not catch that.'),
+        voice,
+        language,
+        audioRef,
+        () => {
+          busyRef.current = false
+          setPhase('idle')
+          setCaption('')
+        },
+      )
     } catch (e: any) {
       setError(e?.message || 'Something went wrong')
       busyRef.current = false
@@ -184,29 +179,76 @@ export default function LiveVoice({
     }
   }
 
-  const startListening = useCallback(() => {
-    if (!recRef.current || busyRef.current) return
+  const startListening = useCallback(async () => {
+    if (busyRef.current) return
+    setError(null)
+    setCaption('')
+    setReply('')
     try {
+      audioRef.current?.pause()
       window.speechSynthesis?.cancel()
     } catch {
       /* ignore */
     }
-    baseRef.current = ''
-    setCaption('')
-    setReply('')
-    setError(null)
+
     try {
-      recRef.current.start()
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const mime =
+        MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/webm')
+            ? 'audio/webm'
+            : ''
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
+      chunksRef.current = []
+      rec.ondataavailable = (e) => {
+        if (e.data?.size) chunksRef.current.push(e.data)
+      }
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        streamRef.current = null
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        chunksRef.current = []
+        if (blob.size < 500) {
+          setPhase('idle')
+          setError(language === 'ha' ? 'Ba a ji magana ba. Sake gwadawa.' : 'No speech detected. Try again.')
+          return
+        }
+        setPhase('thinking')
+        try {
+          const text = await transcribeWithElevenLabs(blob, language)
+          if (!text) {
+            setPhase('idle')
+            setError(language === 'ha' ? 'Ba a gane magana ba.' : 'Could not understand speech.')
+            return
+          }
+          void handleTurn(text)
+        } catch (e: any) {
+          setError(e?.message || 'Transcription failed')
+          setPhase('idle')
+        }
+      }
+      mediaRecRef.current = rec
+      rec.start()
       setPhase('listening')
-    } catch {
-      setError('Could not start microphone')
+    } catch (e: any) {
+      setSupported(false)
+      setError(
+        e?.name === 'NotAllowedError'
+          ? 'Microphone permission denied.'
+          : 'Could not start microphone',
+      )
       setPhase('idle')
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language, voice])
 
   const stopListening = useCallback(() => {
     try {
-      recRef.current?.stop()
+      if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
+        mediaRecRef.current.stop()
+      }
     } catch {
       /* ignore */
     }
@@ -222,14 +264,32 @@ export default function LiveVoice({
     }
   }
 
+  const changeLanguage = (l: VoiceLanguage) => {
+    setLanguage(l)
+    onLanguageChange?.(l)
+    try {
+      localStorage.setItem('quantumy-language', l)
+    } catch {
+      /* ignore */
+    }
+  }
+
   const statusLabel =
     phase === 'listening'
-      ? 'Listening…'
+      ? language === 'ha'
+        ? 'Ina saurare…'
+        : 'Listening…'
       : phase === 'thinking'
-        ? 'Thinking…'
+        ? language === 'ha'
+          ? 'Ina tunani…'
+          : 'Thinking…'
         : phase === 'speaking'
-          ? 'Speaking…'
-          : `Hi${firstName && firstName !== 'there' ? ` ${firstName}` : ''} — tap the mic to talk`
+          ? language === 'ha'
+            ? 'Ina magana…'
+            : 'Speaking…'
+          : language === 'ha'
+            ? `Sannu${firstName && firstName !== 'there' ? ` ${firstName}` : ''} — danna mic don magana`
+            : `Hi${firstName && firstName !== 'there' ? ` ${firstName}` : ''} — tap the mic to talk`
 
   return (
     <motion.div
@@ -248,7 +308,9 @@ export default function LiveVoice({
           type="button"
           onClick={() => {
             try {
-              recRef.current?.abort()
+              mediaRecRef.current?.stop()
+              streamRef.current?.getTracks().forEach((t) => t.stop())
+              audioRef.current?.pause()
               window.speechSynthesis?.cancel()
             } catch {
               /* ignore */
@@ -262,7 +324,9 @@ export default function LiveVoice({
         >
           <X className="w-5 h-5" />
         </button>
-        <span className={`text-sm font-semibold ${dark ? 'text-white/90' : 'text-slate-800'}`}>Live voice</span>
+        <span className={`text-sm font-semibold ${dark ? 'text-white/90' : 'text-slate-800'}`}>
+          Live voice
+        </span>
         <div className="w-10" />
       </div>
 
@@ -320,9 +384,48 @@ export default function LiveVoice({
           <p className={`mt-3 text-sm text-center ${dark ? 'text-rose-300' : 'text-rose-600'}`}>{error}</p>
         )}
 
+        {/* Language picker */}
+        <div
+          className={`mt-6 flex items-center gap-2 p-1 rounded-full ${
+            dark ? 'bg-white/10' : 'bg-white/80 shadow-sm ring-1 ring-black/[0.04]'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => changeLanguage('en')}
+            className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-semibold transition ${
+              language === 'en'
+                ? dark
+                  ? 'bg-white text-slate-900'
+                  : 'bg-slate-900 text-white'
+                : dark
+                  ? 'text-white/70'
+                  : 'text-slate-600'
+            }`}
+          >
+            <Languages className="w-3.5 h-3.5" />
+            English
+          </button>
+          <button
+            type="button"
+            onClick={() => changeLanguage('ha')}
+            className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-semibold transition ${
+              language === 'ha'
+                ? dark
+                  ? 'bg-white text-slate-900'
+                  : 'bg-slate-900 text-white'
+                : dark
+                  ? 'text-white/70'
+                  : 'text-slate-600'
+            }`}
+          >
+            Hausa
+          </button>
+        </div>
+
         {/* Voice picker */}
         <div
-          className={`mt-8 flex items-center gap-2 p-1 rounded-full ${
+          className={`mt-3 flex items-center gap-2 p-1 rounded-full ${
             dark ? 'bg-white/10' : 'bg-white/80 shadow-sm ring-1 ring-black/[0.04]'
           }`}
         >
@@ -367,7 +470,7 @@ export default function LiveVoice({
           disabled={!supported || phase === 'thinking' || phase === 'speaking'}
           onClick={() => {
             if (phase === 'listening') stopListening()
-            else startListening()
+            else void startListening()
           }}
           className={`w-[72px] h-[72px] rounded-full flex items-center justify-center transition shadow-lg disabled:opacity-40 ${
             phase === 'listening'
@@ -381,7 +484,13 @@ export default function LiveVoice({
           {phase === 'listening' ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
         </button>
         <p className={`text-[12px] ${dark ? 'text-white/45' : 'text-slate-400'}`}>
-          {phase === 'listening' ? 'Tap to send' : 'Tap to speak'}
+          {phase === 'listening'
+            ? language === 'ha'
+              ? 'Danna don aika'
+              : 'Tap to send'
+            : language === 'ha'
+              ? 'Danna don magana'
+              : 'Tap to speak'}
         </p>
       </div>
     </motion.div>
