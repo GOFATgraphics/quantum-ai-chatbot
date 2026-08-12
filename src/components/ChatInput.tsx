@@ -214,24 +214,34 @@ export default function ChatInput({
   const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files
     if (!list?.length || !onFilesChange) return
+    const MAX_ATTACHMENTS = 5
+    const room = Math.max(0, MAX_ATTACHMENTS - pendingFiles.length)
+    if (room === 0) {
+      e.target.value = ''
+      return
+    }
     const next: PendingFile[] = [...pendingFiles]
-    for (const file of Array.from(list).slice(0, 5)) {
-      if (file.size > 8_000_000) continue
+    const picked = Array.from(list).slice(0, room)
+    const imageCount = picked.filter((f) => f.type.startsWith('image/')).length + next.filter((f) => f.dataUrl).length
+    const maxSide = imageCount >= 3 ? 1024 : 1280
+    const quality = imageCount >= 3 ? 0.72 : 0.82
+    for (const file of picked) {
+      if (file.size > 10_000_000) continue
       if (file.type.startsWith('image/')) {
         try {
-          const { dataUrl, type } = await compressImageDataUrl(file)
+          const { dataUrl, type } = await compressImageDataUrl(file, maxSide, quality)
           next.push({ name: file.name, type, dataUrl })
         } catch {
           next.push({ name: file.name, type: file.type, text: `[Image attached: ${file.name}]` })
         }
       } else if (file.type.startsWith('text/') || /\.(txt|md|csv|json|ts|tsx|js|jsx|py|html|css)$/i.test(file.name)) {
-        const text = await file.text()
-        next.push({ name: file.name, type: file.type || 'text/plain', text: text.slice(0, 40_000) })
+        const body = await file.text()
+        next.push({ name: file.name, type: file.type || 'text/plain', text: body.slice(0, 40_000) })
       } else {
         next.push({ name: file.name, type: file.type || 'application/octet-stream', text: `[File attached: ${file.name}]` })
       }
     }
-    onFilesChange(next.slice(0, 5))
+    onFilesChange(next.slice(0, MAX_ATTACHMENTS))
     e.target.value = ''
   }
 
@@ -341,7 +351,7 @@ export default function ChatInput({
               />
 
               <div className="flex items-center gap-1.5 pt-1">
-                <input ref={fileInputRef} type="file" multiple accept="image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*" className="hidden" onChange={onFileSelected} />
+                <input ref={fileInputRef} type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*" className="hidden" onChange={onFileSelected} />
                 <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={onPickFiles} disabled={isLoading} title="Attach files" className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${toolBtn}`} aria-label="Add attachment">
                   <Plus className="w-[18px] h-[18px]" />
                 </motion.button>
