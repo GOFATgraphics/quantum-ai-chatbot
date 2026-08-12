@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Plus, Square, AudioLines, Mic, MicOff, X, FileText, Image as ImageIcon, Brain, Search } from 'lucide-react'
+import { Send, Plus, Square, AudioLines, Mic, MicOff, X, FileText, Image as ImageIcon } from 'lucide-react'
 
 export type PendingFile = {
   name: string
@@ -24,10 +24,6 @@ type Props = {
   onFilesChange?: (files: PendingFile[]) => void
   onFocusChange?: (focused: boolean) => void
   language?: VoiceLanguage
-  thinkActive?: boolean
-  deepSearchActive?: boolean
-  onThinkChange?: (v: boolean) => void
-  onDeepSearchChange?: (v: boolean) => void
 }
 
 function readAsDataURL(file: File): Promise<string> {
@@ -91,7 +87,6 @@ async function blobToBase64(blob: Blob): Promise<string> {
 export default function ChatInput({
   value, onChange, onSend, onStop, onSpeak, isLoading, dark, errorHint,
   pendingFiles = [], onFilesChange, onFocusChange, language = 'en',
-  thinkActive = false, deepSearchActive = false, onThinkChange, onDeepSearchChange,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [listening, setListening] = useState(false)
@@ -373,40 +368,6 @@ export default function ChatInput({
                 >
                   {listening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
                 </motion.button>
-                <button
-                  type="button"
-                  onClick={() => onThinkChange?.(!thinkActive)}
-                  disabled={isLoading}
-                  title="Think mode — deeper reasoning"
-                  aria-pressed={thinkActive}
-                  className={`h-9 px-2.5 rounded-full flex items-center gap-1 text-[12px] font-semibold transition disabled:opacity-40 ${
-                    thinkActive
-                      ? dark
-                        ? 'bg-violet-500/25 text-violet-200 ring-1 ring-violet-400/40'
-                        : 'bg-violet-50 text-violet-700 ring-1 ring-violet-200'
-                      : toolBtn
-                  }`}
-                >
-                  <Brain className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Think</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDeepSearchChange?.(!deepSearchActive)}
-                  disabled={isLoading}
-                  title="DeepSearch — research-style answers"
-                  aria-pressed={deepSearchActive}
-                  className={`h-9 px-2.5 rounded-full flex items-center gap-1 text-[12px] font-semibold transition disabled:opacity-40 ${
-                    deepSearchActive
-                      ? dark
-                        ? 'bg-sky-500/25 text-sky-200 ring-1 ring-sky-400/40'
-                        : 'bg-sky-50 text-sky-700 ring-1 ring-sky-200'
-                      : toolBtn
-                  }`}
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Deep</span>
-                </button>
               </div>
             </div>
 
