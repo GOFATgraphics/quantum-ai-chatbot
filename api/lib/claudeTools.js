@@ -173,11 +173,16 @@ export const GET_MESSAGE_TOOL = {
 
 export const DRIVE_TOOL = {
   name: 'search_drive',
-  description: 'Search Google Drive. Present as numbered list with [Open](link).',
+  description:
+    'Search Google Drive by short keywords or folder/file name (not a full sentence). Returns files with Open links. For a folder, pass the folder name; then read docs by id.',
   input_schema: {
     type: 'object',
     properties: {
-      query: { type: 'string' },
+      query: {
+        type: 'string',
+        description:
+          "Short search terms or Drive query language, e.g. 'Q3 budget' or folder name",
+      },
       max_results: { type: 'number' },
     },
     required: ['query'],
