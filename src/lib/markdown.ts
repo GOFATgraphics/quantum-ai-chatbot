@@ -3,11 +3,12 @@ export function formatMarkdown(text: string): string {
   if (!text) return ''
 
   // Escape HTML first so raw tags/scripts cannot be injected
+  // (concat form so transports cannot collapse entities)
   const escaped = text
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-    .replace(/"/g, '"')
+    .replace(/&/g, '&' + 'amp;')
+    .replace(/</g, '&' + 'lt;')
+    .replace(/>/g, '&' + 'gt;')
+    .replace(/"/g, '&' + 'quot;')
 
   const lines = escaped.split('\n')
   const out: string[] = []
@@ -59,7 +60,7 @@ export function formatMarkdown(text: string): string {
 
   const isSafeUrl = (url: string) => {
     try {
-      const u = new URL(url.replace(/&/g, '&'))
+      const u = new URL(url.replace(new RegExp('&' + 'amp;', 'g'), '&'))
       return u.protocol === 'https:' || u.protocol === 'http:'
     } catch {
       return false
@@ -68,7 +69,7 @@ export function formatMarkdown(text: string): string {
 
   const shortenUrl = (url: string) => {
     try {
-      const u = new URL(url.replace(/&/g, '&'))
+      const u = new URL(url.replace(new RegExp('&' + 'amp;', 'g'), '&'))
       if (u.hostname.includes('docs.google.com')) {
         if (u.pathname.includes('/document/')) return 'Open Google Doc'
         if (u.pathname.includes('/spreadsheets/')) return 'Open Spreadsheet'
@@ -88,7 +89,6 @@ export function formatMarkdown(text: string): string {
       .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
 
-    // Markdown links [label](url) — only http(s)
     t = t.replace(
       /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
       (_m, label, url) => {
@@ -97,7 +97,6 @@ export function formatMarkdown(text: string): string {
       }
     )
 
-    // Bare URLs
     t = t.replace(
       /(?<!href="|">)(https?:\/\/[^\s<>"')\]]+)/g,
       (url) => {
