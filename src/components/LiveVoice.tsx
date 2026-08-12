@@ -267,39 +267,6 @@ function createSentencePlayer(
   }
 }
 
-async function speakWithElevenLabs(
-  text: string,
-  language: VoiceLanguage,
-  audioRef: React.MutableRefObject<HTMLAudioElement | null>,
-  onEnd: () => void,
-  onError?: (msg: string) => void,
-  signal?: AbortSignal,
-) {
-  const spoken = voiceFriendlyText(text, language)
-  try {
-    const { sentences, rest } = pullSentences(spoken + ' ')
-    const parts = [...sentences]
-    if (rest.trim()) parts.push(rest.trim())
-    if (parts.length <= 1) {
-      const buf = await fetchTtsBuffer(spoken, language, signal)
-      await playBuffer(buf, audioRef, signal)
-      onEnd()
-      return
-    }
-    const player = createSentencePlayer(language, audioRef, signal)
-    for (const p of parts) player.enqueue(p)
-    await player.finish()
-    onEnd()
-  } catch (e: any) {
-    if (e?.name === 'AbortError') {
-      onEnd()
-      return
-    }
-    onError?.(e?.message || 'Could not play voice')
-    onEnd()
-  }
-}
-
 export default function LiveVoice({
   dark,
   firstName,
