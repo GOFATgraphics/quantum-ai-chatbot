@@ -1,4 +1,4 @@
-import { useState, type RefObject, useEffect } from 'react'
+import { useState, type RefObject, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FileText } from 'lucide-react'
@@ -23,10 +23,8 @@ const messageVariants = {
   },
 }
 
-/** Split user content into text segments and image attachments */
 function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] {
   const parts: { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] = []
-  // Match markdown images; allow data: URLs and normal https URLs
   const imgRe = /!\[([^\]]*)\]\((data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=\s]+|https?:\/\/[^)\s]+)\)/g
   let last = 0
   let m: RegExpExecArray | null
@@ -35,7 +33,6 @@ function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; v
       const text = content.slice(last, m.index).trim()
       if (text) parts.push({ type: 'text', value: text })
     }
-    // strip any whitespace that may have been inserted into base64
     const src = m[2].replace(/\s+/g, '')
     parts.push({ type: 'image', value: src, alt: m[1] || 'Image' })
     last = m.index + m[0].length
@@ -189,6 +186,7 @@ type Props = {
   dark: boolean
   messagesEndRef: RefObject<HTMLDivElement>
   onRegenerate?: () => void
+  onSuggestion?: (text: string) => void
   thoughtSeconds?: number | null
   thinkActive?: boolean
   deepSearchActive?: boolean
@@ -202,6 +200,7 @@ export default function MessageList({
   dark,
   messagesEndRef,
   onRegenerate,
+  onSuggestion,
   thoughtSeconds,
   thinkActive,
   deepSearchActive,
@@ -211,7 +210,15 @@ export default function MessageList({
   const streaming =
     isLoading && last?.role === 'assistant' && !!last.content
 
-  // Keep view pinned to bottom while streaming if user is already near the bottom
+  useEffect(() => {
+    if (isLoading || messages.length === 0) return
+    const el = messagesEndRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'auto', block: 'end' })
+    })
+  }, [messages.length > 0 ? messages[0]?.id : null, messages.length, isLoading, messagesEndRef])
+
   useEffect(() => {
     if (!isLoading) return
     const el = messagesEndRef.current
@@ -222,13 +229,27 @@ export default function MessageList({
       return
     }
     const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
-    if (distance < 140) {
+    if (distance < 180) {
       el.scrollIntoView({ behavior: 'smooth', block: 'end' })
     }
   }, [messages, isLoading, toolStatus, messagesEndRef])
 
+  const suggestions = useMemo(() => {
+    if (isLoading || !last?.content || last.role !== 'assistant') return [] as string[]
+    const c = last.content.toLowerCase()
+    const picks: string[] = []
+    if (/email|gmail|inbox|mail/.test(c)) picks.push('Summarize unread emails', 'Draft a reply')
+    if (/doc|drive|file|sheet/.test(c)) picks.push('Open related files', 'Summarize key points')
+    if (/calendar|meeting|schedule/.test(c)) picks.push('What is next on my calendar?')
+    if (/code|bug|error|function/.test(c)) picks.push('Explain this step by step', 'Suggest a fix')
+    if (picks.length < 2) {
+      picks.push('Go deeper on this', 'Give me next steps', 'Make a shorter version')
+    }
+    return Array.from(new Set(picks)).slice(0, 3)
+  }, [isLoading, last?.id, last?.content, last?.role])
+
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-5 py-4 pb-6 space-y-6">
+    <div className="max-w-2xl mx-auto px-4 sm:px-5 py-4 pb-6 space-y-6 overflow-x-hidden w-full max-w-full">
       <AnimatePresence initial={false} mode="popLayout">
         {messages.map((msg, idx) => {
           const isLast = idx === messages.length - 1
@@ -254,12 +275,12 @@ export default function MessageList({
               ) : (
                 <div className="max-w-[95%] min-w-0">
                   <div
-                    className={`text-[15.5px] leading-[1.65] tracking-[-0.01em] ${
+                    className={`text-[15.5px] leading-[1.65] tracking-[-0.01em] min-w-0 overflow-x-hidden break-words ${
                       dark ? 'text-slate-100' : 'text-slate-900'
                     }`}
                   >
                     {msg.content ? (
-                      <div className="ai-content">
+                      <div className="ai-content overflow-x-hidden break-words max-w-full">
                         <span
                           dangerouslySetInnerHTML={{
                             __html: formatMarkdown(msg.content),
@@ -326,6 +347,25 @@ export default function MessageList({
             </motion.div>
           )}
       </AnimatePresence>
+
+      {!isLoading && suggestions.length > 0 && onSuggestion && (
+        <div className="flex flex-wrap gap-2 pt-1 pb-2 max-w-full overflow-x-hidden">
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onSuggestion(s)}
+              className={`text-[13px] font-medium px-3 py-1.5 rounded-full transition border ${
+                dark
+                  ? 'bg-white/5 border-white/10 text-slate-200 hover:bg-white/10'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div ref={messagesEndRef} />
     </div>
