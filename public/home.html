@@ -4,172 +4,575 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quantumy AI — Personal AI that remembers you</title>
-  <meta name="description" content="Quantumy AI is a personal AI assistant that remembers your preferences, helps draft emails, and optionally connects to Gmail so you can ask about your work in plain language." />
+  <meta name="description" content="Quantumy AI is a personal AI assistant that remembers your preferences, drafts emails, connects optionally to Gmail, and helps you get work done in plain language." />
   <meta name="application-name" content="Quantumy AI" />
-  <meta name="theme-color" content="#07070c" />
+  <meta name="theme-color" content="#05050a" />
+  <meta property="og:title" content="Quantumy AI — Your AI that knows your work" />
+  <meta property="og:description" content="Memory, email drafts, optional Gmail, voice, and projects — a personal AI built for real work." />
+  <meta property="og:type" content="website" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="apple-touch-icon" href="/logo.svg" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <style>
+    :root {
+      --bg: #05050a;
+      --surface: rgba(255, 255, 255, 0.04);
+      --surface-hover: rgba(255, 255, 255, 0.07);
+      --border: rgba(255, 255, 255, 0.1);
+      --border-strong: rgba(129, 140, 248, 0.35);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --faint: #64748b;
+      --indigo: #6366f1;
+      --violet: #8b5cf6;
+      --sky: #38bdf8;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
     body {
-      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      background: #05050a;
-      color: #e2e8f0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 1.25rem 1.25rem 4rem; }
-    header { display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 0 2rem; flex-wrap: wrap; gap: 0.75rem; }
-    .brand { display: flex; align-items: center; gap: 0.65rem; font-weight: 600; font-size: 1.05rem; color: #f8fafc; text-decoration: none; }
-    .brand img { width: 36px; height: 36px; }
-    nav a { color: #94a3b8; text-decoration: none; margin-left: 1.1rem; font-size: 0.9rem; }
-    nav a:hover { color: #e2e8f0; }
-    .hero { padding: 2rem 0 1.5rem; }
-    .hero h1 {
-      font-size: clamp(1.85rem, 4.5vw, 2.65rem);
+
+    body::before,
+    body::after {
+      content: '';
+      position: fixed;
+      width: 70vmax;
+      height: 70vmax;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(90px);
+      opacity: 0.85;
+    }
+    body::before {
+      top: -28%;
+      left: -18%;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.45) 0%, rgba(139, 92, 246, 0.18) 45%, transparent 70%);
+      animation: orb-a 18s ease-in-out infinite;
+    }
+    body::after {
+      bottom: -32%;
+      right: -22%;
+      background: radial-gradient(circle, rgba(129, 140, 248, 0.28) 0%, rgba(56, 189, 248, 0.12) 50%, transparent 70%);
+      animation: orb-b 22s ease-in-out infinite;
+    }
+    @keyframes orb-a {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(12vw, 10vh, 0) scale(1.15); }
+    }
+    @keyframes orb-b {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(-14vw, -8vh, 0) scale(1.12); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body::before, body::after { animation: none; }
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1.25rem 1.35rem 4rem;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0 1.75rem;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
       font-weight: 600;
-      letter-spacing: -0.03em;
-      line-height: 1.2;
+      font-size: 1.05rem;
       color: #f8fafc;
-      max-width: 18ch;
+      text-decoration: none;
+      letter-spacing: -0.02em;
     }
-    .hero h1 span {
-      background: linear-gradient(90deg, #a5b4fc, #c4b5fd, #67e8f9);
+    .brand img {
+      width: 38px;
+      height: 38px;
+      filter: drop-shadow(0 4px 14px rgba(129, 140, 248, 0.4));
+    }
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      padding: 0.45rem 0.75rem;
+      border-radius: 999px;
+      transition: color 0.2s, background 0.2s;
+    }
+    nav a:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.06);
+    }
+    nav a.nav-cta {
+      color: #fff;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      margin-left: 0.35rem;
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
+    }
+    nav a.nav-cta:hover {
+      filter: brightness(1.08);
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    }
+
+    .hero {
+      padding: 2.5rem 0 1rem;
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: #c7d2fe;
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(129, 140, 248, 0.25);
+      margin-bottom: 1.35rem;
+      letter-spacing: 0.02em;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #818cf8;
+      box-shadow: 0 0 8px rgba(129, 140, 248, 0.9);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.85); }
+    }
+
+    .hero h1 {
+      font-size: clamp(2rem, 5.5vw, 3.15rem);
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      line-height: 1.15;
+      color: #f8fafc;
+      max-width: 16ch;
+      margin: 0 auto;
+    }
+    .hero h1 .grad {
+      background: linear-gradient(105deg, #a5b4fc 0%, #c4b5fd 45%, #67e8f9 100%);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
     }
-    .hero p { margin-top: 1.1rem; color: #94a3b8; font-size: 1.05rem; max-width: 38rem; }
-    .purpose-box {
-      margin-top: 1.5rem;
-      padding: 1.25rem 1.35rem;
-      background: rgba(99, 102, 241, 0.08);
-      border: 1px solid rgba(129, 140, 248, 0.25);
-      border-radius: 14px;
-      max-width: 40rem;
+    .hero-lead {
+      margin: 1.25rem auto 0;
+      color: var(--muted);
+      font-size: 1.08rem;
+      max-width: 34rem;
+      line-height: 1.7;
     }
-    .purpose-box h2 {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #c7d2fe;
-      margin-bottom: 0.5rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+
+    .cta-row {
+      margin-top: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
     }
-    .purpose-box p { color: #cbd5e1; font-size: 0.98rem; margin: 0; }
-    .cta { margin-top: 1.75rem; display: flex; flex-wrap: wrap; gap: 0.75rem; }
     .btn {
-      display: inline-flex; align-items: center; justify-content: center;
-      height: 48px; padding: 0 1.35rem; border-radius: 14px;
-      font-weight: 500; font-size: 0.95rem; text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      height: 50px;
+      padding: 0 1.5rem;
+      border-radius: 14px;
+      font-weight: 500;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: transform 0.15s, filter 0.15s, background 0.2s;
     }
+    .btn:active { transform: scale(0.98); }
     .btn-primary {
-      background: linear-gradient(90deg, #4f46e5, #7c3aed);
+      background: linear-gradient(135deg, #4f46e5, #7c3aed 60%, #6366f1);
       color: white;
-      box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
+      box-shadow: 0 10px 32px rgba(79, 70, 229, 0.4);
     }
-    .btn-ghost { border: 1px solid rgba(255,255,255,0.12); color: #cbd5e1; }
-    .section { margin-top: 2.5rem; }
-    .section h2 { font-size: 1.15rem; color: #f1f5f9; margin-bottom: 0.65rem; }
-    .section p, .section li { color: #94a3b8; font-size: 0.98rem; }
-    .section ul { margin: 0.65rem 0 0 1.2rem; }
-    .section li { margin-bottom: 0.35rem; }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-ghost {
+      border: 1px solid var(--border);
+      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .btn-ghost:hover {
+      background: var(--surface-hover);
+      border-color: rgba(255, 255, 255, 0.16);
+      color: #f1f5f9;
+    }
+
+    .purpose {
+      margin: 3rem auto 0;
+      max-width: 40rem;
+      padding: 1.5rem 1.6rem;
+      background: linear-gradient(145deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
+      border: 1px solid var(--border-strong);
+      border-radius: 18px;
+      text-align: left;
+    }
+    .purpose-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #a5b4fc;
+      margin-bottom: 0.55rem;
+    }
+    .purpose p {
+      color: #cbd5e1;
+      font-size: 0.98rem;
+      margin: 0;
+      line-height: 1.7;
+    }
+    .purpose strong { color: #f1f5f9; font-weight: 600; }
+
+    section {
+      margin-top: 3.75rem;
+    }
+    .section-head {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .section-head h2 {
+      font-size: clamp(1.35rem, 3vw, 1.65rem);
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: #f8fafc;
+    }
+    .section-head p {
+      margin-top: 0.5rem;
+      color: var(--muted);
+      font-size: 0.98rem;
+      max-width: 32rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
     .features {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 0.85rem;
-      margin-top: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
     }
     .card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px;
-      padding: 1.15rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.35rem 1.4rem;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
     }
-    .card h3 { font-size: 0.95rem; color: #f1f5f9; margin-bottom: 0.35rem; }
-    .card p { font-size: 0.88rem; color: #94a3b8; }
+    .card:hover {
+      background: var(--surface-hover);
+      border-color: rgba(129, 140, 248, 0.28);
+      transform: translateY(-2px);
+    }
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.95rem;
+      font-size: 1.15rem;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(129, 140, 248, 0.2);
+    }
+    .card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 0.4rem;
+      letter-spacing: -0.015em;
+    }
+    .card p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      counter-reset: step;
+    }
+    .step {
+      position: relative;
+      padding: 1.25rem 1.3rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #c7d2fe;
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(129, 140, 248, 0.3);
+      margin-bottom: 0.85rem;
+    }
+    .step h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 0.35rem;
+    }
+    .step p {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .trust {
+      margin-top: 3.5rem;
+      padding: 1.35rem 1.5rem;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem 2rem;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .trust h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 0.35rem;
+    }
+    .trust p {
+      font-size: 0.88rem;
+      color: var(--muted);
+      max-width: 36rem;
+    }
+    .trust-links a {
+      color: #a5b4fc;
+      text-decoration: none;
+      font-size: 0.88rem;
+      margin-right: 1rem;
+    }
+    .trust-links a:hover { color: #c7d2fe; }
+
+    .bottom-cta {
+      margin-top: 3.5rem;
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      border-radius: 24px;
+      background: linear-gradient(160deg, rgba(79, 70, 229, 0.18), rgba(139, 92, 246, 0.08));
+      border: 1px solid rgba(129, 140, 248, 0.28);
+    }
+    .bottom-cta h2 {
+      font-size: clamp(1.35rem, 3vw, 1.75rem);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: #f8fafc;
+    }
+    .bottom-cta p {
+      margin-top: 0.55rem;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+    .bottom-cta .cta-row { margin-top: 1.5rem; }
+
     footer {
       margin-top: 3.5rem;
-      padding-top: 1.35rem;
-      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
       flex-wrap: wrap;
       gap: 1rem;
       justify-content: space-between;
-      color: #64748b;
+      align-items: center;
+      color: var(--faint);
       font-size: 0.85rem;
     }
-    footer a { color: #94a3b8; text-decoration: none; margin-right: 1rem; }
+    footer a {
+      color: var(--muted);
+      text-decoration: none;
+      margin-right: 1rem;
+    }
     footer a:hover { color: #e2e8f0; }
+
+    @media (max-width: 560px) {
+      .hero { padding-top: 1.5rem; }
+      .hero h1 { max-width: none; }
+      nav a:not(.nav-cta) { display: none; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <a class="brand" href="/home.html">
-        <img src="/logo.svg" alt="Quantumy AI" width="36" height="36" />
+        <img src="/logo.svg" alt="" width="38" height="38" />
         Quantumy AI
       </a>
       <nav>
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
         <a href="/privacy.html">Privacy</a>
-        <a href="/terms.html">Terms</a>
-        <a href="/">Sign in</a>
+        <a class="nav-cta" href="/">Open app</a>
       </nav>
     </header>
 
     <section class="hero">
-      <h1>Quantumy AI — Your AI that <span>knows your work</span></h1>
-      <p>
-        <strong style="color:#e2e8f0">Quantumy AI</strong> is a personal AI assistant for everyday work.
-        It remembers what matters to you, helps you draft clear emails, and can optionally read your Gmail so you can ask questions about your inbox in plain language.
+      <div class="badge">
+        <span class="badge-dot" aria-hidden="true"></span>
+        Personal AI for real work
+      </div>
+      <h1>Your AI that <span class="grad">knows your work</span></h1>
+      <p class="hero-lead">
+        Quantumy is a personal AI assistant with long-term memory, email drafting,
+        optional Gmail access, voice, and projects — so you spend less time hunting
+        context and more time getting things done.
       </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/">
+          Start chatting
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="#purpose">Why Quantumy</a>
+      </div>
+    </section>
 
-      <div class="purpose-box">
-        <h2>Purpose of this application</h2>
+    <div class="purpose" id="purpose">
+      <div class="purpose-label">Purpose of this application</div>
+      <p>
+        <strong>Quantumy AI</strong> is a productivity app whose purpose is to give you a
+        personal AI chatbot with <strong>persistent memory</strong>, help drafting clear
+        emails, and <strong>optional read-only Gmail</strong> so you can ask about your own
+        inbox in plain language. Connectors are opt-in and can be disconnected anytime.
+        Everything is designed so the assistant stays useful across sessions — without
+        forcing a long setup flow.
+      </p>
+    </div>
+
+    <section id="features">
+      <div class="section-head">
+        <h2>Built for how you actually work</h2>
+        <p>Chat, remember, draft, and connect — in a mobile-first interface that feels calm and fast.</p>
+      </div>
+      <div class="features">
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">🧠</div>
+          <h3>Long-term memory</h3>
+          <p>Preferences and facts you save stay with your account across chats, so Quantumy doesn’t start from zero every time.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">✉️</div>
+          <h3>Email drafts</h3>
+          <p>Ask for a reply or outreach draft and get a clear subject and body ready to copy and send.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">📬</div>
+          <h3>Optional Gmail</h3>
+          <p>Connect Gmail read-only when you want. Search and summarize your own messages. Disconnect from Settings anytime.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">🎙️</div>
+          <h3>Live voice</h3>
+          <p>Talk to Quantumy hands-free. Ideal for quick questions when typing isn’t convenient.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">📁</div>
+          <h3>Projects</h3>
+          <p>Group conversations by project so work stays organized and easy to pick up later.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">📱</div>
+          <h3>Install as an app</h3>
+          <p>Progressive web app — add to your phone, tablet, or desktop home screen for a native-like experience.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="section-head">
+        <h2>How it works</h2>
+        <p>No lengthy onboarding. Sign in and start — personalize only when you want.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <h3>Create an account</h3>
+          <p>Sign up with email in under a minute. You’re in the chat right away.</p>
+        </div>
+        <div class="step">
+          <h3>Chat &amp; remember</h3>
+          <p>Ask anything. Save preferences and context so future chats stay personal.</p>
+        </div>
+        <div class="step">
+          <h3>Connect tools (optional)</h3>
+          <p>Link Gmail only if you need inbox help. Scopes stay minimal and reversible.</p>
+        </div>
+        <div class="step">
+          <h3>Ship the work</h3>
+          <p>Drafts, summaries, research, and voice — then move on with less friction.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="trust">
+      <div>
+        <h3>Privacy by design</h3>
         <p>
-          <strong>Quantumy AI</strong> is a productivity application whose purpose is to provide a personal AI chatbot with long-term memory,
-          email drafting assistance, and optional read-only access to the user’s Gmail account so the assistant can search and summarize
-          the user’s own messages when asked. Connectors are opt-in and can be disconnected at any time.
+          API keys never live in the browser. Gmail is opt-in with read-only access.
+          You control connectors and can revoke them at any time.
         </p>
       </div>
+      <div class="trust-links">
+        <a href="/privacy.html">Privacy Policy</a>
+        <a href="/terms.html">Terms of Use</a>
+      </div>
+    </div>
 
-      <div class="cta">
+    <div class="bottom-cta">
+      <h2>Ready when you are</h2>
+      <p>Open Quantumy and ask your first question — no setup quiz required.</p>
+      <div class="cta-row">
         <a class="btn btn-primary" href="/">Open Quantumy AI</a>
-        <a class="btn btn-ghost" href="/privacy.html">Privacy Policy</a>
+        <a class="btn btn-ghost" href="/privacy.html">Read privacy policy</a>
       </div>
-    </section>
-
-    <section class="section">
-      <h2>What you can do with Quantumy AI</h2>
-      <ul>
-        <li>Chat with an AI that remembers facts and preferences you save.</li>
-        <li>Ask it to <strong>draft emails</strong> (subject + body) you can copy and send.</li>
-        <li>Optionally connect <strong>Gmail</strong> (read-only) to search and summarize your own messages.</li>
-        <li>Install as an app on phone, tablet, or desktop (PWA).</li>
-      </ul>
-    </section>
-
-    <section class="section">
-      <h2>Features</h2>
-      <div class="features">
-        <div class="card">
-          <h3>Memory</h3>
-          <p>Preferences and learned facts stay with your account across chats.</p>
-        </div>
-        <div class="card">
-          <h3>Email drafts</h3>
-          <p>Ask for a reply or outreach draft — get a clear subject and body ready to paste.</p>
-        </div>
-        <div class="card">
-          <h3>Optional Gmail</h3>
-          <p>Connect only if you want. Disconnect anytime from Settings → Connectors.</p>
-        </div>
-      </div>
-    </section>
+    </div>
 
     <footer>
       <div>
+        <a href="/home.html">Home</a>
         <a href="/privacy.html">Privacy</a>
         <a href="/terms.html">Terms</a>
         <a href="/">App</a>
