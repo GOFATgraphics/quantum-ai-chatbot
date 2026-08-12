@@ -7,7 +7,6 @@ import Auth from './components/Auth'
 import Sidebar from './components/Sidebar'
 import Settings from './components/Settings'
 import Connectors from './components/Connectors'
-import Onboarding from './components/Onboarding'
 import Logo from './components/Logo'
 import MessageList, { type ChatMessage } from './components/MessageList'
 import EmptyState from './components/EmptyState'
@@ -181,7 +180,6 @@ export default function App() {
     user?.user_metadata?.name?.split(' ')?.[0] ||
     user?.email?.split('@')?.[0] ||
     'there'
-  const needsOnboarding = !!user && user.user_metadata?.onboarding_complete !== true
 
   const loadConversations = useCallback(async () => {
     if (!user) return
@@ -365,7 +363,6 @@ export default function App() {
       const model = MODEL
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (session?.access_token) headers.Authorization = 'Bearer ' + session.access_token
-      // Short context keeps voice turns fast
       const history = messagesRef.current.slice(-6).map((m) => ({
         role: m.role,
         content: String(m.content || '').replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '[Image]').slice(0, 1200),
@@ -489,9 +486,6 @@ export default function App() {
   }
 
   if (!session || !user) return <Auth onSuccess={() => {}} />
-  if (needsOnboarding) {
-    return <Onboarding onComplete={() => { supabase.auth.getSession().then(({ data }) => setSession(data.session)) }} />
-  }
 
   const sidebarProps = {
     dark, user, conversations, projects, currentConversationId, currentProjectId, deletingId,
