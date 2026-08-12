@@ -7,7 +7,14 @@ const MODEL = 'claude-sonnet-5';
 
 function stripEmDashes(s) {
   if (!s || typeof s !== 'string') return s;
-  return s.replace(/\u2014/g, ',').replace(/\u2013/g, '-').replace(/\s+,/g, ',').replace(/,{2,}/g, ',').replace(/\s{2,}/g, ' ');
+  return s
+    .replace(/\u2014/g, ',')
+    .replace(/\u2013/g, '-')
+    .replace(/\u2015/g, ',')
+    .replace(/--+/g, ',')
+    .replace(/\s+,/g, ',')
+    .replace(/,{2,}/g, ',')
+    .replace(/\s{2,}/g, ' ');
 }
 
 function extractText(blocks) {
@@ -55,9 +62,16 @@ function toAnthropicContent(content) {
 async function loadUserMemory(userId) {
   try {
     const admin = getAdminClient();
-    const { data } = await admin.from('user_memory').select('fact, category').eq('user_id', userId).order('updated_at', { ascending: false }).limit(40);
+    const { data } = await admin
+      .from('user_memory')
+      .select('fact, category')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(60);
     return data || [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 async function loadProjectContext(userId, projectId) {
@@ -66,18 +80,31 @@ async function loadProjectContext(userId, projectId) {
     const admin = getAdminClient();
     const { data } = await admin.from('projects').select('name, description').eq('id', projectId).eq('user_id', userId).maybeSingle();
     return data;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
-  const memoryBlock = memory?.length > 0
-    ? `## What you know about this user\n${memory.map((m) => `- ${m.fact}${m.category ? ` (${m.category})` : ''}`).join('\n')}\nThese facts are authoritative. Weave them into answers whenever relevant. Never ignore them. When they share new stable facts, call save_memory right away.`
-    : '## What you know about this user\nNo saved memories yet. As soon as they share stable personal or work facts, call save_memory.';
-  const projectBlock = project ? `## Active project workspace\nName: ${project.name}\n${project.description ? `Description: ${project.description}\n` : ''}` : '';
-  const nameLine = firstName ? `The user's first name is ${firstName}. Address them by first name occasionally when natural.` : '';
-  const voiceBlock = voice
-    ? `## Voice mode\nYou are in a live voice conversation. Reply in 1 to 3 short spoken sentences. No markdown, no lists, no code fences. Be warm and fast. Skip tool calls unless the user clearly needs email, calendar, drive, or a live fact.`
+  const memoryBlock =
+    memory?.length > 0
+      ? `## What you know about this user (use aggressively)\n${memory
+          .map((m) => `- ${m.fact}${m.category ? ` (${m.category})` : ''}`)
+          .join('\n')}\nThese facts are authoritative. Prefer them over generic advice. Reference them by name or detail when relevant. Never pretend you forgot them. When they share new stable personal, work, preference, or project facts, call save_memory immediately.`
+      : '## What you know about this user\nNo saved memories yet. As soon as they share stable personal, work, preference, or project facts, call save_memory right away.';
+
+  const projectBlock = project
+    ? `## Active project workspace\nName: ${project.name}\n${project.description ? `Description: ${project.description}\n` : ''}`
     : '';
+
+  const nameLine = firstName
+    ? `The user's first name is ${firstName}. Address them by first name occasionally when natural.`
+    : '';
+
+  const voiceBlock = voice
+    ? `## Voice mode (critical latency)\nYou are in a live spoken conversation. Reply in 1 or 2 short spoken sentences only. No markdown, no lists, no code, no links, no bullet points. Be warm, direct, and fast. Skip tool calls unless the user clearly needs email, calendar, drive, or a live fact. Prefer saved memory over tools when it answers the question.`
+    : '';
+
   const toolLines = ['- web_search', '- web_fetch', '- save_memory'];
   if (connected.gmail) toolLines.push('- Gmail tools');
   if (connected.drive) toolLines.push('- Drive tools');
@@ -86,15 +113,19 @@ function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
   if (connected.calendar) toolLines.push('- Calendar tools');
   if (connected.outlook) toolLines.push('- Outlook tools');
   if (connected.excel) toolLines.push('- Excel tools');
+
   return `You are **Quantumy**, an AI workspace operator. Direct, brief, outcome-focused. No filler, no emoji.
 
-**Reasoning & research (always on):** Think carefully on complex questions. Use web_search and web_fetch for current facts. Cite sources with links.
+**Reasoning & research (always on):** Think carefully on complex questions. Use web_search and web_fetch for current or uncertain facts. Cite sources with links in text mode.
 
 **Confirmation rule:** Reversible actions do immediately. Irreversible (send email, trash, invite attendees) summarize and wait for confirmation.
 
-**Style:** Lead with outcomes. Clean Markdown. No pipe tables. Never use em dashes (the long hyphen) or en dashes. Use commas, periods, colons, or parentheses instead.
+**Style (hard rules):**
+- Lead with outcomes. Clean Markdown in text mode. No pipe tables.
+- Never use em dashes (—) or en dashes (–) or double hyphens as dashes. Use commas, periods, colons, or parentheses instead.
+- Prefer short sentences over long clauses.
 
-**Memory (critical):** Actively use every saved fact. When they share stable facts, call save_memory immediately.
+**Memory (critical):** Actively use every saved fact below. Prefer memory over guessing. When they share stable facts, call save_memory immediately without asking permission.
 
 ${nameLine}
 ${voiceBlock}
@@ -158,7 +189,11 @@ async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTo
       const payload = trimmed.slice(5).trim();
       if (!payload || payload === '[DONE]') continue;
       let evt;
-      try { evt = JSON.parse(payload); } catch { continue; }
+      try {
+        evt = JSON.parse(payload);
+      } catch {
+        continue;
+      }
       if (evt.type === 'content_block_start') {
         const b = evt.content_block;
         if (b?.type === 'text') contentBlocks.push({ type: 'text', text: '' });
@@ -178,7 +213,11 @@ async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTo
         }
       } else if (evt.type === 'content_block_stop') {
         if (currentTool) {
-          try { currentTool.input = JSON.parse(currentTool.partial_json || '{}'); } catch { currentTool.input = {}; }
+          try {
+            currentTool.input = JSON.parse(currentTool.partial_json || '{}');
+          } catch {
+            currentTool.input = {};
+          }
           delete currentTool.partial_json;
           currentTool = null;
         }
@@ -222,11 +261,25 @@ export default async function handler(req, res) {
     tools = connectorsResult.tools;
     memory = memoryResult;
     project = projectResult;
-    const systemPrompt = buildSystemPrompt({ connected, memory, project, firstName: body?.firstName || null, voice: isVoice });
+
+    // Voice: keep only save_memory for speed (full connector tools add multi-round latency)
+    if (isVoice && Array.isArray(tools)) {
+      tools = tools.filter((t) => t?.name === 'save_memory');
+    }
+
+    const systemPrompt = buildSystemPrompt({
+      connected,
+      memory,
+      project,
+      firstName: body?.firstName || null,
+      voice: isVoice,
+    });
+
     let anthropicMessages = messages.map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.role === 'assistant' ? String(m.content) : toAnthropicContent(m.content),
     }));
+
     if (wantStream) {
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -234,27 +287,42 @@ export default async function handler(req, res) {
       res.setHeader('X-Accel-Buffering', 'no');
       if (typeof res.flushHeaders === 'function') res.flushHeaders();
     }
-    const maxRounds = isVoice ? 6 : 24;
-    const maxTokens = isVoice ? 1024 : (body?.projectId ? 12288 : 8192);
+
+    const maxRounds = isVoice ? 2 : 24;
+    const maxTokens = isVoice ? 400 : body?.projectId ? 12288 : 8192;
+
     for (let round = 0; round < maxRounds; round++) {
       let data;
       if (wantStream) {
         data = await runClaudeStream({
-          apiKey, system: systemPrompt, messages: anthropicMessages,
-          tools: tools.length ? tools : undefined, maxTokens,
-          onDelta: (delta) => { try { sseWrite(res, { delta: stripEmDashes(delta) }); } catch (_) {} },
+          apiKey,
+          system: systemPrompt,
+          messages: anthropicMessages,
+          tools: tools.length ? tools : undefined,
+          maxTokens,
+          onDelta: (delta) => {
+            try {
+              sseWrite(res, { delta: stripEmDashes(delta) });
+            } catch (_) {}
+          },
         });
       } else {
         data = await runClaude({
-          apiKey, system: systemPrompt, messages: anthropicMessages,
-          tools: tools.length ? tools : undefined, maxTokens,
+          apiKey,
+          system: systemPrompt,
+          messages: anthropicMessages,
+          tools: tools.length ? tools : undefined,
+          maxTokens,
         });
       }
       const stop = data.stop_reason;
       const content = data.content || [];
       const clientToolBlocks = content.filter((b) => b.type === 'tool_use');
       if (stop !== 'tool_use' || clientToolBlocks.length === 0) {
-        const textOut = (wantStream ? data.text : extractText(content)) || extractText(content) || 'Sorry, I could not generate a response.';
+        const textOut =
+          (wantStream ? data.text : extractText(content)) ||
+          extractText(content) ||
+          'Sorry, I could not generate a response.';
         if (wantStream) {
           if (!data.text || !String(data.text).trim()) sseWrite(res, { content: stripEmDashes(textOut) });
           sseWrite(res, { done: true });

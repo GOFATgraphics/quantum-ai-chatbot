@@ -1,6 +1,6 @@
 /**
  * ElevenLabs Text-to-Speech proxy
- * Always: eleven_v3 + custom Hausa man voice rPlZjuLXpONhaMouRFww
+ * Flash model + low-bitrate mp3 for fast live voice turns
  * POST { text, language? }
  */
 export default async function handler(req, res) {
@@ -24,15 +24,18 @@ export default async function handler(req, res) {
     if (!text) return res.status(400).json({ error: 'text is required' });
 
     // Strip em/en dashes for natural speech
-    text = text.replace(/\u2014/g, ',').replace(/\u2013/g, '-');
+    text = text
+      .replace(/\u2014/g, ',')
+      .replace(/\u2013/g, '-')
+      .replace(/\u2015/g, ',')
+      .replace(/--+/g, ',');
     // Keep replies short for fast TTS
-    if (text.length > 420) {
-      const cut = text.slice(0, 420);
+    if (text.length > 320) {
+      const cut = text.slice(0, 320);
       const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
-      text = lastStop > 80 ? cut.slice(0, lastStop + 1) : cut + '…';
+      text = lastStop > 60 ? cut.slice(0, lastStop + 1) : cut + '…';
     }
 
-    // HARD LOCK: your Hausa man voice only (ignore accidental env overrides that point elsewhere)
     const voiceId =
       body?.voice_id ||
       process.env.ELEVENLABS_VOICE_MALE ||
@@ -42,7 +45,6 @@ export default async function handler(req, res) {
     const lang = (body?.language || 'en').toLowerCase();
     const isHausa = lang === 'ha' || lang === 'hau' || lang === 'hausa';
 
-    // Flash for low latency voice turns; env can override (e.g. eleven_v3)
     const modelId = process.env.ELEVENLABS_TTS_MODEL || 'eleven_flash_v2_5';
     const languageCode = isHausa ? 'ha' : 'en';
 
@@ -51,15 +53,15 @@ export default async function handler(req, res) {
       model_id: modelId,
       language_code: languageCode,
       voice_settings: {
-        stability: 0.4,
-        similarity_boost: 0.75,
+        stability: 0.35,
+        similarity_boost: 0.7,
         style: 0.0,
         use_speaker_boost: true,
       },
     };
 
-    // 64kbps mp3 = smaller + faster transfer without big quality loss for speech
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`;
+    // optimize_streaming_latency=4 + low bitrate = faster first byte / smaller payload
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32&optimize_streaming_latency=4`;
     const elRes = await fetch(url, {
       method: 'POST',
       headers: {
