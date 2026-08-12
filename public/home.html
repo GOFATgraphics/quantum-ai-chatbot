@@ -27,11 +27,8 @@
       --violet: #8b5cf6;
       --sky: #38bdf8;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     html { scroll-behavior: smooth; }
-
     body {
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       background: var(--bg);
@@ -41,9 +38,7 @@
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
     }
-
-    body::before,
-    body::after {
+    body::before, body::after {
       content: '';
       position: fixed;
       width: 70vmax;
@@ -55,14 +50,12 @@
       opacity: 0.85;
     }
     body::before {
-      top: -28%;
-      left: -18%;
+      top: -28%; left: -18%;
       background: radial-gradient(circle, rgba(99, 102, 241, 0.45) 0%, rgba(139, 92, 246, 0.18) 45%, transparent 70%);
       animation: orb-a 18s ease-in-out infinite;
     }
     body::after {
-      bottom: -32%;
-      right: -22%;
+      bottom: -32%; right: -22%;
       background: radial-gradient(circle, rgba(129, 140, 248, 0.28) 0%, rgba(56, 189, 248, 0.12) 50%, transparent 70%);
       animation: orb-b 22s ease-in-out infinite;
     }
@@ -77,358 +70,70 @@
     @media (prefers-reduced-motion: reduce) {
       body::before, body::after { animation: none; }
     }
-
-    .wrap {
-      position: relative;
-      z-index: 1;
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 1.25rem 1.35rem 4rem;
-    }
-
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.5rem 0 1.75rem;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 0.7rem;
-      font-weight: 600;
-      font-size: 1.05rem;
-      color: #f8fafc;
-      text-decoration: none;
-      letter-spacing: -0.02em;
-    }
-    .brand img {
-      width: 38px;
-      height: 38px;
-      filter: drop-shadow(0 4px 14px rgba(129, 140, 248, 0.4));
-    }
-    nav {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-    nav a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.9rem;
-      padding: 0.45rem 0.75rem;
-      border-radius: 999px;
-      transition: color 0.2s, background 0.2s;
-    }
-    nav a:hover {
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.06);
-    }
-    nav a.nav-cta {
-      color: #fff;
-      background: linear-gradient(135deg, #4f46e5, #7c3aed);
-      margin-left: 0.35rem;
-      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
-    }
-    nav a.nav-cta:hover {
-      filter: brightness(1.08);
-      background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    }
-
-    .hero {
-      padding: 2.5rem 0 1rem;
-      text-align: center;
-    }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      padding: 0.35rem 0.85rem;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      font-weight: 500;
-      color: #c7d2fe;
-      background: rgba(99, 102, 241, 0.12);
-      border: 1px solid rgba(129, 140, 248, 0.25);
-      margin-bottom: 1.35rem;
-      letter-spacing: 0.02em;
-    }
-    .badge-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #818cf8;
-      box-shadow: 0 0 8px rgba(129, 140, 248, 0.9);
-      animation: pulse-dot 2s ease-in-out infinite;
-    }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(0.85); }
-    }
-
-    .hero h1 {
-      font-size: clamp(2rem, 5.5vw, 3.15rem);
-      font-weight: 600;
-      letter-spacing: -0.035em;
-      line-height: 1.15;
-      color: #f8fafc;
-      max-width: 16ch;
-      margin: 0 auto;
-    }
-    .hero h1 .grad {
-      background: linear-gradient(105deg, #a5b4fc 0%, #c4b5fd 45%, #67e8f9 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-    .hero-lead {
-      margin: 1.25rem auto 0;
-      color: var(--muted);
-      font-size: 1.08rem;
-      max-width: 34rem;
-      line-height: 1.7;
-    }
-
-    .cta-row {
-      margin-top: 2rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      justify-content: center;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.45rem;
-      height: 50px;
-      padding: 0 1.5rem;
-      border-radius: 14px;
-      font-weight: 500;
-      font-size: 0.95rem;
-      text-decoration: none;
-      transition: transform 0.15s, filter 0.15s, background 0.2s;
-    }
+    .wrap { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 1.25rem 1.35rem 4rem; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0 1.75rem; flex-wrap: wrap; gap: 0.75rem; }
+    .brand { display: flex; align-items: center; gap: 0.7rem; font-weight: 600; font-size: 1.05rem; color: #f8fafc; text-decoration: none; letter-spacing: -0.02em; }
+    .brand img { width: 38px; height: 38px; filter: drop-shadow(0 4px 14px rgba(129, 140, 248, 0.4)); }
+    nav { display: flex; align-items: center; gap: 0.35rem; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 0.9rem; padding: 0.45rem 0.75rem; border-radius: 999px; transition: color 0.2s, background 0.2s; }
+    nav a:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+    nav a.nav-cta { color: #fff; background: linear-gradient(135deg, #4f46e5, #7c3aed); margin-left: 0.35rem; box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35); }
+    nav a.nav-cta:hover { filter: brightness(1.08); background: linear-gradient(135deg, #4f46e5, #7c3aed); }
+    .hero { padding: 2.5rem 0 1rem; text-align: center; }
+    .badge { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.85rem; border-radius: 999px; font-size: 0.78rem; font-weight: 500; color: #c7d2fe; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(129, 140, 248, 0.25); margin-bottom: 1.35rem; letter-spacing: 0.02em; }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #818cf8; box-shadow: 0 0 8px rgba(129, 140, 248, 0.9); animation: pulse-dot 2s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(0.85); } }
+    .hero h1 { font-size: clamp(2rem, 5.5vw, 3.15rem); font-weight: 600; letter-spacing: -0.035em; line-height: 1.15; color: #f8fafc; max-width: 16ch; margin: 0 auto; }
+    .hero h1 .grad { background: linear-gradient(105deg, #a5b4fc 0%, #c4b5fd 45%, #67e8f9 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero-lead { margin: 1.25rem auto 0; color: var(--muted); font-size: 1.08rem; max-width: 34rem; line-height: 1.7; }
+    .cta-row { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; height: 50px; padding: 0 1.5rem; border-radius: 14px; font-weight: 500; font-size: 0.95rem; text-decoration: none; transition: transform 0.15s, filter 0.15s, background 0.2s; }
     .btn:active { transform: scale(0.98); }
-    .btn-primary {
-      background: linear-gradient(135deg, #4f46e5, #7c3aed 60%, #6366f1);
-      color: white;
-      box-shadow: 0 10px 32px rgba(79, 70, 229, 0.4);
-    }
+    .btn-primary { background: linear-gradient(135deg, #4f46e5, #7c3aed 60%, #6366f1); color: white; box-shadow: 0 10px 32px rgba(79, 70, 229, 0.4); }
     .btn-primary:hover { filter: brightness(1.08); }
-    .btn-ghost {
-      border: 1px solid var(--border);
-      color: #cbd5e1;
-      background: rgba(255, 255, 255, 0.03);
-    }
-    .btn-ghost:hover {
-      background: var(--surface-hover);
-      border-color: rgba(255, 255, 255, 0.16);
-      color: #f1f5f9;
-    }
-
-    .purpose {
-      margin: 3rem auto 0;
-      max-width: 40rem;
-      padding: 1.5rem 1.6rem;
-      background: linear-gradient(145deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05));
-      border: 1px solid var(--border-strong);
-      border-radius: 18px;
-      text-align: left;
-    }
-    .purpose-label {
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #a5b4fc;
-      margin-bottom: 0.55rem;
-    }
-    .purpose p {
-      color: #cbd5e1;
-      font-size: 0.98rem;
-      margin: 0;
-      line-height: 1.7;
-    }
+    .btn-ghost { border: 1px solid var(--border); color: #cbd5e1; background: rgba(255, 255, 255, 0.03); }
+    .btn-ghost:hover { background: var(--surface-hover); border-color: rgba(255, 255, 255, 0.16); color: #f1f5f9; }
+    .purpose { margin: 3rem auto 0; max-width: 40rem; padding: 1.5rem 1.6rem; background: linear-gradient(145deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.05)); border: 1px solid var(--border-strong); border-radius: 18px; text-align: left; }
+    .purpose-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #a5b4fc; margin-bottom: 0.55rem; }
+    .purpose p { color: #cbd5e1; font-size: 0.98rem; margin: 0; line-height: 1.7; }
     .purpose strong { color: #f1f5f9; font-weight: 600; }
-
-    section {
-      margin-top: 3.75rem;
-    }
-    .section-head {
-      text-align: center;
-      margin-bottom: 1.5rem;
-    }
-    .section-head h2 {
-      font-size: clamp(1.35rem, 3vw, 1.65rem);
-      font-weight: 600;
-      letter-spacing: -0.025em;
-      color: #f8fafc;
-    }
-    .section-head p {
-      margin-top: 0.5rem;
-      color: var(--muted);
-      font-size: 0.98rem;
-      max-width: 32rem;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1rem;
-    }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 1.35rem 1.4rem;
-      transition: border-color 0.2s, background 0.2s, transform 0.2s;
-    }
-    .card:hover {
-      background: var(--surface-hover);
-      border-color: rgba(129, 140, 248, 0.28);
-      transform: translateY(-2px);
-    }
-    .card-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 0.95rem;
-      font-size: 1.15rem;
-      background: rgba(99, 102, 241, 0.15);
-      border: 1px solid rgba(129, 140, 248, 0.2);
-    }
-    .card h3 {
-      font-size: 1rem;
-      font-weight: 600;
-      color: #f1f5f9;
-      margin-bottom: 0.4rem;
-      letter-spacing: -0.015em;
-    }
-    .card p {
-      font-size: 0.9rem;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-
-    .steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      counter-reset: step;
-    }
-    .step {
-      position: relative;
-      padding: 1.25rem 1.3rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-    }
-    .step::before {
-      counter-increment: step;
-      content: counter(step);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 9px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #c7d2fe;
-      background: rgba(99, 102, 241, 0.2);
-      border: 1px solid rgba(129, 140, 248, 0.3);
-      margin-bottom: 0.85rem;
-    }
-    .step h3 {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #f1f5f9;
-      margin-bottom: 0.35rem;
-    }
-    .step p {
-      font-size: 0.88rem;
-      color: var(--muted);
-    }
-
-    .trust {
-      margin-top: 3.5rem;
-      padding: 1.35rem 1.5rem;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(0, 0, 0, 0.25);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem 2rem;
-      align-items: flex-start;
-      justify-content: space-between;
-    }
-    .trust h3 {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #e2e8f0;
-      margin-bottom: 0.35rem;
-    }
-    .trust p {
-      font-size: 0.88rem;
-      color: var(--muted);
-      max-width: 36rem;
-    }
-    .trust-links a {
-      color: #a5b4fc;
-      text-decoration: none;
-      font-size: 0.88rem;
-      margin-right: 1rem;
-    }
+    section { margin-top: 3.75rem; }
+    .section-head { text-align: center; margin-bottom: 1.5rem; }
+    .section-head h2 { font-size: clamp(1.35rem, 3vw, 1.65rem); font-weight: 600; letter-spacing: -0.025em; color: #f8fafc; }
+    .section-head p { margin-top: 0.5rem; color: var(--muted); font-size: 0.98rem; max-width: 32rem; margin-left: auto; margin-right: auto; }
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 1.35rem 1.4rem; transition: border-color 0.2s, background 0.2s, transform 0.2s; }
+    .card:hover { background: var(--surface-hover); border-color: rgba(129, 140, 248, 0.28); transform: translateY(-2px); }
+    .card-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.95rem; font-size: 1.15rem; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(129, 140, 248, 0.2); }
+    .card h3 { font-size: 1rem; font-weight: 600; color: #f1f5f9; margin-bottom: 0.4rem; letter-spacing: -0.015em; }
+    .card p { font-size: 0.9rem; color: var(--muted); line-height: 1.6; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; counter-reset: step; }
+    .step { position: relative; padding: 1.25rem 1.3rem; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+    .step::before { counter-increment: step; content: counter(step); display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 9px; font-size: 0.8rem; font-weight: 600; color: #c7d2fe; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(129, 140, 248, 0.3); margin-bottom: 0.85rem; }
+    .step h3 { font-size: 0.95rem; font-weight: 600; color: #f1f5f9; margin-bottom: 0.35rem; }
+    .step p { font-size: 0.88rem; color: var(--muted); }
+    .data-section { margin-top: 3.75rem; }
+    .data-box { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1.6rem; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; text-align: left; }
+    .data-box h3 { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; margin: 1.15rem 0 0.4rem; }
+    .data-box h3:first-child { margin-top: 0; }
+    .data-box p { color: var(--muted); font-size: 0.92rem; line-height: 1.7; margin: 0; }
+    .data-box strong { color: #f1f5f9; font-weight: 600; }
+    .data-box code { font-size: 0.82em; padding: 0.1em 0.35em; border-radius: 6px; background: rgba(99, 102, 241, 0.15); color: #c7d2fe; border: 1px solid rgba(129, 140, 248, 0.25); }
+    .data-policy { margin-top: 1.25rem !important; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+    .data-policy a { color: #a5b4fc; text-decoration: none; font-weight: 500; }
+    .data-policy a:hover { color: #c7d2fe; text-decoration: underline; }
+    .trust { margin-top: 3.5rem; padding: 1.35rem 1.5rem; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(0, 0, 0, 0.25); display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: flex-start; justify-content: space-between; }
+    .trust h3 { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.35rem; }
+    .trust p { font-size: 0.88rem; color: var(--muted); max-width: 36rem; }
+    .trust-links a { color: #a5b4fc; text-decoration: none; font-size: 0.88rem; margin-right: 1rem; }
     .trust-links a:hover { color: #c7d2fe; }
-
-    .bottom-cta {
-      margin-top: 3.5rem;
-      text-align: center;
-      padding: 2.5rem 1.5rem;
-      border-radius: 24px;
-      background: linear-gradient(160deg, rgba(79, 70, 229, 0.18), rgba(139, 92, 246, 0.08));
-      border: 1px solid rgba(129, 140, 248, 0.28);
-    }
-    .bottom-cta h2 {
-      font-size: clamp(1.35rem, 3vw, 1.75rem);
-      font-weight: 600;
-      letter-spacing: -0.03em;
-      color: #f8fafc;
-    }
-    .bottom-cta p {
-      margin-top: 0.55rem;
-      color: var(--muted);
-      font-size: 0.98rem;
-    }
+    .bottom-cta { margin-top: 3.5rem; text-align: center; padding: 2.5rem 1.5rem; border-radius: 24px; background: linear-gradient(160deg, rgba(79, 70, 229, 0.18), rgba(139, 92, 246, 0.08)); border: 1px solid rgba(129, 140, 248, 0.28); }
+    .bottom-cta h2 { font-size: clamp(1.35rem, 3vw, 1.75rem); font-weight: 600; letter-spacing: -0.03em; color: #f8fafc; }
+    .bottom-cta p { margin-top: 0.55rem; color: var(--muted); font-size: 0.98rem; }
     .bottom-cta .cta-row { margin-top: 1.5rem; }
-
-    footer {
-      margin-top: 3.5rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      justify-content: space-between;
-      align-items: center;
-      color: var(--faint);
-      font-size: 0.85rem;
-    }
-    footer a {
-      color: var(--muted);
-      text-decoration: none;
-      margin-right: 1rem;
-    }
+    footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; color: var(--faint); font-size: 0.85rem; }
+    footer a { color: var(--muted); text-decoration: none; margin-right: 1rem; }
     footer a:hover { color: #e2e8f0; }
-
     @media (max-width: 560px) {
       .hero { padding-top: 1.5rem; }
       .hero h1 { max-width: none; }
@@ -440,13 +145,13 @@
   <div class="wrap">
     <header>
       <a class="brand" href="/home.html">
-        <img src="/logo.svg" alt="" width="38" height="38" />
+        <img src="/logo.svg" alt="Quantumy AI" width="38" height="38" />
         Quantumy AI
       </a>
       <nav>
         <a href="#features">Features</a>
-        <a href="#how">How it works</a>
-        <a href="/privacy.html">Privacy</a>
+        <a href="#data">Google data</a>
+        <a href="/privacy.html">Privacy Policy</a>
         <a class="nav-cta" href="/">Open app</a>
       </nav>
     </header>
@@ -463,10 +168,7 @@
         context and more time getting things done.
       </p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="/">
-          Start chatting
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-        </a>
+        <a class="btn btn-primary" href="/">Start chatting</a>
         <a class="btn btn-ghost" href="#purpose">Why Quantumy</a>
       </div>
     </section>
@@ -533,7 +235,7 @@
           <p>Sign up with email in under a minute. You’re in the chat right away.</p>
         </div>
         <div class="step">
-          <h3>Chat &amp; remember</h3>
+          <h3>Chat & remember</h3>
           <p>Ask anything. Save preferences and context so future chats stay personal.</p>
         </div>
         <div class="step">
@@ -547,6 +249,40 @@
       </div>
     </section>
 
+    <section id="data" class="data-section">
+      <div class="section-head">
+        <h2>How we use Google user data</h2>
+        <p>Transparent explanation of why Quantumy AI requests access to your Google account data.</p>
+      </div>
+      <div class="data-box">
+        <h3>What we request</h3>
+        <p>
+          If you choose to connect Gmail, Quantumy AI requests <strong>read-only</strong> access to your Gmail
+          (<code>gmail.readonly</code>) and your Google account email address
+          (<code>userinfo.email</code>). We do <strong>not</strong> request send, delete, or modify permissions.
+        </p>
+        <h3>Why we request it</h3>
+        <p>
+          The sole purpose is so you can ask Quantumy, in plain language, to <strong>search and summarize
+          your own email</strong> (for example: “What did Sara send last week?” or “Summarize unread messages
+          about the invoice”). Access is used only to fulfill requests you make in the chat. We do not use
+          Gmail data for advertising, selling, or training external models beyond generating the response
+          you asked for.
+        </p>
+        <h3>Your control</h3>
+        <p>
+          Connecting Gmail is <strong>optional</strong>. You can disconnect at any time in the app under
+          <strong>Settings → Connectors</strong>, which revokes access and removes stored tokens from our systems.
+          You can also revoke access in your Google Account security settings.
+        </p>
+        <p class="data-policy">
+          Full details are in our
+          <a href="/privacy.html">Privacy Policy</a>
+          (same policy linked on the Google OAuth consent screen).
+        </p>
+      </div>
+    </section>
+
     <div class="trust">
       <div>
         <h3>Privacy by design</h3>
@@ -557,7 +293,7 @@
       </div>
       <div class="trust-links">
         <a href="/privacy.html">Privacy Policy</a>
-        <a href="/terms.html">Terms of Use</a>
+        <a href="/terms.html">Terms of Service</a>
       </div>
     </div>
 
@@ -573,7 +309,7 @@
     <footer>
       <div>
         <a href="/home.html">Home</a>
-        <a href="/privacy.html">Privacy</a>
+        <a href="/privacy.html">Privacy Policy</a>
         <a href="/terms.html">Terms</a>
         <a href="/">App</a>
       </div>
