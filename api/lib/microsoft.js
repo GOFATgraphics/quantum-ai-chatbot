@@ -88,8 +88,13 @@ export async function searchOutlook(accessToken, query, maxResults = 10) {
   const url = new URL('https://graph.microsoft.com/v1.0/me/messages');
   url.searchParams.set('$top', String(top));
   url.searchParams.set('$select', 'id,subject,from,receivedDateTime,bodyPreview,webLink');
-  url.searchParams.set('$orderby', 'receivedDateTime desc');
-  if (query) url.searchParams.set('$search', `"${query.replace(/"/g, '')}"`);
+  // Graph forbids $search + $orderby together → 400. Only order when not searching.
+  const q = String(query || '').trim().replace(/"/g, '');
+  if (q) {
+    url.searchParams.set('$search', `"${q}"`);
+  } else {
+    url.searchParams.set('$orderby', 'receivedDateTime desc');
+  }
   const res = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -113,8 +118,12 @@ export async function searchOutlook(accessToken, query, maxResults = 10) {
 
 export async function searchExcelFiles(accessToken, query, maxResults = 10) {
   const top = Math.min(15, Math.max(1, maxResults));
-  const term = (query || 'xlsx').replace(/'/g, '');
-  const searchUrl = `https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(term)}')?$top=${top}`;
+  // OData: escape single quotes by doubling; keep the rest URL-safe
+  const raw = String(query || 'xlsx').trim().slice(0, 120) || 'xlsx';
+  const term = raw.replace(/'/g, "''");
+  const searchUrl =
+    `https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(term)}')` +
+    `?$top=${top}&$select=id,name,webUrl,lastModifiedDateTime,size,file`;
   const res = await fetch(searchUrl, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
