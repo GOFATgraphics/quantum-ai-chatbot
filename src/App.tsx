@@ -363,7 +363,8 @@ export default function App() {
       const model = MODEL
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (session?.access_token) headers.Authorization = 'Bearer ' + session.access_token
-      const history = messagesRef.current.slice(-6).map((m) => ({
+      // Lean context for lower voice latency (system + last 4 turns)
+      const history = messagesRef.current.slice(-4).map((m) => ({
         role: m.role,
         content: String(m.content || '').replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '[Image]').slice(0, 1200),
       }))
