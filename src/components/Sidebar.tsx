@@ -198,7 +198,7 @@ export default function Sidebar({
                   type="button"
                   onClick={() => onDeleteChat(c.id)}
                   disabled={deletingId === c.id}
-                  className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-400 hover:text-red-500 active:text-red-500 disabled:opacity-40"
+                  className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-red-500 active:text-red-500 disabled:opacity-40"
                   aria-label={`Delete chat ${c.title || 'New chat'}`}
                 >
                   {deletingId === c.id ? (
