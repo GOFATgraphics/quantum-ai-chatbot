@@ -197,8 +197,6 @@ type Props = {
   onRegenerate?: () => void
   onSuggestion?: (text: string) => void
   thoughtSeconds?: number | null
-  thinkActive?: boolean
-  deepSearchActive?: boolean
   toolStatus?: string | null
 }
 
@@ -212,8 +210,6 @@ export default function MessageList({
   onRegenerate,
   onSuggestion,
   thoughtSeconds,
-  thinkActive,
-  deepSearchActive,
   toolStatus,
 }: Props) {
   const last = messages[messages.length - 1]
@@ -378,11 +374,7 @@ export default function MessageList({
                             dark ? 'text-slate-500' : 'text-slate-400'
                           }`}
                         >
-                          {thinkActive
-                            ? `Thought for ${thoughtSeconds}s`
-                            : deepSearchActive
-                              ? `Researched for ${thoughtSeconds}s`
-                              : `Responded in ${thoughtSeconds}s`}
+                          {`Responded in ${thoughtSeconds}s`}
                         </motion.div>
                       )}
                       <MessageActions
@@ -412,8 +404,6 @@ export default function MessageList({
               <ThinkingStatus
                 prompt={lastUserPrompt}
                 dark={dark}
-                thinkActive={thinkActive}
-                deepSearchActive={deepSearchActive}
                 toolLabel={toolStatus}
               />
             </motion.div>
