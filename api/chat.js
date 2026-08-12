@@ -1,1 +1,299 @@
-file:///home/workdir/artifacts/quantumy/api/chat.js
+import { getUserFromAuthHeader, getAdminClient } from './lib/supabaseAdmin.js';
+import { loadConnectorsAndTools, runTool } from './lib/claudeTools.js';
+
+export const config = { maxDuration: 300 };
+
+const MODEL = 'claude-sonnet-5';
+
+function stripEmDashes(s) {
+  if (!s || typeof s !== 'string') return s;
+  return s.replace(/\u2014/g, ',').replace(/\u2013/g, '-').replace(/\s+,/g, ',').replace(/,{2,}/g, ',').replace(/\s{2,}/g, ' ');
+}
+
+function extractText(blocks) {
+  if (!Array.isArray(blocks)) return '';
+  return stripEmDashes(blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim());
+}
+
+function toAnthropicContent(content) {
+  const str = String(content || '');
+  const imgRe = /!\[([^\]]*)\]\((data:image\/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=\s]+))\)/g;
+  const parts = [];
+  let last = 0, m, imageCount = 0;
+  const MAX_IMAGES = 5;
+  while ((m = imgRe.exec(str)) !== null) {
+    if (m.index > last) {
+      const text = str.slice(last, m.index).trim();
+      if (text) parts.push({ type: 'text', text });
+    }
+    if (imageCount < MAX_IMAGES) {
+      let mediaType = m[3];
+      if (!mediaType.startsWith('image/')) mediaType = 'image/' + mediaType;
+      if (mediaType.includes('jpg')) mediaType = 'image/jpeg';
+      else if (mediaType.includes('png')) mediaType = 'image/png';
+      else if (mediaType.includes('gif')) mediaType = 'image/gif';
+      else if (mediaType.includes('webp')) mediaType = 'image/webp';
+      else if (!['image/jpeg','image/png','image/gif','image/webp'].includes(mediaType)) mediaType = 'image/jpeg';
+      const data = String(m[4] || '').replace(/\s+/g, '');
+      if (data.length > 64) {
+        parts.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data } });
+        imageCount += 1;
+      }
+    }
+    last = m.index + m[0].length;
+  }
+  const rest = str.slice(last).trim();
+  if (rest) parts.push({ type: 'text', text: rest });
+  if (parts.length === 0) return str || '';
+  if (parts.length === 1 && parts[0].type === 'text') return parts[0].text;
+  if (parts.every((p) => p.type === 'image')) {
+    parts.unshift({ type: 'text', text: `Please analyze the ${parts.length} attached image${parts.length > 1 ? 's' : ''}.` });
+  }
+  return parts;
+}
+
+async function loadUserMemory(userId) {
+  try {
+    const admin = getAdminClient();
+    const { data } = await admin.from('user_memory').select('fact, category').eq('user_id', userId).order('updated_at', { ascending: false }).limit(40);
+    return data || [];
+  } catch { return []; }
+}
+
+async function loadProjectContext(userId, projectId) {
+  if (!projectId) return null;
+  try {
+    const admin = getAdminClient();
+    const { data } = await admin.from('projects').select('name, description').eq('id', projectId).eq('user_id', userId).maybeSingle();
+    return data;
+  } catch { return null; }
+}
+
+function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
+  const memoryBlock = memory?.length > 0
+    ? `## What you know about this user\n${memory.map((m) => `- ${m.fact}${m.category ? ` (${m.category})` : ''}`).join('\n')}\nThese facts are authoritative. Weave them into answers whenever relevant. Never ignore them. When they share new stable facts, call save_memory right away.`
+    : '## What you know about this user\nNo saved memories yet. As soon as they share stable personal or work facts, call save_memory.';
+  const projectBlock = project ? `## Active project workspace\nName: ${project.name}\n${project.description ? `Description: ${project.description}\n` : ''}` : '';
+  const nameLine = firstName ? `The user's first name is ${firstName}. Address them by first name occasionally when natural.` : '';
+  const voiceBlock = voice
+    ? `## Voice mode\nYou are in a live voice conversation. Reply in 1 to 3 short spoken sentences. No markdown, no lists, no code fences. Be warm and fast. Skip tool calls unless the user clearly needs email, calendar, drive, or a live fact.`
+    : '';
+  const toolLines = ['- web_search', '- web_fetch', '- save_memory'];
+  if (connected.gmail) toolLines.push('- Gmail tools');
+  if (connected.drive) toolLines.push('- Drive tools');
+  if (connected.docs) toolLines.push('- Docs tools');
+  if (connected.sheets) toolLines.push('- Sheets tools');
+  if (connected.calendar) toolLines.push('- Calendar tools');
+  if (connected.outlook) toolLines.push('- Outlook tools');
+  if (connected.excel) toolLines.push('- Excel tools');
+  return `You are **Quantumy**, an AI workspace operator. Direct, brief, outcome-focused. No filler, no emoji.
+
+**Reasoning & research (always on):** Think carefully on complex questions. Use web_search and web_fetch for current facts. Cite sources with links.
+
+**Confirmation rule:** Reversible actions do immediately. Irreversible (send email, trash, invite attendees) summarize and wait for confirmation.
+
+**Style:** Lead with outcomes. Clean Markdown. No pipe tables. Never use em dashes (the long hyphen) or en dashes. Use commas, periods, colons, or parentheses instead.
+
+**Memory (critical):** Actively use every saved fact. When they share stable facts, call save_memory immediately.
+
+${nameLine}
+${voiceBlock}
+## Connected tools
+${toolLines.join('\n')}
+${memoryBlock}
+${projectBlock}`;
+}
+
+function sseWrite(res, obj) {
+  res.write(`data: ${JSON.stringify(obj)}\n\n`);
+}
+
+async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) {
+  const body = { model: MODEL, max_tokens: maxTokens, system, messages };
+  if (tools?.length) body.tools = tools;
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    const err = new Error(`Anthropic API error ${response.status}`);
+    err.status = response.status;
+    err.details = errorText;
+    throw err;
+  }
+  return response.json();
+}
+
+async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTokens = 4096 }) {
+  const body = { model: MODEL, max_tokens: maxTokens, system, messages, stream: true };
+  if (tools?.length) body.tools = tools;
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    const err = new Error(`Anthropic API error ${response.status}`);
+    err.status = response.status;
+    err.details = errorText;
+    throw err;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '', stopReason = null, textAcc = '';
+  const contentBlocks = [];
+  let currentTool = null;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const payload = trimmed.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      let evt;
+      try { evt = JSON.parse(payload); } catch { continue; }
+      if (evt.type === 'content_block_start') {
+        const b = evt.content_block;
+        if (b?.type === 'text') contentBlocks.push({ type: 'text', text: '' });
+        else if (b?.type === 'tool_use') {
+          currentTool = { type: 'tool_use', id: b.id, name: b.name, input: '', partial_json: '' };
+          contentBlocks.push(currentTool);
+        }
+      } else if (evt.type === 'content_block_delta') {
+        const d = evt.delta;
+        if (d?.type === 'text_delta' && typeof d.text === 'string') {
+          textAcc += d.text;
+          const last = contentBlocks[contentBlocks.length - 1];
+          if (last?.type === 'text') last.text += d.text;
+          if (onDelta) onDelta(d.text);
+        } else if (d?.type === 'input_json_delta' && currentTool) {
+          currentTool.partial_json = (currentTool.partial_json || '') + (d.partial_json || '');
+        }
+      } else if (evt.type === 'content_block_stop') {
+        if (currentTool) {
+          try { currentTool.input = JSON.parse(currentTool.partial_json || '{}'); } catch { currentTool.input = {}; }
+          delete currentTool.partial_json;
+          currentTool = null;
+        }
+      } else if (evt.type === 'message_delta') {
+        if (evt.delta?.stop_reason) stopReason = evt.delta.stop_reason;
+      }
+    }
+  }
+  const normalized = contentBlocks.map((b) => {
+    if (b.type === 'tool_use') return { type: 'tool_use', id: b.id, name: b.name, input: b.input || {} };
+    return b;
+  });
+  return { stop_reason: stopReason || 'end_turn', content: normalized, text: textAcc };
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Missing ANTHROPIC_API_KEY' });
+  try {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const messages = body?.messages;
+    if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages array is required' });
+    const user = await getUserFromAuthHeader(req);
+    const wantStream = body?.stream === true;
+    const isVoice = !!body?.voice;
+    let memory = [];
+    let project = null;
+    let connected = { gmail: false, drive: false, docs: false, sheets: false, calendar: false, outlook: false, excel: false };
+    let tools = [];
+    const [connectorsResult, memoryResult, projectResult] = await Promise.all([
+      loadConnectorsAndTools(user).catch(() => ({ connected, tools: [] })),
+      user ? loadUserMemory(user.id) : Promise.resolve([]),
+      user && body?.projectId ? loadProjectContext(user.id, body.projectId) : Promise.resolve(null),
+    ]);
+    connected = connectorsResult.connected;
+    tools = connectorsResult.tools;
+    memory = memoryResult;
+    project = projectResult;
+    const systemPrompt = buildSystemPrompt({ connected, memory, project, firstName: body?.firstName || null, voice: isVoice });
+    let anthropicMessages = messages.map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.role === 'assistant' ? String(m.content) : toAnthropicContent(m.content),
+    }));
+    if (wantStream) {
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      if (typeof res.flushHeaders === 'function') res.flushHeaders();
+    }
+    const maxRounds = isVoice ? 6 : 24;
+    const maxTokens = isVoice ? 1024 : (body?.projectId ? 12288 : 8192);
+    for (let round = 0; round < maxRounds; round++) {
+      let data;
+      if (wantStream) {
+        data = await runClaudeStream({
+          apiKey, system: systemPrompt, messages: anthropicMessages,
+          tools: tools.length ? tools : undefined, maxTokens,
+          onDelta: (delta) => { try { sseWrite(res, { delta: stripEmDashes(delta) }); } catch (_) {} },
+        });
+      } else {
+        data = await runClaude({
+          apiKey, system: systemPrompt, messages: anthropicMessages,
+          tools: tools.length ? tools : undefined, maxTokens,
+        });
+      }
+      const stop = data.stop_reason;
+      const content = data.content || [];
+      const clientToolBlocks = content.filter((b) => b.type === 'tool_use');
+      if (stop !== 'tool_use' || clientToolBlocks.length === 0) {
+        const textOut = (wantStream ? data.text : extractText(content)) || extractText(content) || 'Sorry, I could not generate a response.';
+        if (wantStream) {
+          if (!data.text || !String(data.text).trim()) sseWrite(res, { content: stripEmDashes(textOut) });
+          sseWrite(res, { done: true });
+          res.write('data: [DONE]\n\n');
+          return res.end();
+        }
+        return res.status(200).json({ content: stripEmDashes(textOut) });
+      }
+      if (wantStream) {
+        try {
+          const names = clientToolBlocks.map((b) => b.name).filter(Boolean);
+          sseWrite(res, { status: 'tool_use', tool: names[0] || 'tool', tools: names });
+        } catch (_) {}
+      }
+      anthropicMessages = [...anthropicMessages, { role: 'assistant', content }];
+      const toolResults = (await Promise.all(clientToolBlocks.map((block) => runTool(block, user)))).filter(Boolean);
+      if (toolResults.length === 0) {
+        const fallback = 'Tool step produced no results. Please try a more specific request.';
+        if (wantStream) {
+          sseWrite(res, { content: fallback });
+          sseWrite(res, { done: true });
+          res.write('data: [DONE]\n\n');
+          return res.end();
+        }
+        return res.status(200).json({ content: fallback });
+      }
+      anthropicMessages.push({ role: 'user', content: toolResults });
+    }
+    const limitMsg = 'I reached the tool-step ceiling. Ask me to continue from where I left off.';
+    if (wantStream) {
+      sseWrite(res, { content: limitMsg });
+      sseWrite(res, { done: true });
+      res.write('data: [DONE]\n\n');
+      return res.end();
+    }
+    return res.status(200).json({ content: limitMsg });
+  } catch (err) {
+    console.error('Handler error:', err);
+    if (err.status) return res.status(502).json({ error: 'Anthropic API error', status: err.status, details: err.details });
+    return res.status(500).json({ error: 'Internal server error', message: err?.message || String(err) });
+  }
+}
