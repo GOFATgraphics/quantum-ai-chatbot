@@ -23,11 +23,13 @@ export default async function handler(req, res) {
     let text = (body?.text || '').trim();
     if (!text) return res.status(400).json({ error: 'text is required' });
 
-    // Keep replies shorter for faster playback
-    if (text.length > 900) {
-      const cut = text.slice(0, 900);
+    // Strip em/en dashes for natural speech
+    text = text.replace(/\u2014/g, ',').replace(/\u2013/g, '-');
+    // Keep replies short for fast TTS
+    if (text.length > 420) {
+      const cut = text.slice(0, 420);
       const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
-      text = lastStop > 120 ? cut.slice(0, lastStop + 1) : cut + '…';
+      text = lastStop > 80 ? cut.slice(0, lastStop + 1) : cut + '…';
     }
 
     // HARD LOCK: your Hausa man voice only (ignore accidental env overrides that point elsewhere)
@@ -40,8 +42,8 @@ export default async function handler(req, res) {
     const lang = (body?.language || 'en').toLowerCase();
     const isHausa = lang === 'ha' || lang === 'hau' || lang === 'hausa';
 
-    // Always eleven_v3 as requested (best for your custom voice + Hausa)
-    const modelId = process.env.ELEVENLABS_TTS_MODEL || 'eleven_v3';
+    // Flash for low latency voice turns; env can override (e.g. eleven_v3)
+    const modelId = process.env.ELEVENLABS_TTS_MODEL || 'eleven_flash_v2_5';
     const languageCode = isHausa ? 'ha' : 'en';
 
     const payload = {
@@ -49,14 +51,15 @@ export default async function handler(req, res) {
       model_id: modelId,
       language_code: languageCode,
       voice_settings: {
-        stability: 0.45,
-        similarity_boost: 0.8,
-        style: 0.1,
+        stability: 0.4,
+        similarity_boost: 0.75,
+        style: 0.0,
         use_speaker_boost: true,
       },
     };
 
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
+    // 64kbps mp3 = smaller + faster transfer without big quality loss for speech
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32`;
     const elRes = await fetch(url, {
       method: 'POST',
       headers: {
