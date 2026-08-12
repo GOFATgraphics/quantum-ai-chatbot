@@ -39,12 +39,32 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
 
   const load = async () => {
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('connectors')
-      .select('id, user_id, provider, account_email, status, scopes, created_at, updated_at')
-      .eq('status', 'connected')
-    if (!err && data) setConnectors(data as Connector[])
-    setLoading(false)
+    setError(null)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const uid = sessionData.session?.user?.id
+      if (!uid) {
+        setConnectors([])
+        return
+      }
+      // Strict isolation: only this user's connectors (never other users')
+      const { data, error: err } = await supabase
+        .from('connectors')
+        .select('id, user_id, provider, account_email, status, scopes, created_at, updated_at')
+        .eq('user_id', uid)
+        .eq('status', 'connected')
+      if (err) {
+        setError(err.message || 'Failed to load connectors')
+        setConnectors([])
+      } else {
+        setConnectors((data || []) as Connector[])
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load connectors')
+      setConnectors([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
