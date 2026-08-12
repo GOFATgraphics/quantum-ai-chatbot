@@ -32,7 +32,7 @@ import {
   searchOutlook,
   searchExcelFiles,
 } from './microsoft.js';
-import { READ_DRIVE_FILE_TOOL, handleReadDriveFile } from './driveRead.js';
+import { READ_DRIVE_FILE_TOOL, LIST_DRIVE_FOLDER_TOOL, handleReadDriveFile, handleListDriveFolder } from './driveRead.js';
 
 /** Anthropic server-side tools — executed by Anthropic, not by us */
 export const ANTHROPIC_WEB_SEARCH_TOOL = {
@@ -175,7 +175,7 @@ export const GET_MESSAGE_TOOL = {
 export const DRIVE_TOOL = {
   name: 'search_drive',
   description:
-    'Search Google Drive by short keywords or folder/file name (not a full sentence). Returns files with Open links. For a folder, pass the folder name; then read docs by id.',
+    'Search Google Drive by short keywords or folder/file name (not a full sentence). Returns files with Open links. For a folder, pass the folder name; then list_drive_folder or read_drive_file by id.',
   input_schema: {
     type: 'object',
     properties: {
@@ -594,6 +594,9 @@ export async function runTool(block, user) {
     if (name === 'read_drive_file' && user) {
       return handleReadDriveFile(block, user, getValidToken);
     }
+    if (name === 'list_drive_folder' && user) {
+      return handleListDriveFolder(block, user, getValidToken);
+    }
     if (name === 'read_google_doc' && user) {
       const token =
         (await getValidToken(user.id, 'google_docs')) ||
@@ -865,14 +868,14 @@ export async function loadConnectorsAndTools(user) {
   }
   if (driveTok) {
     connected.drive = true;
-    tools.push(DRIVE_TOOL, READ_DRIVE_FILE_TOOL);
+    tools.push(DRIVE_TOOL, READ_DRIVE_FILE_TOOL, LIST_DRIVE_FOLDER_TOOL);
   }
   if (docsTok) {
     connected.docs = true;
     tools.push(DOCS_TOOL, CREATE_DOC_TOOL, APPEND_DOC_TOOL);
     if (!connected.drive) {
       connected.drive = true;
-      tools.push(DRIVE_TOOL, READ_DRIVE_FILE_TOOL);
+      tools.push(DRIVE_TOOL, READ_DRIVE_FILE_TOOL, LIST_DRIVE_FOLDER_TOOL);
     }
   }
   if (sheetsTok) {
