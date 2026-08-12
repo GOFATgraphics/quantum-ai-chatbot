@@ -91,3 +91,49 @@ export async function readDriveFile(accessToken, fileId) {
   text = text.slice(0, MAX);
   return { id: meta.id, name, mimeType: mime, link, text, truncated, size: meta.size };
 }
+
+export const READ_DRIVE_FILE_TOOL = {
+  name: 'read_drive_file',
+  description:
+    'Read the text content of a Google Drive file by id (from search_drive). Works for .txt, .md, .csv, .json, and Google Docs/Sheets/Slides. Not for PDF/images/binaries.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      file_id: { type: 'string', description: 'Drive file id from search_drive' },
+    },
+    required: ['file_id'],
+  },
+};
+
+export async function handleReadDriveFile(block, user, getToken) {
+  const id = block.id;
+  const input = block.input || {};
+  const token = (await getToken(user.id, 'google_drive')) || (await getToken(user.id, 'google_docs'));
+  if (!token) {
+    return {
+      type: 'tool_result',
+      tool_use_id: id,
+      content: 'Google Drive is not connected.',
+      is_error: true,
+    };
+  }
+  try {
+    const file = await readDriveFile(token, String(input.file_id || ''));
+    if (file.error && !file.text) {
+      return {
+        type: 'tool_result',
+        tool_use_id: id,
+        content: JSON.stringify(file),
+        is_error: true,
+      };
+    }
+    return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(file) };
+  } catch (e) {
+    return {
+      type: 'tool_result',
+      tool_use_id: id,
+      content: `Tool error: ${e.message}`,
+      is_error: true,
+    };
+  }
+}
