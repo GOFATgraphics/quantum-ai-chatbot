@@ -3,7 +3,6 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Check, Loader2 } from 'lucide-react'
 
 const DEFAULT_STEPS = ['Thinking', 'Gathering context', 'Working on it']
-const THINK_STEPS = ['Reasoning', 'Checking assumptions', 'Refining answer']
 const SEARCH_STEPS = ['Searching sources', 'Cross-checking facts', 'Synthesizing findings']
 const EMAIL_STEPS = [
   'Connecting to Workspace',
@@ -22,10 +21,8 @@ const CAL_STEPS = [
   'Pulling events',
 ]
 
-function pickSteps(prompt: string, think?: boolean, deep?: boolean): string[] {
+function pickSteps(prompt: string): string[] {
   const p = prompt.toLowerCase()
-  if (deep) return SEARCH_STEPS
-  if (think) return THINK_STEPS
   if (/email|inbox|gmail|mail|message|send|outlook/.test(p)) return EMAIL_STEPS
   if (/calendar|schedule|meeting|event|appointment/.test(p)) return CAL_STEPS
   if (/drive|doc|file|sheet|document|excel/.test(p)) return DRIVE_STEPS
@@ -68,8 +65,6 @@ function friendlyToolLabel(raw: string): string {
 type Props = {
   prompt?: string
   dark: boolean
-  thinkActive?: boolean
-  deepSearchActive?: boolean
   /** Live tool names from server status events, e.g. "search_gmail · web_search" */
   toolLabel?: string | null
 }
@@ -77,11 +72,9 @@ type Props = {
 export default function ThinkingStatus({
   prompt = '',
   dark,
-  thinkActive,
-  deepSearchActive,
   toolLabel,
 }: Props) {
-  const steps = pickSteps(prompt, thinkActive, deepSearchActive)
+  const steps = pickSteps(prompt)
   const [activeIdx, setActiveIdx] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const reduceMotion = useReducedMotion()
@@ -100,8 +93,6 @@ export default function ThinkingStatus({
     }
   }, [steps])
 
-  const label =
-    deepSearchActive ? 'DeepSearch' : thinkActive ? 'Think' : null
   const liveTool = toolLabel ? friendlyToolLabel(toolLabel) : null
 
   return (
@@ -137,23 +128,6 @@ export default function ThinkingStatus({
             />
           ))}
         </div>
-        {label && (
-          <motion.span
-            initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-              deepSearchActive
-                ? dark
-                  ? 'bg-sky-500/20 text-sky-300'
-                  : 'bg-sky-50 text-sky-700'
-                : dark
-                  ? 'bg-violet-500/20 text-violet-300'
-                  : 'bg-violet-50 text-violet-700'
-            }`}
-          >
-            {label}
-          </motion.span>
-        )}
         {elapsed > 0 && (
           <span className={`text-[12px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
             {elapsed}s
