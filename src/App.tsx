@@ -359,11 +359,16 @@ export default function App() {
   }
 
   const askForVoice = useCallback(
-    async (userMessage: string): Promise<string> => {
+    async (
+      userMessage: string,
+      opts?: { onDelta?: (delta: string) => void; signal?: AbortSignal },
+    ): Promise<string> => {
       const model = MODEL
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      }
       if (session?.access_token) headers.Authorization = 'Bearer ' + session.access_token
-      // Lean context for lower voice latency (system + last 4 turns)
       const history = messagesRef.current.slice(-4).map((m) => ({
         role: m.role,
         content: String(m.content || '').replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '[Image]').slice(0, 1200),
@@ -371,25 +376,67 @@ export default function App() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers,
+        signal: opts?.signal,
         body: JSON.stringify({
           messages: [...history, { role: 'user', content: userMessage }],
           firstName,
           projectId: currentProjectId,
           model: model.anthropic,
           modelId: model.id,
-          stream: false,
+          stream: true,
           voice: true,
         }),
       })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || data.message || 'Request failed')
-      const text = (data.content || '').trim()
+      const ctype = response.headers.get('content-type') || ''
+      let text = ''
+      if (ctype.includes('text/event-stream') && response.ok && response.body) {
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const parts = buffer.split('\n')
+          buffer = parts.pop() || ''
+          for (const line of parts) {
+            const trimmed = line.trim()
+            if (!trimmed.startsWith('data:')) continue
+            const payload = trimmed.slice(5).trim()
+            if (payload === '[DONE]') continue
+            try {
+              const evt = JSON.parse(payload)
+              if (evt.error) throw new Error(evt.error)
+              if (typeof evt.delta === 'string' && evt.delta) {
+                text += evt.delta
+                opts?.onDelta?.(evt.delta)
+              } else if (typeof evt.content === 'string' && evt.content) {
+                const add = evt.content.slice(text.length)
+                text = evt.content
+                if (add) opts?.onDelta?.(add)
+              }
+            } catch (e: any) {
+              if (e?.message && !String(e.message).includes('JSON')) throw e
+            }
+          }
+        }
+        text = text.trim()
+      } else {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || data.message || 'Request failed')
+        text = (data.content || '').trim()
+        if (text) opts?.onDelta?.(text)
+      }
       if (!text) throw new Error('Empty response')
       try {
         const convId = await ensureConversation(userMessage)
         await saveMessage(convId, 'user', userMessage)
         await saveMessage(convId, 'assistant', text)
-        setMessages((p) => [...p, { id: generateId(), role: 'user', content: userMessage }, { id: generateId(), role: 'assistant', content: text }])
+        setMessages((p) => [
+          ...p,
+          { id: generateId(), role: 'user', content: userMessage },
+          { id: generateId(), role: 'assistant', content: text },
+        ])
         await refineConversationTitle(convId, userMessage, text)
         await loadConversations()
       } catch { /* best-effort */ }
