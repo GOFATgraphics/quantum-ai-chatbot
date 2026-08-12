@@ -3,7 +3,7 @@ import { loadConnectorsAndTools, runTool } from './lib/claudeTools.js';
 
 export const config = { maxDuration: 300 };
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = 'claude-haiku-4-5-20251001';
 
 function stripEmDashes(s) {
   if (!s || typeof s !== 'string') return s;
@@ -215,6 +215,18 @@ async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTo
   return { stop_reason: stopReason || 'end_turn', content: normalized, text: textAcc };
 }
 
+function sendSseError(res, message) {
+  try {
+    sseWrite(res, { error: message });
+    sseWrite(res, { content: message });
+    sseWrite(res, { done: true });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (_) {
+    try { res.end(); } catch (_) {}
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -223,12 +235,14 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Missing ANTHROPIC_API_KEY' });
+  let wantStream = false;
+  let sseStarted = false;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const messages = body?.messages;
     if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages array is required' });
     const user = await getUserFromAuthHeader(req);
-    const wantStream = body?.stream === true;
+    wantStream = body?.stream === true;
     const isVoice = !!body?.voice;
     let memory = [];
     let project = null;
@@ -267,6 +281,8 @@ export default async function handler(req, res) {
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
       if (typeof res.flushHeaders === 'function') res.flushHeaders();
+      sseStarted = true;
+      try { sseWrite(res, { status: 'started' }); } catch (_) {}
     }
 
     const maxRounds = isVoice ? 2 : 24;
@@ -296,10 +312,9 @@ export default async function handler(req, res) {
           maxTokens,
         });
       }
-      const stop = data.stop_reason;
       const content = data.content || [];
-      const clientToolBlocks = content.filter((b) => b.type === 'tool_use');
-      if (stop !== 'tool_use' || clientToolBlocks.length === 0) {
+      const clientToolBlocks = content.filter((b) => b.type === 'tool_use' && b.name);
+      if (clientToolBlocks.length === 0) {
         const textOut =
           (wantStream ? data.text : extractText(content)) ||
           extractText(content) ||
@@ -386,7 +401,18 @@ export default async function handler(req, res) {
     return res.status(200).json({ content: limitMsg });
   } catch (err) {
     console.error('Handler error:', err);
-    if (err.status) return res.status(502).json({ error: 'Anthropic API error', status: err.status, details: err.details });
-    return res.status(500).json({ error: 'Internal server error', message: err?.message || String(err) });
+    const msg =
+      err?.status === 401
+        ? 'AI provider auth failed. Check ANTHROPIC_API_KEY on the server.'
+        : err?.status === 429
+          ? 'AI rate limit hit. Wait a moment and try again.'
+          : err?.status
+            ? `AI provider error (${err.status}). ${String(err.details || '').slice(0, 180)}`
+            : err?.message || 'Internal server error';
+    if (sseStarted || wantStream) {
+      return sendSseError(res, msg);
+    }
+    if (err.status) return res.status(502).json({ error: msg, status: err.status, details: err.details });
+    return res.status(500).json({ error: msg });
   }
 }
