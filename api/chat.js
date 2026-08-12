@@ -114,7 +114,7 @@ function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
   if (connected.outlook) toolLines.push('- Outlook tools');
   if (connected.excel) toolLines.push('- Excel tools');
 
-  return `You are **Quantumy**, an AI workspace operator. Direct, brief, outcome-focused. No filler, no emoji.\n\n**Reasoning & research (always on):** Think carefully on complex questions. Use web_search and web_fetch for current or uncertain facts. Cite sources with links in text mode.\n\n**Confirmation rule:** Reversible actions do immediately. Irreversible (send email, trash, invite attendees) summarize and wait for confirmation.\n\n**Style (hard rules):**\n- Lead with outcomes. Clean Markdown in text mode. No pipe tables.\n- Never use em dashes (—) or en dashes (–) or double hyphens as dashes. Use commas, periods, colons, or parentheses instead.\n- Prefer short sentences over long clauses.\n\n**Memory (critical):** Actively use every saved fact below. Prefer memory over guessing. When they share stable facts, call save_memory immediately without asking permission.\n\n${nameLine}\n${voiceBlock}\n## Connected tools\n${toolLines.join('\n')}\n${memoryBlock}\n${projectBlock}`;
+  return `You are **Quantumy**, an AI workspace operator. Direct, brief, outcome-focused. No filler, no emoji.\n\n**Reasoning & research (always on):** Think carefully on complex questions. Use web_search and web_fetch for current or uncertain facts. Cite sources with links in text mode.\n\n**Confirmation rule:** Reversible actions do immediately (sheet updates, drafts, search). Irreversible (send email, trash, invite attendees) summarize and wait for confirmation; use create_email_draft first, only send_email with user_confirmed=true after they say yes.\n\n**Multi-step ops (sheets + email):** Do not stall. Prefer the shortest tool path:\n1) search_sheets / search_drive to get spreadsheet_id\n2) read_sheet with range like "Master!A1:Z2" (or the named tab) to learn columns\n3) update_sheet with append:true and the same tab range (e.g. "Master!A:Z") mapping values in column order\n4) create_email_draft (not send) matching the user's requested style, then ask them to confirm send\nIf a tool errors, report it and continue with what you can. Never claim success without a successful tool_result.\n\n**Style (hard rules):**\n- Lead with outcomes. Clean Markdown in text mode. No pipe tables.\n- Never use em dashes (—) or en dashes (–) or double hyphens as dashes. Use commas, periods, colons, or parentheses instead.\n- Prefer short sentences over long clauses.\n\n**Memory (critical):** Actively use every saved fact below. Prefer memory over guessing. When they share stable facts, call save_memory immediately without asking permission.\n\n${nameLine}\n${voiceBlock}\n## Connected tools\n${toolLines.join('\n')}\n${memoryBlock}\n${projectBlock}`;
 }
 
 function sseWrite(res, obj) {
@@ -316,11 +316,55 @@ export default async function handler(req, res) {
       if (wantStream) {
         try {
           const names = clientToolBlocks.map((b) => b.name).filter(Boolean);
-          sseWrite(res, { status: 'tool_use', tool: names[0] || 'tool', tools: names });
+          sseWrite(res, {
+            status: 'tool_use',
+            tool: names[0] || 'tool',
+            tools: names,
+            round: round + 1,
+            message: 'Running: ' + names.join(', '),
+          });
         } catch (_) {}
       }
       anthropicMessages = [...anthropicMessages, { role: 'assistant', content }];
-      const toolResults = (await Promise.all(clientToolBlocks.map((block) => runTool(block, user)))).filter(Boolean);
+      const toolResults = (
+        await Promise.all(
+          clientToolBlocks.map(async (block) => {
+            const started = Date.now();
+            try {
+              const result = await runTool(block, user);
+              if (wantStream) {
+                try {
+                  sseWrite(res, {
+                    status: 'tool_done',
+                    tool: block.name,
+                    ms: Date.now() - started,
+                    ok: !(result && result.is_error),
+                  });
+                } catch (_) {}
+              }
+              return result;
+            } catch (e) {
+              if (wantStream) {
+                try {
+                  sseWrite(res, {
+                    status: 'tool_done',
+                    tool: block.name,
+                    ms: Date.now() - started,
+                    ok: false,
+                    error: e?.message || String(e),
+                  });
+                } catch (_) {}
+              }
+              return {
+                type: 'tool_result',
+                tool_use_id: block.id,
+                is_error: true,
+                content: `Tool error: ${e?.message || String(e)}`,
+              };
+            }
+          })
+        )
+      ).filter(Boolean);
       if (toolResults.length === 0) {
         const fallback = 'Tool step produced no results. Please try a more specific request.';
         if (wantStream) {
