@@ -298,8 +298,6 @@ export default function App() {
         model: model.anthropic,
         modelId: model.id,
         stream: true,
-        think: true,
-        deepSearch: false,
       }),
     })
     const ctype = response.headers.get('content-type') || ''
@@ -367,7 +365,11 @@ export default function App() {
       const model = MODEL
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (session?.access_token) headers.Authorization = 'Bearer ' + session.access_token
-      const history = messagesRef.current.slice(-12).map((m) => ({ role: m.role, content: m.content }))
+      // Short context keeps voice turns fast
+      const history = messagesRef.current.slice(-6).map((m) => ({
+        role: m.role,
+        content: String(m.content || '').replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '[Image]').slice(0, 1200),
+      }))
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers,
@@ -378,8 +380,7 @@ export default function App() {
           model: model.anthropic,
           modelId: model.id,
           stream: false,
-          think: true,
-          deepSearch: false,
+          voice: true,
         }),
       })
       const data = await response.json().catch(() => ({}))
