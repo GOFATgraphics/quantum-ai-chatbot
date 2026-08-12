@@ -192,6 +192,7 @@ type Props = {
   thoughtSeconds?: number | null
   thinkActive?: boolean
   deepSearchActive?: boolean
+  toolStatus?: string | null
 }
 
 export default function MessageList({
@@ -204,10 +205,27 @@ export default function MessageList({
   thoughtSeconds,
   thinkActive,
   deepSearchActive,
+  toolStatus,
 }: Props) {
   const last = messages[messages.length - 1]
   const streaming =
     isLoading && last?.role === 'assistant' && !!last.content
+
+  // Keep view pinned to bottom while streaming if user is already near the bottom
+  useEffect(() => {
+    if (!isLoading) return
+    const el = messagesEndRef.current
+    if (!el) return
+    const scroller = el.closest('[data-scrollable="true"]') as HTMLElement | null
+    if (!scroller) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      return
+    }
+    const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+    if (distance < 140) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }, [messages, isLoading, toolStatus, messagesEndRef])
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-5 py-4 pb-6 space-y-6">
@@ -290,7 +308,7 @@ export default function MessageList({
 
       <AnimatePresence>
         {isLoading &&
-          !(last?.role === 'assistant' && last?.content) && (
+          (!(last?.role === 'assistant' && last?.content) || !!toolStatus) && (
             <motion.div
               key="thinking"
               initial={{ opacity: 0, y: 8 }}
@@ -303,6 +321,7 @@ export default function MessageList({
                 dark={dark}
                 thinkActive={thinkActive}
                 deepSearchActive={deepSearchActive}
+                toolLabel={toolStatus}
               />
             </motion.div>
           )}
