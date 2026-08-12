@@ -122,13 +122,14 @@ async function speakWithElevenLabs(
 ) {
   const spoken = voiceFriendlyText(text, language)
   try {
+    // No voice_id here — api/tts uses ELEVENLABS_VOICE_* from Vercel env
     const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: spoken,
         language,
-        voice_id: 'rPlZjuLXpONhaMouRFww',
+        chunk: true,
       }),
     })
     if (!res.ok) {
@@ -339,7 +340,6 @@ export default function LiveVoice({
         speechSeenRef.current = false
 
         const data = new Uint8Array(analyser.frequencyBinCount)
-        // End turn sooner after the user stops talking
         const SILENCE_MS = 520
         const SPEECH_THRESHOLD = 8
 
