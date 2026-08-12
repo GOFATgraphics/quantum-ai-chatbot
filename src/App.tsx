@@ -230,12 +230,8 @@ export default function App() {
     setToolStatus(null)
     const { data } = await supabase.from('messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true })
     if (data) {
+      // MessageList pins to bottom when conversationId / messages update
       setMessages(data.map((m: DbMessage) => ({ id: m.id, role: m.role, content: m.content })))
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
-        })
-      })
     }
   }
 
@@ -579,7 +575,20 @@ export default function App() {
             </div>
           ) : (
             <main className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 min-w-0" data-scrollable="true">
-              <MessageList messages={messages} isLoading={isLoading} lastUserPrompt={lastUserPrompt} dark={dark} messagesEndRef={messagesEndRef} thoughtSeconds={thoughtSeconds} thinkActive={thinkActive} deepSearchActive={deepSearchActive} toolStatus={toolStatus} onRegenerate={() => { if (lastUserPrompt) handleSend(lastUserPrompt) }} onSuggestion={(s) => { setInput(s); void handleSend(s) }} />
+              <MessageList
+                messages={messages}
+                isLoading={isLoading}
+                lastUserPrompt={lastUserPrompt}
+                dark={dark}
+                messagesEndRef={messagesEndRef}
+                conversationId={currentConversationId}
+                thoughtSeconds={thoughtSeconds}
+                thinkActive={thinkActive}
+                deepSearchActive={deepSearchActive}
+                toolStatus={toolStatus}
+                onRegenerate={() => { if (lastUserPrompt) handleSend(lastUserPrompt) }}
+                onSuggestion={(s) => { setInput(s); void handleSend(s) }}
+              />
             </main>
           )}
           <div className="shrink-0">
