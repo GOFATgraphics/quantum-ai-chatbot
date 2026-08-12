@@ -12,7 +12,8 @@ const rateBuckets = new Map();
 function checkRateLimit(key) {
   const now = Date.now();
   const windowMs = 5 * 60 * 1000;
-  const max = 30;
+  const max = 80; // enterprise / complex multi-tool sessions
+
   let bucket = rateBuckets.get(key);
   if (!bucket || now - bucket.start > windowMs) {
     bucket = { start: now, count: 0 };
@@ -258,6 +259,12 @@ ${modeBlock}## Connected tools (runtime)\n${toolLines.join('\n')}\n${missingLine
 - create_google_doc / create_spreadsheet / update_sheet / append_google_doc: do when the user asks to create or update their own files.
 - For Drive folders with many files: search_drive first, then read several docs in parallel in the same turn when possible. Prefer summarizing batches rather than one-by-one narration.
 
+## Complex / multi-step tasks (enterprise)
+- Finish the full job. Do not stop early with partial narration when more tool calls would complete the request.
+- Batch aggressively: issue multiple tool calls in one turn whenever the next steps are independent (e.g. read several docs, search several queries, fetch several URLs).
+- Prefer action over asking the user to narrow the scope, unless a critical choice is genuinely ambiguous or irreversible.
+- When scope is huge, still deliver a structured first pass (inventory + key findings) then continue digging rather than refusing.
+
 ${memoryBlock}
 
 ${projectBlock}`;
@@ -343,11 +350,11 @@ export default async function handler(req, res) {
       if (typeof res.flushHeaders === 'function') res.flushHeaders();
     }
 
-    // Drive folder / multi-doc / Gmail deep digs need more rounds than simple Q&A
-    const maxRounds = body?.deepSearch || body?.think ? 14 : 10;
+    // Enterprise complex tasks (multi-connector, multi-doc, deep research)
+    const maxRounds = body?.deepSearch || body?.think ? 30 : 20;
     for (let round = 0; round < maxRounds; round++) {
       let data;
-      const maxTokens = body?.think || body?.deepSearch ? 8192 : 4096;
+      const maxTokens = body?.think || body?.deepSearch ? 16384 : 8192;
       if (wantStream) {
         data = await runClaudeStream({
           apiKey, system: systemPrompt, messages: anthropicMessages,
@@ -406,8 +413,55 @@ export default async function handler(req, res) {
       anthropicMessages.push({ role: 'user', content: toolResults });
     }
 
+    // Last chance: synthesize whatever tool results we already have (no more tools)
+    try {
+      const synthSystem =
+        systemPrompt +
+        '\n\n## Forced wrap-up\nYou have reached the maximum number of tool steps for this request. Using only the information already gathered above, deliver the best complete answer you can. Be explicit about anything you could not finish.';
+      let data;
+      if (wantStream) {
+        data = await runClaudeStream({
+          apiKey,
+          system: synthSystem,
+          messages: anthropicMessages,
+          tools: undefined,
+          model: body?.model,
+          maxTokens: 8192,
+          onDelta: (delta) => {
+            try {
+              sseWrite(res, { delta });
+            } catch (_) {}
+          },
+        });
+      } else {
+        data = await runClaude({
+          apiKey,
+          system: synthSystem,
+          messages: anthropicMessages,
+          tools: undefined,
+          model: body?.model,
+          maxTokens: 8192,
+        });
+      }
+      const textOut =
+        (wantStream ? data.text : extractText(data.content || [])) ||
+        extractText(data.content || []) ||
+        '';
+      if (textOut.trim()) {
+        if (wantStream) {
+          if (!data.text || !String(data.text).trim()) sseWrite(res, { content: textOut });
+          sseWrite(res, { done: true });
+          res.write('data: [DONE]\n\n');
+          return res.end();
+        }
+        return res.status(200).json({ content: textOut });
+      }
+    } catch (synthErr) {
+      console.warn('Synthesis wrap-up failed:', synthErr?.message || synthErr);
+    }
+
     const limitMsg =
-      'I hit the tool-step limit while working through this. Try a smaller batch (e.g. one folder or a few specific docs), or turn on DeepSearch/Think and ask again.';
+      'I reached the tool-step ceiling on this request and could not finish every step. Ask me to continue from where I left off, or enable DeepSearch/Think for a larger budget.';
     if (wantStream) {
       sseWrite(res, { content: limitMsg });
       sseWrite(res, { done: true });
