@@ -328,19 +328,29 @@ export default function App() {
           if (payload === '[DONE]') continue
           try {
             const evt = JSON.parse(payload)
-            if (evt.error) throw new Error(evt.error)
+            // Fatal only for top-level stream errors, not tool_done payloads
+            if (evt.error && !evt.status) throw new Error(evt.error)
             if (evt.status === 'tool_use') {
               const names = Array.isArray(evt.tools) ? evt.tools.filter(Boolean) : []
-              const label = names.length ? names.join(' · ') : (evt.tool || 'Working…')
+              const label =
+                (typeof evt.message === 'string' && evt.message) ||
+                (names.length ? names.join(' · ') : evt.tool || 'Working…')
               setToolStatus(String(label))
               continue
-            } else if (typeof evt.delta === 'string') {
+            }
+            if (evt.status === 'tool_done') {
+              const name = evt.tool || 'tool'
+              setToolStatus(evt.ok === false ? `Failed: ${name}` : `Done: ${name}`)
+              continue
+            }
+            if (typeof evt.delta === 'string' && evt.delta) {
               setToolStatus(null)
               full += evt.delta
               setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
-            } else if (typeof evt.content === 'string') {
+            } else if (typeof evt.content === 'string' && evt.content) {
               setToolStatus(null)
-              full = evt.content
+              if (evt.content.length >= full.length) full = evt.content
+              else full += evt.content
               setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
             }
           } catch (e: any) {
@@ -354,7 +364,7 @@ export default function App() {
       if (err?.name === 'AbortError') return full
       throw err
     }
-    if (!full.trim()) throw new Error('Empty response')
+    if (!full.trim()) throw new Error('No reply received. Try again, or reconnect Gmail/Sheets if this needed tools.')
     return full
   }
 
@@ -406,7 +416,8 @@ export default function App() {
             if (payload === '[DONE]') continue
             try {
               const evt = JSON.parse(payload)
-              if (evt.error) throw new Error(evt.error)
+              if (evt.error && !evt.status) throw new Error(evt.error)
+              if (evt.status === 'tool_use' || evt.status === 'tool_done') continue
               if (typeof evt.delta === 'string' && evt.delta) {
                 text += evt.delta
                 opts?.onDelta?.(evt.delta)
