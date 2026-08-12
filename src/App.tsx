@@ -95,6 +95,7 @@ export default function App() {
   const [lastUserPrompt, setLastUserPrompt] = useState('')
   const [greetingLine, setGreetingLine] = useState('')
   const [errorHint, setErrorHint] = useState<string | null>(null)
+  const [toolStatus, setToolStatus] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const messagesRef = useRef<ChatMessage[]>([])
@@ -139,18 +140,6 @@ export default function App() {
     document.documentElement.classList.toggle('is-empty-chat', empty)
     return () => document.documentElement.classList.remove('is-empty-chat')
   }, [messages.length, isLoading])
-
-  useEffect(() => {
-    if (!composerFocused) return
-    const pin = () => {
-      window.scrollTo(0, 0)
-      document.documentElement.scrollTop = 0
-      document.body.scrollTop = 0
-    }
-    pin()
-    const id = window.setInterval(pin, 250)
-    return () => clearInterval(id)
-  }, [composerFocused])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -345,12 +334,16 @@ export default function App() {
             const evt = JSON.parse(payload)
             if (evt.error) throw new Error(evt.error)
             if (evt.status === 'tool_use') {
-              // Keep prior streamed text visible during tool loops
+              const names = Array.isArray(evt.tools) ? evt.tools.filter(Boolean) : []
+              const label = names.length ? names.join(' · ') : (evt.tool || 'Working…')
+              setToolStatus(String(label))
               continue
             } else if (typeof evt.delta === 'string') {
+              setToolStatus(null)
               full += evt.delta
               setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
             } else if (typeof evt.content === 'string') {
+              setToolStatus(null)
               full = evt.content
               setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: full } : m)))
             }
@@ -443,6 +436,7 @@ export default function App() {
     setPendingFiles([])
     setLastUserPrompt(content)
     setErrorHint(null)
+    setToolStatus(null)
     setComposerFocused(false)
     setIsLoading(true)
     thinkStartedAt.current = Date.now()
@@ -471,13 +465,20 @@ export default function App() {
       }
       const hint = err?.message || 'Something went wrong. Please try again.'
       setErrorHint(hint)
-      setMessages((p) => p.map((m) => (m.id === assistantId ? { ...m, content: hint } : m)))
+      setToolStatus(null)
+      // Keep partial text if any; otherwise drop the empty assistant bubble
+      setMessages((p) => {
+        const m = p.find((x) => x.id === assistantId)
+        if (!m || !m.content.trim()) return p.filter((x) => x.id !== assistantId)
+        return p
+      })
     } finally {
       if (thinkStartedAt.current) {
         setThoughtSeconds(Math.max(1, Math.round((Date.now() - thinkStartedAt.current) / 1000)))
         thinkStartedAt.current = null
       }
       setIsLoading(false)
+      setToolStatus(null)
       abortRef.current = null
     }
   }
@@ -559,7 +560,7 @@ export default function App() {
             </div>
           ) : (
             <main className="flex-1 overflow-y-auto min-h-0" data-scrollable="true">
-              <MessageList messages={messages} isLoading={isLoading} lastUserPrompt={lastUserPrompt} dark={dark} messagesEndRef={messagesEndRef} thoughtSeconds={thoughtSeconds} thinkActive={thinkActive} deepSearchActive={deepSearchActive} onRegenerate={() => { if (lastUserPrompt) handleSend(lastUserPrompt) }} />
+              <MessageList messages={messages} isLoading={isLoading} lastUserPrompt={lastUserPrompt} dark={dark} messagesEndRef={messagesEndRef} thoughtSeconds={thoughtSeconds} thinkActive={thinkActive} deepSearchActive={deepSearchActive} toolStatus={toolStatus} onRegenerate={() => { if (lastUserPrompt) handleSend(lastUserPrompt) }} />
             </main>
           )}
           <div className="shrink-0">
