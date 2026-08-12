@@ -74,13 +74,7 @@ export default function App() {
   const [showLiveVoice, setShowLiveVoice] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [showProjects, setShowProjects] = useState(false)
-  const [thinkActive, setThinkActive] = useState(false)
-  const [deepSearchActive, setDeepSearchActive] = useState(false)
   const [glowDone, setGlowDone] = useState(false)
-  const thinkActiveRef = useRef(false)
-  const deepSearchActiveRef = useRef(false)
-  useEffect(() => { thinkActiveRef.current = thinkActive }, [thinkActive])
-  useEffect(() => { deepSearchActiveRef.current = deepSearchActive }, [deepSearchActive])
   const [composerFocused, setComposerFocused] = useState(false)
   const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage>(() => {
     try {
@@ -304,8 +298,8 @@ export default function App() {
         model: model.anthropic,
         modelId: model.id,
         stream: true,
-        think: thinkActiveRef.current,
-        deepSearch: deepSearchActiveRef.current,
+        think: true,
+        deepSearch: false,
       }),
     })
     const ctype = response.headers.get('content-type') || ''
@@ -384,8 +378,8 @@ export default function App() {
           model: model.anthropic,
           modelId: model.id,
           stream: false,
-          think: thinkActiveRef.current,
-          deepSearch: deepSearchActiveRef.current,
+          think: true,
+          deepSearch: false,
         }),
       })
       const data = await response.json().catch(() => ({}))
@@ -573,7 +567,20 @@ export default function App() {
             </main>
           )}
           <div className="shrink-0">
-            <ChatInput value={input} onChange={setInput} onSend={() => handleSend()} onStop={handleStop} onSpeak={() => void openLiveVoice()} language={voiceLanguage} isLoading={isLoading} dark={dark} errorHint={errorHint} pendingFiles={pendingFiles} onFilesChange={setPendingFiles} onFocusChange={setComposerFocused} thinkActive={thinkActive} deepSearchActive={deepSearchActive} onThinkChange={setThinkActive} onDeepSearchChange={setDeepSearchActive} />
+            <ChatInput
+              value={input}
+              onChange={setInput}
+              onSend={() => handleSend()}
+              onStop={handleStop}
+              onSpeak={() => void openLiveVoice()}
+              language={voiceLanguage}
+              isLoading={isLoading}
+              dark={dark}
+              errorHint={errorHint}
+              pendingFiles={pendingFiles}
+              onFilesChange={setPendingFiles}
+              onFocusChange={setComposerFocused}
+            />
           </div>
         </div>
         <InstallPWA dark={dark} />
