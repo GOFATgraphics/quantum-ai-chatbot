@@ -10,13 +10,92 @@ type Props = {
 
 function stripMarkdown(text: string) {
   return text
+    .replace(/\u2014/g, ',')
+    .replace(/\u2013/g, '-')
+    .replace(/\u2015/g, ',')
+    .replace(/--+/g, ',')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]+`/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/[#*_>~]/g, '')
+    .replace(/\s+,/g, ',')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/** Split into ~380-char spoken chunks on sentence boundaries for fast first audio. */
+function chunkForSpeech(text: string, maxLen = 380): string[] {
+  const plain = text.trim()
+  if (!plain) return []
+  if (plain.length <= maxLen) return [plain]
+
+  const parts: string[] = []
+  let rest = plain
+  while (rest.length > 0) {
+    if (rest.length <= maxLen) {
+      parts.push(rest.trim())
+      break
+    }
+    const window = rest.slice(0, maxLen)
+    let cut = Math.max(
+      window.lastIndexOf('. '),
+      window.lastIndexOf('! '),
+      window.lastIndexOf('? '),
+      window.lastIndexOf('; '),
+    )
+    if (cut < 40) cut = window.lastIndexOf(', ')
+    if (cut < 40) cut = window.lastIndexOf(' ')
+    if (cut < 20) cut = maxLen
+    else cut = cut + 1
+    parts.push(rest.slice(0, cut).trim())
+    rest = rest.slice(cut).trim()
+  }
+  return parts.filter(Boolean)
+}
+
+async function fetchTtsChunk(text: string, language: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+  const res = await fetch('/api/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify({
+      text,
+      language,
+      chunk: true,
+      stream: false,
+    }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || data.details || 'TTS failed')
+  }
+  return res.arrayBuffer()
+}
+
+function playBuffer(buf: ArrayBuffer, audioRef: React.MutableRefObject<HTMLAudioElement | null>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }))
+      const audio = new Audio(url)
+      audio.setAttribute('playsinline', 'true')
+      ;(audio as any).playsInline = true
+      audioRef.current = audio
+      audio.onended = () => {
+        URL.revokeObjectURL(url)
+        if (audioRef.current === audio) audioRef.current = null
+        resolve()
+      }
+      audio.onerror = () => {
+        URL.revokeObjectURL(url)
+        if (audioRef.current === audio) audioRef.current = null
+        reject(new Error('Audio playback failed'))
+      }
+      void audio.play().catch(reject)
+    } catch (e) {
+      reject(e)
+    }
+  })
 }
 
 export default function MessageActions({ content, dark, onRegenerate }: Props) {
@@ -25,6 +104,8 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
   const [speaking, setSpeaking] = useState(false)
   const [loadingSpeak, setLoadingSpeak] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const stopFlagRef = useRef(false)
 
   const muted = dark
     ? 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.08]'
@@ -44,6 +125,13 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
   }
 
   const stopSpeak = () => {
+    stopFlagRef.current = true
+    try {
+      abortRef.current?.abort()
+    } catch {
+      /* ignore */
+    }
+    abortRef.current = null
     try {
       audioRef.current?.pause()
       if (audioRef.current?.src) URL.revokeObjectURL(audioRef.current.src)
@@ -60,6 +148,19 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
     setLoadingSpeak(false)
   }
 
+  const speakBrowserFallback = (plain: string, language: string) => {
+    if (!('speechSynthesis' in window)) return false
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(plain.slice(0, 1200))
+    u.lang = language === 'ha' ? 'ha' : 'en-US'
+    u.onend = () => setSpeaking(false)
+    u.onerror = () => setSpeaking(false)
+    setLoadingSpeak(false)
+    setSpeaking(true)
+    window.speechSynthesis.speak(u)
+    return true
+  }
+
   const speak = async () => {
     if (speaking || loadingSpeak) {
       stopSpeak()
@@ -68,57 +169,71 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
     const plain = stripMarkdown(content)
     if (!plain) return
 
+    stopFlagRef.current = false
     setLoadingSpeak(true)
+
+    let language = 'en'
     try {
-      let language = 'en'
-      try {
-        const saved = localStorage.getItem('quantumy-language')
-        if (saved === 'ha' || saved === 'en') language = saved
-      } catch {
-        /* ignore */
-      }
+      const saved = localStorage.getItem('quantumy-language')
+      if (saved === 'ha' || saved === 'en') language = saved
+    } catch {
+      /* ignore */
+    }
 
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: plain.slice(0, 4000), language }),
-      })
+    const chunks = chunkForSpeech(plain, 380)
+    const ac = new AbortController()
+    abortRef.current = ac
 
-      if (!res.ok) {
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel()
-          const u = new SpeechSynthesisUtterance(plain)
-          u.lang = language === 'ha' ? 'ha' : 'en-US'
-          u.onend = () => setSpeaking(false)
-          u.onerror = () => setSpeaking(false)
-          setLoadingSpeak(false)
-          setSpeaking(true)
-          window.speechSynthesis.speak(u)
-          return
-        }
-        throw new Error('TTS failed')
-      }
+    try {
+      // Prefetch first chunk only — start audio ASAP
+      let nextBuf: ArrayBuffer | null = await fetchTtsChunk(chunks[0], language, ac.signal)
+      if (stopFlagRef.current) return
 
-      const buf = await res.arrayBuffer()
-      const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }))
-      const audio = new Audio(url)
-      audioRef.current = audio
-      audio.onended = () => {
-        URL.revokeObjectURL(url)
-        setSpeaking(false)
-        audioRef.current = null
-      }
-      audio.onerror = () => {
-        URL.revokeObjectURL(url)
-        setSpeaking(false)
-        audioRef.current = null
-      }
       setLoadingSpeak(false)
       setSpeaking(true)
-      await audio.play()
-    } catch {
-      setLoadingSpeak(false)
-      setSpeaking(false)
+
+      for (let i = 0; i < chunks.length; i++) {
+        if (stopFlagRef.current) break
+        const buf = nextBuf
+        nextBuf = null
+        if (!buf) break
+
+        // Prefetch the following chunk while this one plays
+        const prefetch =
+          i + 1 < chunks.length
+            ? fetchTtsChunk(chunks[i + 1], language, ac.signal).catch(() => null)
+            : Promise.resolve(null)
+
+        try {
+          await playBuffer(buf, audioRef)
+        } catch {
+          // If first chunk fails, try browser TTS once
+          if (i === 0) {
+            if (speakBrowserFallback(plain, language)) return
+          }
+          break
+        }
+
+        if (stopFlagRef.current) break
+        nextBuf = await prefetch
+      }
+    } catch (e: any) {
+      if (e?.name === 'AbortError') {
+        /* user stopped */
+      } else if (!stopFlagRef.current) {
+        // Full fallback
+        if (!speakBrowserFallback(plain, language)) {
+          setLoadingSpeak(false)
+          setSpeaking(false)
+        }
+        return
+      }
+    } finally {
+      abortRef.current = null
+      if (!stopFlagRef.current) {
+        setSpeaking(false)
+        setLoadingSpeak(false)
+      }
     }
   }
 

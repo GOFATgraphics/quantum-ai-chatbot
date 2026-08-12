@@ -1,7 +1,9 @@
 /**
  * ElevenLabs Text-to-Speech proxy
- * Flash model + low-bitrate mp3 for fast live voice turns
- * POST { text, language? }
+ * - Uses ELEVENLABS_VOICE_* env when set
+ * - Flash model + low bitrate + streaming latency opt
+ * - Optional body.stream pipes ElevenLabs stream for earlier first-byte
+ * POST { text, language?, voice_id?, stream? }
  */
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,23 +25,28 @@ export default async function handler(req, res) {
     let text = (body?.text || '').trim();
     if (!text) return res.status(400).json({ error: 'text is required' });
 
-    // Strip em/en dashes for natural speech
     text = text
       .replace(/\u2014/g, ',')
       .replace(/\u2013/g, '-')
       .replace(/\u2015/g, ',')
-      .replace(/--+/g, ',');
-    // Keep replies short for fast TTS
-    if (text.length > 320) {
-      const cut = text.slice(0, 320);
-      const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
-      text = lastStop > 60 ? cut.slice(0, lastStop + 1) : cut + '…';
+      .replace(/--+/g, ',')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Hard cap keeps latency bounded (client should chunk longer text)
+    const maxLen = body?.chunk ? 450 : 900;
+    if (text.length > maxLen) {
+      const cut = text.slice(0, maxLen);
+      const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '), cut.lastIndexOf(', '));
+      text = lastStop > 40 ? cut.slice(0, lastStop + 1) : cut;
     }
 
     const voiceId =
       body?.voice_id ||
+      process.env.ELEVENLABS_VOICE_ID ||
       process.env.ELEVENLABS_VOICE_MALE ||
       process.env.ELEVENLABS_VOICE_HAUSA_MALE ||
+      process.env.ELEVENLABS_VOICE ||
       'rPlZjuLXpONhaMouRFww';
 
     const lang = (body?.language || 'en').toLowerCase();
@@ -54,14 +61,18 @@ export default async function handler(req, res) {
       language_code: languageCode,
       voice_settings: {
         stability: 0.35,
-        similarity_boost: 0.7,
+        similarity_boost: 0.72,
         style: 0.0,
         use_speaker_boost: true,
       },
     };
 
-    // optimize_streaming_latency=4 + low bitrate = faster first byte / smaller payload
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_22050_32&optimize_streaming_latency=4`;
+    const wantStream = body?.stream === true;
+    const path = wantStream
+      ? `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`
+      : `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+    const url = `${path}?output_format=mp3_22050_32&optimize_streaming_latency=4`;
+
     const elRes = await fetch(url, {
       method: 'POST',
       headers: {
@@ -84,12 +95,29 @@ export default async function handler(req, res) {
       });
     }
 
-    const audioBuf = Buffer.from(await elRes.arrayBuffer());
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Length', audioBuf.length);
     res.setHeader('X-Voice-Id', voiceId);
     res.setHeader('X-Model-Id', modelId);
+
+    if (wantStream && elRes.body && typeof elRes.body.getReader === 'function') {
+      // Pipe stream through for lower time-to-first-byte
+      const reader = elRes.body.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) res.write(Buffer.from(value));
+        }
+        return res.end();
+      } catch (pipeErr) {
+        console.error('TTS stream pipe error', pipeErr);
+        return res.end();
+      }
+    }
+
+    const audioBuf = Buffer.from(await elRes.arrayBuffer());
+    res.setHeader('Content-Length', audioBuf.length);
     return res.status(200).send(audioBuf);
   } catch (err) {
     console.error('TTS handler error:', err);
