@@ -1,17 +1,10 @@
-import { useState, type RefObject, useEffect, useMemo, useRef } from 'react'
+import { useState, type RefObject, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FileText } from 'lucide-react'
 import MessageActions from './MessageActions'
 import ThinkingStatus from './ThinkingStatus'
 import { formatMarkdown } from '../lib/markdown'
-import {
-  getScrollParent,
-  isNearBottom,
-  scrollChatToBottom,
-  scrollChatToBottomAfterLayout,
-  NEAR_BOTTOM_PX,
-} from '../lib/chatScroll'
 
 export type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
 
@@ -192,8 +185,6 @@ type Props = {
   lastUserPrompt: string
   dark: boolean
   messagesEndRef: RefObject<HTMLDivElement>
-  /** When this changes (open chat / new thread), force scroll to bottom. */
-  conversationId?: string | null
   onRegenerate?: () => void
   onSuggestion?: (text: string) => void
   thoughtSeconds?: number | null
@@ -206,7 +197,6 @@ export default function MessageList({
   lastUserPrompt,
   dark,
   messagesEndRef,
-  conversationId = null,
   onRegenerate,
   onSuggestion,
   thoughtSeconds,
@@ -216,91 +206,29 @@ export default function MessageList({
   const streaming =
     isLoading && last?.role === 'assistant' && !!last.content
 
-  /** User is "stuck" to bottom unless they scroll up. */
-  const stickToBottomRef = useRef(true)
-  const lastConvRef = useRef<string | null>(null)
-  const lastContentLenRef = useRef(0)
-
-  // Track user scroll: leave stick mode when they scroll up; re-enter near bottom
   useEffect(() => {
-    const end = messagesEndRef.current
-    const scroller = getScrollParent(end)
-    if (!scroller) return
-
-    let ticking = false
-    const onScroll = () => {
-      if (ticking) return
-      ticking = true
-      requestAnimationFrame(() => {
-        ticking = false
-        stickToBottomRef.current = isNearBottom(scroller, NEAR_BOTTOM_PX)
-      })
-    }
-
-    scroller.addEventListener('scroll', onScroll, { passive: true })
-    return () => scroller.removeEventListener('scroll', onScroll)
-  }, [messagesEndRef, conversationId, messages.length > 0])
-
-  // Open conversation / first paint: always pin to bottom
-  useEffect(() => {
-    const convKey = conversationId ?? (messages[0]?.id ?? null)
-    const switched = convKey !== lastConvRef.current
-    if (switched) {
-      lastConvRef.current = convKey
-      stickToBottomRef.current = true
-      lastContentLenRef.current = 0
-    }
-    if (messages.length === 0) return
-    if (!switched && isLoading) return
-
-    scrollChatToBottomAfterLayout(messagesEndRef.current, { force: true, behavior: 'auto' })
-  }, [conversationId, messages.length > 0 ? messages[0]?.id : null, messages.length, messagesEndRef])
-
-  // Streaming / tool status / new tokens: stick only if user hasn't scrolled up
-  useEffect(() => {
-    if (messages.length === 0) return
-    const contentLen = last?.content?.length ?? 0
-    const contentGrew = contentLen > lastContentLenRef.current
-    lastContentLenRef.current = contentLen
-
-    const shouldFollow =
-      stickToBottomRef.current &&
-      (isLoading || contentGrew || !!toolStatus || messages.length > 0)
-
-    if (!shouldFollow) return
-
-    // Instant while streaming tokens (smooth fights rapid updates on mobile)
-    const behavior: ScrollBehavior = isLoading && contentGrew ? 'auto' : isLoading ? 'auto' : 'smooth'
-    scrollChatToBottom(messagesEndRef.current, {
-      force: false,
-      behavior,
+    if (isLoading || messages.length === 0) return
+    const el = messagesEndRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'auto', block: 'end' })
     })
-  }, [messages, isLoading, toolStatus, last?.content, messagesEndRef])
+  }, [messages.length > 0 ? messages[0]?.id : null, messages.length, isLoading, messagesEndRef])
 
-  // Keyboard / visualViewport resize: re-pin if stuck to bottom
-  useEffect(() => {
-    const reflow = () => {
-      if (!stickToBottomRef.current) return
-      scrollChatToBottom(messagesEndRef.current, { force: true, behavior: 'auto' })
-    }
-    const vv = window.visualViewport
-    vv?.addEventListener('resize', reflow)
-    vv?.addEventListener('scroll', reflow)
-    window.addEventListener('resize', reflow)
-    return () => {
-      vv?.removeEventListener('resize', reflow)
-      vv?.removeEventListener('scroll', reflow)
-      window.removeEventListener('resize', reflow)
-    }
-  }, [messagesEndRef])
-
-  // Sending a new user message: re-enable stick + jump
   useEffect(() => {
     if (!isLoading) return
-    // When loading starts, assume user wants to follow the reply
-    stickToBottomRef.current = true
-    scrollChatToBottomAfterLayout(messagesEndRef.current, { force: true, behavior: 'auto' })
-  }, [isLoading === true ? '1' : '0', messagesEndRef])
+    const el = messagesEndRef.current
+    if (!el) return
+    const scroller = el.closest('[data-scrollable="true"]') as HTMLElement | null
+    if (!scroller) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      return
+    }
+    const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+    if (distance < 180) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }, [messages, isLoading, toolStatus, messagesEndRef])
 
   const suggestions = useMemo(() => {
     if (isLoading || !last?.content || last.role !== 'assistant') return [] as string[]
@@ -429,7 +357,7 @@ export default function MessageList({
         </div>
       )}
 
-      <div ref={messagesEndRef} className="h-px w-full shrink-0" aria-hidden />
+      <div ref={messagesEndRef} />
     </div>
   )
 }
