@@ -1,7 +1,39 @@
-/** Read text files and Workspace exports from Google Drive */
+/** Read text files, Workspace exports, and list folders on Google Drive */
 
-export async function readDriveFile(accessToken, fileId) {
+const DEFAULT_MAX = 80000; // raised from 12k — large trade dumps
+const HARD_MAX = 150000;   // absolute ceiling per call
+
+function clampInt(n, lo, hi, fallback) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(hi, Math.max(lo, Math.floor(v)));
+}
+
+function sliceText(full, offset, maxChars) {
+  const total = full.length;
+  const start = clampInt(offset, 0, total, 0);
+  const limit = clampInt(maxChars, 1, HARD_MAX, DEFAULT_MAX);
+  const end = Math.min(total, start + limit);
+  const text = full.slice(start, end);
+  return {
+    text,
+    offset: start,
+    length: text.length,
+    total_length: total,
+    truncated: end < total,
+    next_offset: end < total ? end : null,
+  };
+}
+
+/**
+ * Read a Drive file's text content.
+ * Supports offset/max_chars for paging through large .txt dumps.
+ */
+export async function readDriveFile(accessToken, fileId, opts = {}) {
   if (!fileId) throw new Error('fileId is required');
+  const offset = clampInt(opts.offset, 0, 50_000_000, 0);
+  const maxChars = clampInt(opts.max_chars, 1, HARD_MAX, DEFAULT_MAX);
+
   const id = encodeURIComponent(String(fileId));
   const metaRes = await fetch(
     `https://www.googleapis.com/drive/v3/files/${id}?fields=id,name,mimeType,size,webViewLink&supportsAllDrives=true`,
@@ -12,16 +44,18 @@ export async function readDriveFile(accessToken, fileId) {
   const mime = meta.mimeType || '';
   const name = meta.name || '';
   const link = meta.webViewLink || '';
-  const MAX = 12000;
 
+  const base = { id: meta.id, name, mimeType: mime, link, size: meta.size };
+
+  // Google Workspace → export then slice
   if (mime === 'application/vnd.google-apps.document') {
     const res = await fetch(
       `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=${encodeURIComponent('text/plain')}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (!res.ok) throw new Error(`Docs export failed: ${res.status} ${await res.text()}`);
-    const text = (await res.text()).slice(0, MAX);
-    return { id: meta.id, name, mimeType: mime, link, text };
+    const full = await res.text();
+    return { ...base, ...sliceText(full, offset, maxChars) };
   }
   if (mime === 'application/vnd.google-apps.spreadsheet') {
     const res = await fetch(
@@ -29,8 +63,8 @@ export async function readDriveFile(accessToken, fileId) {
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (!res.ok) throw new Error(`Sheets export failed: ${res.status} ${await res.text()}`);
-    const text = (await res.text()).slice(0, MAX);
-    return { id: meta.id, name, mimeType: mime, link, text, format: 'csv' };
+    const full = await res.text();
+    return { ...base, format: 'csv', ...sliceText(full, offset, maxChars) };
   }
   if (mime === 'application/vnd.google-apps.presentation') {
     const res = await fetch(
@@ -38,8 +72,8 @@ export async function readDriveFile(accessToken, fileId) {
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     if (!res.ok) throw new Error(`Slides export failed: ${res.status} ${await res.text()}`);
-    const text = (await res.text()).slice(0, MAX);
-    return { id: meta.id, name, mimeType: mime, link, text };
+    const full = await res.text();
+    return { ...base, ...sliceText(full, offset, maxChars) };
   }
 
   const textLike =
@@ -55,18 +89,16 @@ export async function readDriveFile(accessToken, fileId) {
 
   if (!textLike) {
     return {
-      id: meta.id,
-      name,
-      mimeType: mime,
-      link,
+      ...base,
       text: null,
       error: `Cannot read binary type "${mime}". Supported: .txt, .md, .csv, .json, and Google Docs/Sheets/Slides.`,
     };
   }
 
+  const headers = { Authorization: `Bearer ${accessToken}` };
   const res = await fetch(
     `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
+    { headers }
   );
   if (!res.ok) throw new Error(`Drive download failed: ${res.status} ${await res.text()}`);
   const buf = Buffer.from(await res.arrayBuffer());
@@ -77,31 +109,85 @@ export async function readDriveFile(accessToken, fileId) {
     else if (b < 7 || (b > 14 && b < 32 && b !== 9 && b !== 10 && b !== 13)) nonText += 1;
   }
   if (nonText > 50) {
-    return {
-      id: meta.id,
-      name,
-      mimeType: mime,
-      link,
-      text: null,
-      error: 'File looks binary; cannot extract text.',
-    };
+    return { ...base, text: null, error: 'File looks binary; cannot extract text.' };
   }
-  let text = buf.toString('utf8');
-  const truncated = text.length > MAX;
-  text = text.slice(0, MAX);
-  return { id: meta.id, name, mimeType: mime, link, text, truncated, size: meta.size };
+  const full = buf.toString('utf8');
+  return { ...base, ...sliceText(full, offset, maxChars) };
+}
+
+/**
+ * List children of a Drive folder by folder id.
+ */
+export async function listDriveFolder(accessToken, folderId, opts = {}) {
+  if (!folderId) throw new Error('folderId is required');
+  const pageSize = clampInt(opts.max_results, 1, 100, 50);
+  const q = `'${String(folderId).replace(/'/g, "\\'")}' in parents and trashed = false`;
+  const params = new URLSearchParams({
+    q,
+    pageSize: String(pageSize),
+    fields: 'nextPageToken,files(id,name,mimeType,modifiedTime,size,webViewLink)',
+    orderBy: 'folder,name',
+    supportsAllDrives: 'true',
+    includeItemsFromAllDrives: 'true',
+    spaces: 'drive',
+  });
+  if (opts.page_token) params.set('pageToken', String(opts.page_token));
+
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Drive folder list failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  const files = (data.files || []).map((f) => ({
+    id: f.id,
+    name: f.name,
+    mimeType: f.mimeType,
+    modifiedTime: f.modifiedTime,
+    size: f.size,
+    link: f.webViewLink,
+    isFolder: f.mimeType === 'application/vnd.google-apps.folder',
+  }));
+  return {
+    folder_id: folderId,
+    count: files.length,
+    next_page_token: data.nextPageToken || null,
+    files,
+  };
 }
 
 export const READ_DRIVE_FILE_TOOL = {
   name: 'read_drive_file',
   description:
-    'Read the text content of a Google Drive file by id (from search_drive). Works for .txt, .md, .csv, .json, and Google Docs/Sheets/Slides. Not for PDF/images/binaries.',
+    'Read text content of a Google Drive file by id (from search_drive or list_drive_folder). Works for .txt, .md, .csv, .json, and Google Docs/Sheets/Slides. For large files use offset + max_chars and follow next_offset until truncated is false. Not for PDF/images.',
   input_schema: {
     type: 'object',
     properties: {
-      file_id: { type: 'string', description: 'Drive file id from search_drive' },
+      file_id: { type: 'string', description: 'Drive file id' },
+      offset: {
+        type: 'number',
+        description: 'Character offset to start reading (default 0). Use next_offset from a previous read to continue.',
+      },
+      max_chars: {
+        type: 'number',
+        description: 'Max characters to return (default 80000, max 150000).',
+      },
     },
     required: ['file_id'],
+  },
+};
+
+export const LIST_DRIVE_FOLDER_TOOL = {
+  name: 'list_drive_folder',
+  description:
+    'List files and subfolders inside a Google Drive folder by folder id. Prefer this over search when you already have the folder id. Returns id, name, mimeType, size, isFolder.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      folder_id: { type: 'string', description: 'Drive folder id' },
+      max_results: { type: 'number', description: '1-100, default 50' },
+      page_token: { type: 'string', description: 'Pagination token from a previous list' },
+    },
+    required: ['folder_id'],
   },
 };
 
@@ -118,7 +204,10 @@ export async function handleReadDriveFile(block, user, getToken) {
     };
   }
   try {
-    const file = await readDriveFile(token, String(input.file_id || ''));
+    const file = await readDriveFile(token, String(input.file_id || ''), {
+      offset: input.offset,
+      max_chars: input.max_chars,
+    });
     if (file.error && !file.text) {
       return {
         type: 'tool_result',
@@ -128,6 +217,34 @@ export async function handleReadDriveFile(block, user, getToken) {
       };
     }
     return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(file) };
+  } catch (e) {
+    return {
+      type: 'tool_result',
+      tool_use_id: id,
+      content: `Tool error: ${e.message}`,
+      is_error: true,
+    };
+  }
+}
+
+export async function handleListDriveFolder(block, user, getToken) {
+  const id = block.id;
+  const input = block.input || {};
+  const token = (await getToken(user.id, 'google_drive')) || (await getToken(user.id, 'google_docs'));
+  if (!token) {
+    return {
+      type: 'tool_result',
+      tool_use_id: id,
+      content: 'Google Drive is not connected.',
+      is_error: true,
+    };
+  }
+  try {
+    const result = await listDriveFolder(token, String(input.folder_id || ''), {
+      max_results: input.max_results,
+      page_token: input.page_token,
+    });
+    return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
   } catch (e) {
     return {
       type: 'tool_result',
