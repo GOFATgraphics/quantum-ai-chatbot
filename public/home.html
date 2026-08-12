@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quantumy AI — Personal AI that remembers you</title>
-  <meta name="description" content="Quantumy AI is a personal assistant that remembers you, drafts email, and optionally connects to Gmail so you can ask about your work in plain language." />
+  <meta name="description" content="Quantumy AI is a personal AI assistant that remembers your preferences, helps draft emails, and optionally connects to Gmail so you can ask about your work in plain language." />
+  <meta name="application-name" content="Quantumy AI" />
   <meta name="theme-color" content="#07070c" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="apple-touch-icon" href="/logo.svg" />
@@ -31,7 +32,7 @@
       letter-spacing: -0.03em;
       line-height: 1.2;
       color: #f8fafc;
-      max-width: 16ch;
+      max-width: 18ch;
     }
     .hero h1 span {
       background: linear-gradient(90deg, #a5b4fc, #c4b5fd, #67e8f9);
@@ -39,7 +40,24 @@
       background-clip: text;
       color: transparent;
     }
-    .hero p { margin-top: 1.1rem; color: #94a3b8; font-size: 1.05rem; max-width: 36rem; }
+    .hero p { margin-top: 1.1rem; color: #94a3b8; font-size: 1.05rem; max-width: 38rem; }
+    .purpose-box {
+      margin-top: 1.5rem;
+      padding: 1.25rem 1.35rem;
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(129, 140, 248, 0.25);
+      border-radius: 14px;
+      max-width: 40rem;
+    }
+    .purpose-box h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #c7d2fe;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .purpose-box p { color: #cbd5e1; font-size: 0.98rem; margin: 0; }
     .cta { margin-top: 1.75rem; display: flex; flex-wrap: wrap; gap: 0.75rem; }
     .btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -90,7 +108,7 @@
   <div class="wrap">
     <header>
       <a class="brand" href="/home.html">
-        <img src="/logo.svg" alt="Quantumy" width="36" height="36" />
+        <img src="/logo.svg" alt="Quantumy AI" width="36" height="36" />
         Quantumy AI
       </a>
       <nav>
@@ -101,24 +119,33 @@
     </header>
 
     <section class="hero">
-      <h1>Your AI that <span>knows your work</span></h1>
+      <h1>Quantumy AI — Your AI that <span>knows your work</span></h1>
       <p>
-        <strong style="color:#cbd5e1">Purpose:</strong>
-        Quantumy AI is a personal assistant for chat, memory, and optional Gmail access.
-        It remembers your preferences, can draft emails, and answers questions about your mail when you connect Gmail.
+        <strong style="color:#e2e8f0">Quantumy AI</strong> is a personal AI assistant for everyday work.
+        It remembers what matters to you, helps you draft clear emails, and can optionally read your Gmail so you can ask questions about your inbox in plain language.
       </p>
+
+      <div class="purpose-box">
+        <h2>Purpose of this application</h2>
+        <p>
+          <strong>Quantumy AI</strong> is a productivity application whose purpose is to provide a personal AI chatbot with long-term memory,
+          email drafting assistance, and optional read-only access to the user’s Gmail account so the assistant can search and summarize
+          the user’s own messages when asked. Connectors are opt-in and can be disconnected at any time.
+        </p>
+      </div>
+
       <div class="cta">
-        <a class="btn btn-primary" href="/">Open Quantumy</a>
+        <a class="btn btn-primary" href="/">Open Quantumy AI</a>
         <a class="btn btn-ghost" href="/privacy.html">Privacy Policy</a>
       </div>
     </section>
 
     <section class="section">
-      <h2>What you can do</h2>
+      <h2>What you can do with Quantumy AI</h2>
       <ul>
         <li>Chat with an AI that remembers facts and preferences you save.</li>
         <li>Ask it to <strong>draft emails</strong> (subject + body) you can copy and send.</li>
-        <li>Optionally connect <strong>Gmail</strong> (read-only) to search and summarize messages.</li>
+        <li>Optionally connect <strong>Gmail</strong> (read-only) to search and summarize your own messages.</li>
         <li>Install as an app on phone, tablet, or desktop (PWA).</li>
       </ul>
     </section>
