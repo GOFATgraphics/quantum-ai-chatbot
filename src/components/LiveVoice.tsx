@@ -19,7 +19,6 @@ type Props = {
 type Phase = 'idle' | 'listening' | 'thinking' | 'speaking'
 
 function pickRecorderMime(): string {
-  // iOS prefers mp4/aac; Chrome prefers webm/opus
   const candidates = [
     'audio/mp4',
     'audio/aac',
@@ -67,16 +66,21 @@ function voiceFriendlyText(text: string, language: VoiceLanguage): string {
   let t = (text || '').replace(/\s+/g, ' ').trim()
   if (!t) return language === 'ha' ? 'Ban fahimta ba.' : 'Sorry, I did not catch that.'
   t = t
+    .replace(/\u2014/g, ',')
+    .replace(/\u2013/g, '-')
+    .replace(/\u2015/g, ',')
+    .replace(/--+/g, ',')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]+`/g, ' ')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/[#*_>~]/g, '')
+    .replace(/\s+,/g, ',')
     .replace(/\s+/g, ' ')
     .trim()
-  if (t.length > 600) {
-    const cut = t.slice(0, 600)
+  if (t.length > 320) {
+    const cut = t.slice(0, 320)
     const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '))
-    t = lastStop > 80 ? cut.slice(0, lastStop + 1) : cut + '…'
+    t = lastStop > 60 ? cut.slice(0, lastStop + 1) : cut + '…'
   }
   return t
 }
@@ -157,7 +161,7 @@ async function speakWithElevenLabs(
     }
     try {
       await audio.play()
-    } catch (playErr: any) {
+    } catch {
       onError?.(
         language === 'ha'
           ? 'Danna allo don ba da izinin sauti.'
@@ -239,7 +243,7 @@ export default function LiveVoice({
     }
   }, [])
 
-  const scheduleListen = useCallback((delay = 400) => {
+  const scheduleListen = useCallback((delay = 220) => {
     if (!continuousRef.current) return
     window.setTimeout(() => {
       if (!continuousRef.current) return
@@ -259,7 +263,11 @@ export default function LiveVoice({
     setCaption(text)
     try {
       const answer = await onAsk(text)
-      const clean = (answer || '').replace(/\s+/g, ' ').trim()
+      const clean = (answer || '')
+        .replace(/\u2014/g, ',')
+        .replace(/\u2013/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim()
       setReply(clean)
       setPhase('speaking')
       await speakWithElevenLabs(
@@ -270,7 +278,7 @@ export default function LiveVoice({
           busyRef.current = false
           setPhase('idle')
           setCaption('')
-          scheduleListen(450)
+          scheduleListen(220)
         },
         (msg) => setError(msg),
       )
@@ -278,7 +286,7 @@ export default function LiveVoice({
       setError(e?.message || 'Something went wrong')
       busyRef.current = false
       setPhase('idle')
-      scheduleListen(1000)
+      scheduleListen(700)
     }
   }
 
@@ -297,7 +305,6 @@ export default function LiveVoice({
 
     try {
       let stream = streamRef.current
-      // Prefer live tracks from initial Speak gesture
       if (!stream || stream.getTracks().every((t) => t.readyState === 'ended')) {
         if (initialStreamRef.current && initialStreamRef.current.getTracks().some((t) => t.readyState === 'live')) {
           stream = initialStreamRef.current
@@ -315,12 +322,10 @@ export default function LiveVoice({
         streamRef.current = stream
       }
 
-      // Ensure tracks are enabled
       stream.getAudioTracks().forEach((t) => {
         t.enabled = true
       })
 
-      // Silence / speech detection
       try {
         const ctx =
           audioCtxRef.current ||
@@ -334,7 +339,8 @@ export default function LiveVoice({
         speechSeenRef.current = false
 
         const data = new Uint8Array(analyser.frequencyBinCount)
-        const SILENCE_MS = 900
+        // End turn sooner after the user stops talking
+        const SILENCE_MS = 520
         const SPEECH_THRESHOLD = 8
 
         const tick = () => {
@@ -357,7 +363,7 @@ export default function LiveVoice({
         }
         rafRef.current = requestAnimationFrame(tick)
       } catch {
-        /* analyser optional — fall back to max timer */
+        /* analyser optional */
       }
 
       if (typeof MediaRecorder === 'undefined') {
@@ -381,7 +387,7 @@ export default function LiveVoice({
       rec.onerror = () => {
         setError('Recording error')
         setPhase('idle')
-        scheduleListen(800)
+        scheduleListen(600)
       }
       rec.onstop = async () => {
         stopSilenceWatch()
@@ -393,12 +399,9 @@ export default function LiveVoice({
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || mime || 'audio/webm' })
         chunksRef.current = []
 
-        // Keep stream for next turn (don't stop tracks unless we own a fresh one each time)
-        // On iOS reusing stream is more reliable
-
         if (blob.size < 600) {
           setPhase('idle')
-          scheduleListen(250)
+          scheduleListen(180)
           return
         }
 
@@ -407,30 +410,28 @@ export default function LiveVoice({
           const text = await transcribeWithElevenLabs(blob, languageRef.current)
           if (!text) {
             setPhase('idle')
-            scheduleListen(350)
+            scheduleListen(250)
             return
           }
           void handleTurn(text)
         } catch (e: any) {
           setError(e?.message || 'Transcription failed')
           setPhase('idle')
-          scheduleListen(1000)
+          scheduleListen(700)
         }
       }
 
       mediaRecRef.current = rec
-      // timeslice helps some browsers flush data; iOS may ignore it
       try {
-        rec.start(200)
+        rec.start(150)
       } catch {
         rec.start()
       }
       setPhase('listening')
 
-      // If no silence detection, still end after ~6s so we process something
       maxListenTimerRef.current = window.setTimeout(() => {
         if (phaseRef.current === 'listening') stopListening()
-      }, 12000)
+      }, 9000)
     } catch (e: any) {
       setError(
         e?.name === 'NotAllowedError'
@@ -451,7 +452,6 @@ export default function LiveVoice({
     initialStreamRef.current = initialStream || null
     if (initialStream) streamRef.current = initialStream
 
-    // Start immediately — mic was already granted on Speak tap
     void startListening()
 
     return () => {
@@ -468,7 +468,6 @@ export default function LiveVoice({
       } catch {
         /* ignore */
       }
-      // Parent closes and stops the initial stream
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -485,7 +484,7 @@ export default function LiveVoice({
 
   const onScreenTap = () => {
     void unlockAudio(silentAudioRef, audioCtxRef)
-    if (phase === 'idle' && !busyRef.current) scheduleListen(50)
+    if (phase === 'idle' && !busyRef.current) scheduleListen(40)
   }
 
   const statusLabel =
@@ -643,8 +642,8 @@ export default function LiveVoice({
         <p className={`text-[12px] text-center max-w-xs ${dark ? 'text-white/45' : 'text-slate-400'}`}>
           {phase === 'listening'
             ? language === 'ha'
-              ? 'Yi magana — idan ka tsaya, za a amsa da murya'
-              : 'Speak — pause and it answers with voice'
+              ? 'Yi magana, idan ka tsaya, za a amsa da murya'
+              : 'Speak, pause, and it answers with voice'
             : language === 'ha'
               ? 'Rufe da ×'
               : 'Close with ×'}
