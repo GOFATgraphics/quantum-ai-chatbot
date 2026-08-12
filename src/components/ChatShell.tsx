@@ -62,8 +62,6 @@ export default function ChatShell(p: Props) {
             dark={p.dark}
             messagesEndRef={p.messagesEndRef}
             thoughtSeconds={p.thoughtSeconds}
-            thinkActive={false}
-            deepSearchActive={false}
             onRegenerate={p.onRegenerate}
           />
         )}
