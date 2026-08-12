@@ -228,12 +228,37 @@ export async function trashGmailMessage(accessToken, messageId) {
   return { id: data.id, labelIds: data.labelIds || [], trashed: true };
 }
 
+/** Build a valid Drive API q= clause from free text or raw Drive query language. */
+function buildDriveQuery(raw) {
+  const q = String(raw || '').trim();
+  if (!q) return 'trashed = false';
+  // Already looks like Drive query language — just ensure not trashed
+  if (/\b(contains|mimeType|trashed|parents|fullText|modifiedTime|createdTime|name\s*=)\b/i.test(q) || /\s(and|or)\s/i.test(q)) {
+    if (!/trashed/i.test(q)) return `(${q}) and trashed = false`;
+    return q;
+  }
+  // Free-text from the model: escape quotes and search name + fullText
+  const safe = q.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return `(name contains '${safe}' or fullText contains '${safe}') and trashed = false`;
+}
+
 export async function searchDrive(accessToken, query, maxResults = 10) {
-  const q = encodeURIComponent(query || "modifiedTime > '2020-01-01T00:00:00'");
-  const fields = encodeURIComponent('files(id,name,mimeType,modifiedTime,webViewLink)');
-  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&pageSize=${Math.min(20, maxResults)}&fields=${fields}&orderBy=modifiedTime desc`;
+  const q = buildDriveQuery(query);
+  const params = new URLSearchParams({
+    q,
+    pageSize: String(Math.min(25, Math.max(1, maxResults || 10))),
+    fields: 'files(id,name,mimeType,modifiedTime,webViewLink,parents)',
+    orderBy: 'modifiedTime desc',
+    spaces: 'drive',
+    supportsAllDrives: 'true',
+    includeItemsFromAllDrives: 'true',
+  });
+  const url = `https://www.googleapis.com/drive/v3/files?${params.toString()}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!res.ok) throw new Error(`Drive search failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Drive search failed: ${res.status} ${body}`);
+  }
   const data = await res.json();
   return (data.files || []).map((f) => ({
     id: f.id,
@@ -241,6 +266,7 @@ export async function searchDrive(accessToken, query, maxResults = 10) {
     mimeType: f.mimeType,
     modifiedTime: f.modifiedTime,
     link: f.webViewLink,
+    parents: f.parents || [],
   }));
 }
 
@@ -290,7 +316,6 @@ export async function createGoogleDoc(accessToken, { title, body }) {
       }),
     });
     if (!updateRes.ok) {
-      // Doc exists but body insert failed — still return id
       const t = await updateRes.text();
       return {
         documentId,
@@ -311,7 +336,6 @@ export async function createGoogleDoc(accessToken, { title, body }) {
 export async function appendGoogleDocText(accessToken, documentId, text) {
   if (!documentId) throw new Error('documentId is required');
   if (!text) throw new Error('text is required');
-  // Get end index
   const getRes = await fetch(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}?fields=body(content)`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -339,11 +363,21 @@ export async function appendGoogleDocText(accessToken, documentId, text) {
 }
 
 export async function searchSheets(accessToken, query, maxResults = 8) {
-  const qParts = ["mimeType='application/vnd.google-apps.spreadsheet'", 'trashed=false'];
-  if (query) qParts.push(`name contains '${String(query).replace(/'/g, "\\'")}'`);
-  const q = encodeURIComponent(qParts.join(' and '));
-  const fields = encodeURIComponent('files(id,name,modifiedTime,webViewLink)');
-  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&pageSize=${Math.min(15, maxResults)}&fields=${fields}&orderBy=modifiedTime desc`;
+  const qParts = ["mimeType = 'application/vnd.google-apps.spreadsheet'", 'trashed = false'];
+  if (query && String(query).trim()) {
+    const safe = String(query).trim().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    qParts.push(`name contains '${safe}'`);
+  }
+  const params = new URLSearchParams({
+    q: qParts.join(' and '),
+    pageSize: String(Math.min(15, Math.max(1, maxResults || 8))),
+    fields: 'files(id,name,modifiedTime,webViewLink)',
+    orderBy: 'modifiedTime desc',
+    spaces: 'drive',
+    supportsAllDrives: 'true',
+    includeItemsFromAllDrives: 'true',
+  });
+  const url = `https://www.googleapis.com/drive/v3/files?${params.toString()}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!res.ok) throw new Error(`Sheets search failed: ${res.status} ${await res.text()}`);
   const data = await res.json();
