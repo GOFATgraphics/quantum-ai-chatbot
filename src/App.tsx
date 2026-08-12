@@ -16,7 +16,7 @@ import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
 import ProjectsWorkspace from './components/ProjectsWorkspace'
 
-const MODEL = { id: 'quantumy', name: 'Quantumy', anthropic: 'claude-sonnet-5' as const }
+const MODEL = { id: 'quantumy', name: 'Quantumy', anthropic: 'claude-haiku-4-5' as const }
 
 function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
