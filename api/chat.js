@@ -244,7 +244,6 @@ export default async function handler(req, res) {
     memory = memoryResult;
     project = projectResult;
 
-    // Voice: keep only save_memory for speed (full connector tools add multi-round latency)
     if (isVoice && Array.isArray(tools)) {
       tools = tools.filter((t) => t?.name === 'save_memory');
     }
@@ -306,7 +305,7 @@ export default async function handler(req, res) {
           extractText(content) ||
           'Sorry, I could not generate a response.';
         if (wantStream) {
-          if (!data.text || !String(data.text).trim()) sseWrite(res, { content: stripEmDashes(textOut) });
+          sseWrite(res, { content: stripEmDashes(textOut) });
           sseWrite(res, { done: true });
           res.write('data: [DONE]\n\n');
           return res.end();
@@ -351,7 +350,7 @@ export default async function handler(req, res) {
                     tool: block.name,
                     ms: Date.now() - started,
                     ok: false,
-                    error: e?.message || String(e),
+                    detail: e?.message || String(e),
                   });
                 } catch (_) {}
               }
