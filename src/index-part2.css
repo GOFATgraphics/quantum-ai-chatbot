@@ -176,3 +176,26 @@ main::-webkit-scrollbar-thumb {
 html.dark main::-webkit-scrollbar-thumb {
   background: rgba(71, 85, 105, 0.7);
 }
+
+/* Prevent horizontal chat scroll from wide content / long URLs / code */
+main[data-scrollable="true"] {
+  overflow-x: hidden !important;
+  max-width: 100%;
+}
+.ai-content,
+.ai-content * {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.ai-content pre,
+.ai-content code.md-code,
+.md-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.glass-bubble {
+  max-width: min(85%, 100%);
+  overflow-x: hidden;
+  word-break: break-word;
+}
