@@ -256,6 +256,7 @@ ${modeBlock}## Connected tools (runtime)\n${toolLines.join('\n')}\n${missingLine
 
 ## Docs & Sheets
 - create_google_doc / create_spreadsheet / update_sheet / append_google_doc: do when the user asks to create or update their own files.
+- For Drive folders with many files: search_drive first, then read several docs in parallel in the same turn when possible. Prefer summarizing batches rather than one-by-one narration.
 
 ${memoryBlock}
 
@@ -342,7 +343,8 @@ export default async function handler(req, res) {
       if (typeof res.flushHeaders === 'function') res.flushHeaders();
     }
 
-    const maxRounds = body?.deepSearch || body?.think ? 8 : 5;
+    // Drive folder / multi-doc / Gmail deep digs need more rounds than simple Q&A
+    const maxRounds = body?.deepSearch || body?.think ? 14 : 10;
     for (let round = 0; round < maxRounds; round++) {
       let data;
       const maxTokens = body?.think || body?.deepSearch ? 8192 : 4096;
@@ -387,10 +389,10 @@ export default async function handler(req, res) {
       }
 
       anthropicMessages = [...anthropicMessages, { role: 'assistant', content }];
-      const toolResults = [];
-      for (const block of clientToolBlocks) {
-        toolResults.push(await runTool(block, user));
-      }
+      // Run tool calls in parallel when the model requests several at once (e.g. multiple docs)
+      const toolResults = (
+        await Promise.all(clientToolBlocks.map((block) => runTool(block, user)))
+      ).filter(Boolean);
       if (toolResults.length === 0) {
         const fallback = 'Tool step produced no results. Please try a more specific request.';
         if (wantStream) {
@@ -405,7 +407,7 @@ export default async function handler(req, res) {
     }
 
     const limitMsg =
-      'I ran out of tool steps on this request. Try a narrower query (e.g. emails with a person in the last 3–6 months), or turn on DeepSearch and ask again.';
+      'I hit the tool-step limit while working through this. Try a smaller batch (e.g. one folder or a few specific docs), or turn on DeepSearch/Think and ask again.';
     if (wantStream) {
       sseWrite(res, { content: limitMsg });
       sseWrite(res, { done: true });
