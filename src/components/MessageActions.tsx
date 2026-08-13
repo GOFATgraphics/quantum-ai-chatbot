@@ -1,6 +1,13 @@
 import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Copy, Check, ThumbsUp, ThumbsDown, Volume2, VolumeX, Share2, RotateCcw, Loader2 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  return token ? { Authorization: 'Bearer ' + token } : {}
+}
 
 type Props = {
   content: string
@@ -57,7 +64,7 @@ function chunkForSpeech(text: string, maxLen = 380): string[] {
 async function fetchTtsChunk(text: string, language: string, signal?: AbortSignal): Promise<ArrayBuffer> {
   const res = await fetch('/api/tts', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     signal,
     body: JSON.stringify({
       text,

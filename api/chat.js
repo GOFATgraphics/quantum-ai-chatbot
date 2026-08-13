@@ -121,9 +121,38 @@ function sseWrite(res, obj) {
   res.write(`data: ${JSON.stringify(obj)}\n\n`);
 }
 
+const CACHE_CONTROL = { type: 'ephemeral' };
+
+/** Tags the last block of the last message so the growing prefix gets cached round to round. */
+function withCacheBreakpoint(messages) {
+  if (!messages?.length) return messages;
+  const out = messages.slice(0, -1);
+  const last = messages[messages.length - 1];
+  let content = last.content;
+  if (typeof content === 'string') {
+    content = [{ type: 'text', text: content, cache_control: CACHE_CONTROL }];
+  } else if (Array.isArray(content) && content.length) {
+    content = content.map((b, i) => (i === content.length - 1 ? { ...b, cache_control: CACHE_CONTROL } : b));
+  }
+  out.push({ ...last, content });
+  return out;
+}
+
+/** Tags the last tool so the whole (static) tool list is cached rather than re-billed every round. */
+function withToolsCacheBreakpoint(tools) {
+  if (!tools?.length) return tools;
+  const out = tools.slice(0, -1);
+  out.push({ ...tools[tools.length - 1], cache_control: CACHE_CONTROL });
+  return out;
+}
+
+function systemBlocks(system) {
+  return [{ type: 'text', text: system, cache_control: CACHE_CONTROL }];
+}
+
 async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages };
-  if (tools?.length) body.tools = tools;
+  const body = { model: MODEL, max_tokens: maxTokens, system: systemBlocks(system), messages: withCacheBreakpoint(messages) };
+  if (tools?.length) body.tools = withToolsCacheBreakpoint(tools);
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -140,8 +169,14 @@ async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) 
 }
 
 async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTokens = 4096 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages, stream: true };
-  if (tools?.length) body.tools = tools;
+  const body = {
+    model: MODEL,
+    max_tokens: maxTokens,
+    system: systemBlocks(system),
+    messages: withCacheBreakpoint(messages),
+    stream: true,
+  };
+  if (tools?.length) body.tools = withToolsCacheBreakpoint(tools);
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -242,6 +277,7 @@ export default async function handler(req, res) {
     const messages = body?.messages;
     if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages array is required' });
     const user = await getUserFromAuthHeader(req);
+    if (!user) return res.status(401).json({ error: 'Sign in required' });
     wantStream = body?.stream === true;
     const isVoice = !!body?.voice;
     let memory = [];

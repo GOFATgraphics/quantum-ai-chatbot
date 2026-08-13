@@ -4,6 +4,8 @@
  * or JSON { audioBase64, mimeType, language }
  * Returns { text, language_code? }
  */
+import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
+
 export const config = {
   api: {
     bodyParser: false, // we parse multipart / raw ourselves when needed
@@ -25,6 +27,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const user = await getUserFromAuthHeader(req);
+  if (!user) return res.status(401).json({ error: 'Sign in required' });
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {

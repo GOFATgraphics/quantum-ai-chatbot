@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Plus, Square, AudioLines, Mic, MicOff, X, FileText, Image as ImageIcon } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  return token ? { Authorization: 'Bearer ' + token } : {}
+}
 
 export type PendingFile = {
   name: string
@@ -170,7 +177,7 @@ export default function ChatInput({
           const audioBase64 = await blobToBase64(blob)
           const res = await fetch('/api/stt', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
             body: JSON.stringify({
               audioBase64,
               mimeType: blob.type || 'audio/webm',

@@ -2,6 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Languages } from 'lucide-react'
 import Logo from './Logo'
+import { supabase } from '../lib/supabase'
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  return token ? { Authorization: 'Bearer ' + token } : {}
+}
 
 export type VoiceLanguage = 'en' | 'ha'
 
@@ -45,7 +52,7 @@ async function transcribeWithElevenLabs(blob: Blob, language: VoiceLanguage): Pr
   const audioBase64 = await blobToBase64(blob)
   const res = await fetch('/api/stt', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ audioBase64, mimeType: blob.type || 'audio/webm', language }),
   })
   const data = await res.json().catch(() => ({}))
@@ -125,7 +132,7 @@ async function fetchTtsBuffer(
   const spoken = voiceFriendlyText(text, language)
   const res = await fetch('/api/tts', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     signal,
     body: JSON.stringify({ text: spoken, language, chunk: true, stream: true }),
   })
