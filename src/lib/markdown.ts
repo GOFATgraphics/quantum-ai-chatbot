@@ -1,14 +1,50 @@
 /** Lightweight markdown → HTML for chat bubbles (sanitized) */
-export function formatMarkdown(text: string): string {
-  if (!text) return ''
 
-  // Escape HTML first so raw tags/scripts cannot be injected
-  // (concat form so transports cannot collapse entities)
-  const escaped = text
+function escapeHtml(text: string): string {
+  return text
     .replace(/&/g, '&' + 'amp;')
     .replace(/</g, '&' + 'lt;')
     .replace(/>/g, '&' + 'gt;')
     .replace(/"/g, '&' + 'quot;')
+}
+
+function extractFences(text: string): { text: string; blocks: { lang: string; code: string }[] } {
+  const blocks: { lang: string; code: string }[] = []
+  let replaced = text.replace(
+    /```([a-zA-Z0-9_+-]*)[ \t]*\r?\n([\s\S]*?)```/g,
+    (_m, lang, body) => {
+      const i = blocks.length
+      blocks.push({ lang: String(lang || '').trim(), code: String(body).replace(/\r?\n$/, '') })
+      return `\n%%CODEBLOCK_${i}%%\n`
+    }
+  )
+  replaced = replaced.replace(/```([^\n`]+)```/g, (_m, body) => {
+    const i = blocks.length
+    blocks.push({ lang: '', code: String(body).trim() })
+    return `\n%%CODEBLOCK_${i}%%\n`
+  })
+  return { text: replaced, blocks }
+}
+
+function renderCodeBlock(lang: string, code: string, index: number): string {
+  const safeLang = escapeHtml(lang || 'text')
+  const safeCode = escapeHtml(code)
+  return (
+    `<div class="md-codeblock" data-code-index="${index}">` +
+    `<div class="md-codeblock-bar">` +
+    `<span class="md-codeblock-lang">${lang ? safeLang : 'text'}</span>` +
+    `<button type="button" class="md-codeblock-copy" data-copy-code="${index}" aria-label="Copy to clipboard">Copy</button>` +
+    `</div>` +
+    `<pre class="md-pre"><code class="md-code-block">${safeCode}</code></pre>` +
+    `</div>`
+  )
+}
+
+export function formatMarkdown(text: string): string {
+  if (!text) return ''
+
+  const { text: withPlaceholders, blocks } = extractFences(text)
+  const escaped = escapeHtml(withPlaceholders)
 
   const lines = escaped.split('\n')
   const out: string[] = []
@@ -36,21 +72,17 @@ export function formatMarkdown(text: string): string {
     }
     const isSep = (cells: string[]) =>
       cells.every((c) => /^:?-{2,}:?$/.test(c.trim()) || c.trim() === '')
-
     const rows = tableRows.filter((r) => !isSep(r))
     if (rows.length === 0) {
       inTable = false
       tableRows = []
       return
     }
-
     out.push('<div class="md-table-wrap"><table class="md-table">')
     rows.forEach((cells, idx) => {
       const tag = idx === 0 ? 'th' : 'td'
       out.push('<tr>')
-      cells.forEach((c) => {
-        out.push(`<${tag}>${inline(c.trim())}</${tag}>`)
-      })
+      cells.forEach((c) => out.push(`<${tag}>${inline(c.trim())}</${tag}>`))
       out.push('</tr>')
     })
     out.push('</table></div>')
@@ -111,6 +143,17 @@ export function formatMarkdown(text: string): string {
   for (const raw of lines) {
     const line = raw.trimEnd()
     const trimmed = line.trim()
+
+    // After HTML escape, % stays %, so placeholder is intact
+    const m = trimmed.match(/^%%CODEBLOCK_(\d+)%%$/)
+    if (m) {
+      closeLists()
+      flushTable()
+      const idx = Number(m[1])
+      const block = blocks[idx]
+      if (block) out.push(renderCodeBlock(block.lang, block.code, idx))
+      continue
+    }
 
     if (trimmed.includes('|') && /^\|?.+\|.+\|?$/.test(trimmed)) {
       closeLists()
