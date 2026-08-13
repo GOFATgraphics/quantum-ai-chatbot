@@ -5,6 +5,10 @@
  * Returns { text, language_code? }
  */
 import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
+import { allowRequest } from './lib/rateLimit.js';
+
+const RATE_LIMIT = 20;
+const RATE_WINDOW_MS = 60_000;
 
 export const config = {
   api: {
@@ -30,6 +34,9 @@ export default async function handler(req, res) {
 
   const user = await getUserFromAuthHeader(req);
   if (!user) return res.status(401).json({ error: 'Sign in required' });
+  if (!allowRequest(`stt:${user.id}`, RATE_LIMIT, RATE_WINDOW_MS)) {
+    return res.status(429).json({ error: 'Too many requests. Wait a moment and try again.' });
+  }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {

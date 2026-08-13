@@ -6,6 +6,12 @@
  * POST { text, language?, voice_id?, stream? }
  */
 import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
+import { allowRequest } from './lib/rateLimit.js';
+
+// Read-aloud chunks a reply into ~380-char pieces and prefetches ahead, so
+// this needs headroom above chat's limit for a burst of legitimate use.
+const RATE_LIMIT = 40;
+const RATE_WINDOW_MS = 60_000;
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,6 +22,9 @@ export default async function handler(req, res) {
 
   const user = await getUserFromAuthHeader(req);
   if (!user) return res.status(401).json({ error: 'Sign in required' });
+  if (!allowRequest(`tts:${user.id}`, RATE_LIMIT, RATE_WINDOW_MS)) {
+    return res.status(429).json({ error: 'Too many requests. Wait a moment and try again.' });
+  }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
