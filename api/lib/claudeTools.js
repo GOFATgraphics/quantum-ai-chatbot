@@ -350,6 +350,24 @@ export const SAVE_MEMORY_TOOL = {
   },
 };
 
+/**
+ * Cheap connectivity probe for deciding which tools to offer — no refresh,
+ * no write. Actual token validity/refresh happens in getValidToken(Microsoft)
+ * at the moment a tool is invoked, which is the only place a usable access
+ * token is actually needed.
+ */
+async function isConnectorActive(userId, provider) {
+  const admin = getAdminClient();
+  const { data } = await admin
+    .from('connectors')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('provider', provider)
+    .eq('status', 'connected')
+    .maybeSingle();
+  return !!data;
+}
+
 export async function getValidToken(userId, provider) {
   const admin = getAdminClient();
   const { data: connector } = await admin
@@ -866,13 +884,13 @@ export async function loadConnectorsAndTools(user) {
   if (!user) return { connected, tools };
 
   const [gmailTok, driveTok, docsTok, sheetsTok, calTok, outlookTok, excelTok] = await Promise.all([
-    getValidToken(user.id, 'gmail'),
-    getValidToken(user.id, 'google_drive'),
-    getValidToken(user.id, 'google_docs'),
-    getValidToken(user.id, 'google_sheets'),
-    getValidToken(user.id, 'google_calendar'),
-    getValidMicrosoftToken(user.id, 'outlook'),
-    getValidMicrosoftToken(user.id, 'excel'),
+    isConnectorActive(user.id, 'gmail'),
+    isConnectorActive(user.id, 'google_drive'),
+    isConnectorActive(user.id, 'google_docs'),
+    isConnectorActive(user.id, 'google_sheets'),
+    isConnectorActive(user.id, 'google_calendar'),
+    isConnectorActive(user.id, 'outlook'),
+    isConnectorActive(user.id, 'excel'),
   ]);
 
   if (gmailTok) {
