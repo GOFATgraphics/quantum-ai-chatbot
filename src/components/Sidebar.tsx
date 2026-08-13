@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   SquarePen, Search, Link2, Settings, X, Trash2, Loader2,
-  FolderKanban, ChevronRight,
+  FolderKanban, ChevronRight, StickyNote,
 } from 'lucide-react'
 import type { Conversation, Project } from '../lib/supabase'
 import Logo from './Logo'
@@ -22,6 +22,7 @@ type Props = {
   onOpenSettings: () => void
   onOpenConnectors: () => void
   onOpenProjects: () => void
+  onOpenNotes: () => void
   onSelectProject: (id: string | null) => void
   onOpenCommandPalette?: () => void
   onClose?: () => void
@@ -31,7 +32,7 @@ type Props = {
 export default function Sidebar({
   dark, user, conversations, projects, currentConversationId, currentProjectId,
   deletingId, onNewChat, onSelectChat, onDeleteChat, onOpenSettings, onOpenConnectors,
-  onOpenProjects, onSelectProject, onOpenCommandPalette, onClose, showClose,
+  onOpenProjects, onOpenNotes, onSelectProject, onOpenCommandPalette, onClose, showClose,
 }: Props) {
   const [query, setQuery] = useState('')
 
@@ -118,6 +119,11 @@ export default function Sidebar({
           <FolderKanban className="w-[18px] h-[18px]" />
           <span className="flex-1 text-left">Projects</span>
           <ChevronRight className={`w-4 h-4 shrink-0 ${muted}`} />
+        </button>
+
+        <button type="button" onClick={onOpenNotes} className={row}>
+          <StickyNote className="w-[18px] h-[18px]" />
+          <span className="flex-1 text-left">Notes</span>
         </button>
       </div>
 

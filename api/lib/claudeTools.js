@@ -350,6 +350,33 @@ export const SAVE_MEMORY_TOOL = {
   },
 };
 
+export const SAVE_NOTE_TOOL = {
+  name: 'save_note',
+  description:
+    'Save a short, explicit note or action item. Only call this when the user directly asks to save/add a note (e.g. "add a note", "note this", "save this as a note"). Never infer or save a note on your own judgment; for facts about the user to remember and use unprompted, use save_memory instead.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      note: { type: 'string', description: 'The note text' },
+      project: { type: 'string', description: 'Optional project or tag to file this note under' },
+    },
+    required: ['note'],
+  },
+};
+
+export const LIST_NOTES_TOOL = {
+  name: 'list_notes',
+  description: "List the user's saved notes, optionally filtered by project and/or status.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      project: { type: 'string', description: 'Filter to notes tagged with this project' },
+      status: { type: 'string', description: '"open" or "done"; omit for all' },
+    },
+    required: [],
+  },
+};
+
 /**
  * Cheap connectivity probe for deciding which tools to offer — no refresh,
  * no write. Actual token validity/refresh happens in getValidToken(Microsoft)
@@ -852,6 +879,47 @@ export async function runTool(block, user) {
       });
       return { type: 'tool_result', tool_use_id: id, content: `Saved memory: ${fact}` };
     }
+    if (name === 'save_note' && user) {
+      const note = String(input.note || '').trim();
+      if (!note)
+        return {
+          type: 'tool_result',
+          tool_use_id: id,
+          content: 'Empty note; nothing saved.',
+          is_error: true,
+        };
+      const admin = getAdminClient();
+      const { data, error } = await admin
+        .from('notes')
+        .insert({
+          user_id: user.id,
+          note,
+          project: input.project ? String(input.project).trim() : null,
+        })
+        .select()
+        .single();
+      if (error)
+        return { type: 'tool_result', tool_use_id: id, content: `Could not save note: ${error.message}`, is_error: true };
+      return {
+        type: 'tool_result',
+        tool_use_id: id,
+        content: `Saved note${data.project ? ` (${data.project})` : ''}: ${data.note}`,
+      };
+    }
+    if (name === 'list_notes' && user) {
+      const admin = getAdminClient();
+      let query = admin.from('notes').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      if (input.project) query = query.ilike('project', `%${String(input.project).trim()}%`);
+      if (input.status) query = query.eq('status', String(input.status).trim());
+      const { data, error } = await query.limit(100);
+      if (error)
+        return { type: 'tool_result', tool_use_id: id, content: `Could not list notes: ${error.message}`, is_error: true };
+      return {
+        type: 'tool_result',
+        tool_use_id: id,
+        content: JSON.stringify({ count: data?.length || 0, notes: data || [] }),
+      };
+    }
     return {
       type: 'tool_result',
       tool_use_id: id,
@@ -880,7 +948,7 @@ export async function loadConnectorsAndTools(user) {
     outlook: false,
     excel: false,
   };
-  const tools = [ANTHROPIC_WEB_SEARCH_TOOL, ANTHROPIC_WEB_FETCH_TOOL, SAVE_MEMORY_TOOL];
+  const tools = [ANTHROPIC_WEB_SEARCH_TOOL, ANTHROPIC_WEB_FETCH_TOOL, SAVE_MEMORY_TOOL, SAVE_NOTE_TOOL, LIST_NOTES_TOOL];
   if (!user) return { connected, tools };
 
   const [gmailTok, driveTok, docsTok, sheetsTok, calTok, outlookTok, excelTok] = await Promise.all([

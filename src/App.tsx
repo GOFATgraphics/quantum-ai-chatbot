@@ -14,6 +14,7 @@ import ChatInput, { type PendingFile, type VoiceLanguage } from './components/Ch
 import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
 import ProjectsWorkspace from './components/ProjectsWorkspace'
+import Notes from './components/Notes'
 
 const MODEL = { id: 'quantumy', name: 'Quantumy', anthropic: 'claude-sonnet-5' as const }
 
@@ -71,6 +72,7 @@ export default function App() {
   const [showConnectors, setShowConnectors] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [showProjects, setShowProjects] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
   const [glowDone, setGlowDone] = useState(false)
   const [composerFocused, setComposerFocused] = useState(false)
   const [voiceLanguage] = useState<VoiceLanguage>(() => {
@@ -477,6 +479,7 @@ export default function App() {
     onOpenSettings: () => { setShowSettings(true); setMobileSidebar(false) },
     onOpenConnectors: () => { setShowConnectors(true); setMobileSidebar(false) },
     onOpenProjects: () => { setShowProjects(true); setMobileSidebar(false) },
+    onOpenNotes: () => { setShowNotes(true); setMobileSidebar(false) },
     onSelectProject: setCurrentProjectId,
     onOpenCommandPalette: () => { setShowCommandPalette(true); setMobileSidebar(false) },
   }
@@ -587,6 +590,15 @@ export default function App() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setShowProjects(false)}>
             <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <ProjectsWorkspace dark={dark} projects={projects} conversations={conversations} currentProjectId={currentProjectId} onClose={() => setShowProjects(false)} onSelectProject={setCurrentProjectId} onCreateProject={createProject} onDeleteProject={deleteProject} onNewChat={() => { setShowProjects(false); startNewChat() }} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showNotes && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setShowNotes(false)}>
+            <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <Notes dark={dark} user={user} onClose={() => setShowNotes(false)} />
             </motion.div>
           </motion.div>
         )}
