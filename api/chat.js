@@ -1,9 +1,13 @@
 import { getUserFromAuthHeader, getAdminClient } from './lib/supabaseAdmin.js';
 import { loadConnectorsAndTools, runTool } from './lib/claudeTools.js';
+import { allowRequest } from './lib/rateLimit.js';
 
 export const config = { maxDuration: 300 };
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = 'claude-sonnet-5';
+// Generous enough that no real conversation hits it; stops a runaway loop or abuse from one account.
+const RATE_LIMIT = 20;
+const RATE_WINDOW_MS = 60_000;
 
 function stripEmDashes(s) {
   if (!s || typeof s !== 'string') return s;
@@ -85,7 +89,7 @@ async function loadProjectContext(userId, projectId) {
   }
 }
 
-function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
+function buildSystemPrompt({ connected, memory, project, firstName }) {
   const memoryBlock =
     memory?.length > 0
       ? `## What you know about this user (use aggressively)\n${memory
@@ -101,10 +105,6 @@ function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
     ? `The user's first name is ${firstName}. Address them by first name occasionally when natural.`
     : '';
 
-  const voiceBlock = voice
-    ? `## Voice mode (critical latency)\nYou are in a live spoken conversation. Reply in 1 or 2 short spoken sentences only. No markdown, no lists, no code, no links, no bullet points. Be warm, direct, and fast. Skip tool calls unless the user clearly needs email, calendar, drive, or a live fact. Prefer saved memory over tools when it answers the question.`
-    : '';
-
   const toolLines = ['- web_search', '- web_fetch', '- save_memory'];
   if (connected.gmail) toolLines.push('- Gmail tools');
   if (connected.drive) toolLines.push('- Drive tools');
@@ -114,16 +114,45 @@ function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
   if (connected.outlook) toolLines.push('- Outlook tools');
   if (connected.excel) toolLines.push('- Excel tools');
 
-  return `You are **Quantumy**, an AI workspace operator. Direct, brief, outcome-focused. No filler, no emoji.\n\n**Reasoning & research (always on):** Think carefully on complex questions. Use web_search and web_fetch for current or uncertain facts. Cite sources with links in text mode.\n\n**Confirmation rule:** Reversible actions do immediately (sheet updates, drafts, search). Irreversible (send email, trash, invite attendees) summarize and wait for confirmation; use create_email_draft first, only send_email with user_confirmed=true after they say yes.\n\n**Multi-step ops (sheets + email):** Do not stall. Prefer the shortest tool path:\n1) search_sheets / search_drive to get spreadsheet_id\n2) read_sheet with range like "Master!A1:Z2" (or the named tab) to learn columns\n3) update_sheet with append:true and the same tab range (e.g. "Master!A:Z") mapping values in column order\n4) create_email_draft (not send) matching the user's requested style, then ask them to confirm send\nIf a tool errors, report it and continue with what you can. Never claim success without a successful tool_result.\n\n**Style (hard rules):**\n- Lead with outcomes. Clean Markdown in text mode. No pipe tables.\n- Never use em dashes (—) or en dashes (–) or double hyphens as dashes. Use commas, periods, colons, or parentheses instead.\n- Prefer short sentences over long clauses.\n\n**Memory (critical):** Actively use every saved fact below. Prefer memory over guessing. When they share stable facts, call save_memory immediately without asking permission.\n\n${nameLine}\n${voiceBlock}\n## Connected tools\n${toolLines.join('\n')}\n${memoryBlock}\n${projectBlock}`;
+  return `You are **Quantumy**, an AI workspace operator. Direct, brief, outcome-focused. No filler, no emoji.\n\n**Reasoning depth:** Match deliberation to the question. Think it through carefully when it's complex, ambiguous, or high-stakes; answer directly and concisely when it's simple, don't pad a short answer with unneeded deliberation.\n\n**Research (always on, independent of reasoning depth):** Always use web_search or web_fetch whenever the answer depends on current, time-sensitive, or uncertain facts (prices, scores, news, dates, versions, anything that could be stale), even if the question itself is short or simple. A simple-sounding question is not a reason to skip a search it needs. Cite sources with links in text mode.\n\n**Tool choice: web vs. connected accounts:** web_search and web_fetch are for public information on the open internet, never for anything in the user's own accounts. If the question is about the user's own data, an email, a file, a sheet, an event, use the matching connected tool (search_gmail, search_drive, read_sheet, list_calendar_events, etc.) instead, not a web search. If a request needs both (e.g. "find that email and look up the company mentioned in it"), use the connected tool for their data and web_search only for the external part.\n\n**Confirmation rule:** Reversible actions do immediately (sheet updates, drafts, search). Irreversible (send email, trash, invite attendees) summarize and wait for confirmation; use create_email_draft first, only send_email with user_confirmed=true after they say yes.\n\n**Multi-step ops (sheets + email):** Do not stall. Prefer the shortest tool path:\n1) search_sheets / search_drive to get spreadsheet_id\n2) read_sheet with range like "Master!A1:Z2" (or the named tab) to learn columns\n3) update_sheet with append:true and the same tab range (e.g. "Master!A:Z") mapping values in column order\n4) create_email_draft (not send) matching the user's requested style, then ask them to confirm send\nIf a tool errors, report it and continue with what you can. Never claim success without a successful tool_result.\n\n**Style (hard rules):**\n- Lead with outcomes. Clean Markdown in text mode. No pipe tables.\n- Never use em dashes (—) or en dashes (–) or double hyphens as dashes. Use commas, periods, colons, or parentheses instead.\n- Prefer short sentences over long clauses.\n\n**Memory (critical):** Actively use every saved fact below. Prefer memory over guessing. When they share stable facts, call save_memory immediately without asking permission.\n\n${nameLine}\n## Connected tools\n${toolLines.join('\n')}\n${memoryBlock}\n${projectBlock}`;
 }
 
 function sseWrite(res, obj) {
   res.write(`data: ${JSON.stringify(obj)}\n\n`);
 }
 
+const CACHE_CONTROL = { type: 'ephemeral' };
+
+/** Tags the last block of the last message so the growing prefix gets cached round to round. */
+function withCacheBreakpoint(messages) {
+  if (!messages?.length) return messages;
+  const out = messages.slice(0, -1);
+  const last = messages[messages.length - 1];
+  let content = last.content;
+  if (typeof content === 'string') {
+    content = [{ type: 'text', text: content, cache_control: CACHE_CONTROL }];
+  } else if (Array.isArray(content) && content.length) {
+    content = content.map((b, i) => (i === content.length - 1 ? { ...b, cache_control: CACHE_CONTROL } : b));
+  }
+  out.push({ ...last, content });
+  return out;
+}
+
+/** Tags the last tool so the whole (static) tool list is cached rather than re-billed every round. */
+function withToolsCacheBreakpoint(tools) {
+  if (!tools?.length) return tools;
+  const out = tools.slice(0, -1);
+  out.push({ ...tools[tools.length - 1], cache_control: CACHE_CONTROL });
+  return out;
+}
+
+function systemBlocks(system) {
+  return [{ type: 'text', text: system, cache_control: CACHE_CONTROL }];
+}
+
 async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages };
-  if (tools?.length) body.tools = tools;
+  const body = { model: MODEL, max_tokens: maxTokens, system: systemBlocks(system), messages: withCacheBreakpoint(messages) };
+  if (tools?.length) body.tools = withToolsCacheBreakpoint(tools);
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -140,8 +169,14 @@ async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) 
 }
 
 async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTokens = 4096 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages, stream: true };
-  if (tools?.length) body.tools = tools;
+  const body = {
+    model: MODEL,
+    max_tokens: maxTokens,
+    system: systemBlocks(system),
+    messages: withCacheBreakpoint(messages),
+    stream: true,
+  };
+  if (tools?.length) body.tools = withToolsCacheBreakpoint(tools);
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -242,8 +277,11 @@ export default async function handler(req, res) {
     const messages = body?.messages;
     if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages array is required' });
     const user = await getUserFromAuthHeader(req);
+    if (!user) return res.status(401).json({ error: 'Sign in required' });
+    if (!allowRequest(`chat:${user.id}`, RATE_LIMIT, RATE_WINDOW_MS)) {
+      return res.status(429).json({ error: 'Too many requests. Wait a moment and try again.' });
+    }
     wantStream = body?.stream === true;
-    const isVoice = !!body?.voice;
     let memory = [];
     let project = null;
     let connected = { gmail: false, drive: false, docs: false, sheets: false, calendar: false, outlook: false, excel: false };
@@ -258,16 +296,11 @@ export default async function handler(req, res) {
     memory = memoryResult;
     project = projectResult;
 
-    if (isVoice && Array.isArray(tools)) {
-      tools = tools.filter((t) => t?.name === 'save_memory');
-    }
-
     const systemPrompt = buildSystemPrompt({
       connected,
       memory,
       project,
       firstName: body?.firstName || null,
-      voice: isVoice,
     });
 
     let anthropicMessages = messages.map((m) => ({
@@ -285,8 +318,8 @@ export default async function handler(req, res) {
       try { sseWrite(res, { status: 'started' }); } catch (_) {}
     }
 
-    const maxRounds = isVoice ? 2 : 24;
-    const maxTokens = isVoice ? 400 : body?.projectId ? 12288 : 8192;
+    const maxRounds = 24;
+    const maxTokens = body?.projectId ? 12288 : 8192;
 
     for (let round = 0; round < maxRounds; round++) {
       let data;

@@ -10,13 +10,12 @@ import Connectors from './components/Connectors'
 import Logo from './components/Logo'
 import MessageList, { type ChatMessage } from './components/MessageList'
 import EmptyState from './components/EmptyState'
-import ChatInput, { type PendingFile } from './components/ChatInput'
-import LiveVoice, { type VoiceLanguage } from './components/LiveVoice'
+import ChatInput, { type PendingFile, type VoiceLanguage } from './components/ChatInput'
 import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
 import ProjectsWorkspace from './components/ProjectsWorkspace'
 
-const MODEL = { id: 'quantumy', name: 'Quantumy', anthropic: 'claude-haiku-4-5-20251001' as const }
+const MODEL = { id: 'quantumy', name: 'Quantumy', anthropic: 'claude-sonnet-5' as const }
 
 function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -70,12 +69,11 @@ export default function App() {
   const [thoughtSeconds, setThoughtSeconds] = useState<number | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
-  const [showLiveVoice, setShowLiveVoice] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [showProjects, setShowProjects] = useState(false)
   const [glowDone, setGlowDone] = useState(false)
   const [composerFocused, setComposerFocused] = useState(false)
-  const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage>(() => {
+  const [voiceLanguage] = useState<VoiceLanguage>(() => {
     try {
       const v = localStorage.getItem('quantumy-language')
       if (v === 'en' || v === 'ha') return v
@@ -91,7 +89,6 @@ export default function App() {
   const abortRef = useRef<AbortController | null>(null)
   const messagesRef = useRef<ChatMessage[]>([])
   const currentConversationIdRef = useRef<string | null>(null)
-  const voiceStreamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => { messagesRef.current = messages }, [messages])
   useEffect(() => { currentConversationIdRef.current = currentConversationId }, [currentConversationId])
@@ -400,110 +397,7 @@ export default function App() {
     throw new Error(streamError || 'No reply received. Try again in a moment.')
   }
 
-  const askForVoice = useCallback(
-    async (
-      userMessage: string,
-      opts?: { onDelta?: (delta: string) => void; signal?: AbortSignal },
-    ): Promise<string> => {
-      const model = MODEL
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-      }
-      if (session?.access_token) headers.Authorization = 'Bearer ' + session.access_token
-      const history = messagesRef.current.slice(-4).map((m) => ({
-        role: m.role,
-        content: String(m.content || '').replace(/!\[[^\]]*\]\(data:image\/[^)]+\)/g, '[Image]').slice(0, 1200),
-      }))
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers,
-        signal: opts?.signal,
-        body: JSON.stringify({
-          messages: [...history, { role: 'user', content: userMessage }],
-          firstName,
-          projectId: currentProjectId,
-          model: model.anthropic,
-          modelId: model.id,
-          stream: true,
-          voice: true,
-        }),
-      })
-      const ctype = response.headers.get('content-type') || ''
-      let text = ''
-      if (ctype.includes('text/event-stream') && response.ok && response.body) {
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const parts = buffer.split('\n')
-          buffer = parts.pop() || ''
-          for (const line of parts) {
-            const trimmed = line.trim()
-            if (!trimmed.startsWith('data:')) continue
-            const payload = trimmed.slice(5).trim()
-            if (payload === '[DONE]') continue
-            try {
-              const evt = JSON.parse(payload)
-              if (evt.status === 'tool_use' || evt.status === 'tool_done' || evt.status === 'started') continue
-              if (typeof evt.delta === 'string' && evt.delta) {
-                text += evt.delta
-                opts?.onDelta?.(evt.delta)
-              } else if (typeof evt.content === 'string' && evt.content) {
-                const add = evt.content.slice(text.length)
-                text = evt.content
-                if (add) opts?.onDelta?.(add)
-              }
-            } catch (e: any) {
-              if (e?.message && !String(e.message).includes('JSON')) throw e
-            }
-          }
-        }
-        text = text.trim()
-      } else {
-        const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || data.message || 'Request failed')
-        text = (data.content || '').trim()
-        if (text) opts?.onDelta?.(text)
-      }
-      if (!text) throw new Error('Empty response')
-      try {
-        const convId = await ensureConversation(userMessage)
-        await saveMessage(convId, 'user', userMessage)
-        await saveMessage(convId, 'assistant', text)
-        setMessages((p) => [
-          ...p,
-          { id: generateId(), role: 'user', content: userMessage },
-          { id: generateId(), role: 'assistant', content: text },
-        ])
-        await refineConversationTitle(convId, userMessage, text)
-        await loadConversations()
-      } catch { /* best-effort */ }
-      return text
-    },
-    [session?.access_token, firstName, currentProjectId],
-  )
-
   const handleStop = useCallback(() => { abortRef.current?.abort() }, [])
-
-  const openLiveVoice = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      voiceStreamRef.current = stream
-    } catch {
-      voiceStreamRef.current = null
-    }
-    setShowLiveVoice(true)
-  }
-
-  const closeLiveVoice = () => {
-    setShowLiveVoice(false)
-    try { voiceStreamRef.current?.getTracks().forEach((t) => t.stop()) } catch { /* ignore */ }
-    voiceStreamRef.current = null
-  }
 
   const handleSend = async (overrideText?: string) => {
     const textPart = (overrideText ?? input).trim()
@@ -657,7 +551,6 @@ export default function App() {
               onChange={setInput}
               onSend={() => handleSend()}
               onStop={handleStop}
-              onSpeak={() => void openLiveVoice()}
               language={voiceLanguage}
               isLoading={isLoading}
               dark={dark}
@@ -687,11 +580,6 @@ export default function App() {
               <Connectors dark={dark} accessToken={session.access_token} onClose={() => setShowConnectors(false)} />
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showLiveVoice && (
-          <LiveVoice dark={dark} firstName={firstName} preferredLanguage={voiceLanguage} onLanguageChange={setVoiceLanguage} onClose={closeLiveVoice} onAsk={askForVoice} initialStream={voiceStreamRef.current} />
         )}
       </AnimatePresence>
       <AnimatePresence>
