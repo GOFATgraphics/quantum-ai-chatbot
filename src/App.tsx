@@ -10,7 +10,7 @@ import Connectors from './components/Connectors'
 import Logo from './components/Logo'
 import MessageList, { type ChatMessage } from './components/MessageList'
 import EmptyState from './components/EmptyState'
-import ChatInput, { type PendingFile } from './components/ChatInput'
+import ChatInput, { type PendingFile, type VoiceLanguage } from './components/ChatInput'
 import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
 import ProjectsWorkspace from './components/ProjectsWorkspace'
@@ -73,6 +73,13 @@ export default function App() {
   const [showProjects, setShowProjects] = useState(false)
   const [glowDone, setGlowDone] = useState(false)
   const [composerFocused, setComposerFocused] = useState(false)
+  const [voiceLanguage] = useState<VoiceLanguage>(() => {
+    try {
+      const v = localStorage.getItem('quantumy-language')
+      if (v === 'en' || v === 'ha') return v
+    } catch { /* ignore */ }
+    return 'en'
+  })
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [lastUserPrompt, setLastUserPrompt] = useState('')
   const [greetingLine, setGreetingLine] = useState('')
@@ -544,6 +551,7 @@ export default function App() {
               onChange={setInput}
               onSend={() => handleSend()}
               onStop={handleStop}
+              language={voiceLanguage}
               isLoading={isLoading}
               dark={dark}
               errorHint={errorHint}
