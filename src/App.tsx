@@ -60,6 +60,9 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true)
   const [mobileSidebar, setMobileSidebar] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const messagesCacheRef = useRef<Map<string, ChatMessage[]>>(new Map())
+  const activeLoadRef = useRef<string | null>(null)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -249,20 +252,42 @@ export default function App() {
   }
 
   const loadMessages = async (conversationId: string) => {
+    if (currentConversationId && currentConversationId !== conversationId) {
+      messagesCacheRef.current.set(currentConversationId, messages)
+    }
+    if (conversationId === currentConversationId) return
+    activeLoadRef.current = conversationId
     setCurrentConversationId(conversationId)
     setMobileSidebar(false)
     setErrorHint(null)
     setComposerFocused(false)
     setIsLoading(false)
     setToolStatus(null)
+    const cached = messagesCacheRef.current.get(conversationId)
+    if (cached) {
+      setMessages(cached)
+      setMessagesLoading(false)
+    } else {
+      setMessages([])
+      setMessagesLoading(true)
+    }
     const { data } = await supabase.from('messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true })
-    if (data) setMessages(data.map((m: DbMessage) => ({ id: m.id, role: m.role, content: m.content })))
+    if (activeLoadRef.current !== conversationId) return
+    if (data) {
+      const mapped = data.map((m: DbMessage) => ({ id: m.id, role: m.role, content: m.content }))
+      messagesCacheRef.current.set(conversationId, mapped)
+      setMessages(mapped)
+    }
+    setMessagesLoading(false)
   }
 
   const startNewChat = () => {
+    if (currentConversationId) messagesCacheRef.current.set(currentConversationId, messages)
+    activeLoadRef.current = null
     abortRef.current?.abort()
     abortRef.current = null
     setIsLoading(false)
+    setMessagesLoading(false)
     setCurrentConversationId(null)
     setMessages([])
     setMobileSidebar(false)
@@ -285,9 +310,25 @@ export default function App() {
   const refineConversationTitle = async (conversationId: string, userText: string, assistantText: string) => {
     try {
       const userClean = stripAttachmentsForTitle(userText)
-      let source = userClean
-      if (!source || source.length < 8) source = assistantText.replace(/\s+/g, ' ').trim().slice(0, 80)
-      const title = makeChatTitle(source)
+      let title: string | null = null
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (session?.access_token) headers.Authorization = 'Bearer ' + session.access_token
+        const res = await fetch('/api/title', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ userText: userClean, assistantText: assistantText.slice(0, 800) }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data?.title) title = data.title
+        }
+      } catch { /* fall through to local heuristic */ }
+      if (!title) {
+        let source = userClean
+        if (!source || source.length < 8) source = assistantText.replace(/\s+/g, ' ').trim().slice(0, 80)
+        title = makeChatTitle(source)
+      }
       if (!title || title === 'New chat') return
       await supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', conversationId)
       setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, title } : c)))
@@ -497,7 +538,7 @@ export default function App() {
     }
   }
 
-  const isEmpty = messages.length === 0 && !isLoading
+  const isEmpty = messages.length === 0 && !isLoading && !messagesLoading
   const glowMode = isLoading ? 'thinking' : glowDone ? 'done' : 'idle'
 
   if (authLoading) {
@@ -566,7 +607,11 @@ export default function App() {
           </div>
         </header>
         <div className="relative z-10 flex-1 flex flex-col min-h-0 overflow-hidden">
-          {isEmpty ? (
+          {messagesLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            </div>
+          ) : isEmpty ? (
             <div className="flex-1 flex items-center justify-center px-4">
               <EmptyState greeting={greetingLine || creativeGreeting(firstName)} dark={dark} composing={composerFocused} />
             </div>
