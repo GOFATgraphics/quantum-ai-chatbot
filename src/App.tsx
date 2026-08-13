@@ -194,12 +194,29 @@ export default function App() {
 
   useEffect(() => { if (user) { loadConversations(); loadProjects() } }, [user, loadConversations, loadProjects])
 
-  const createProject = async (name: string) => {
+  const createProject = async (name: string, description?: string, color?: string) => {
     if (!user) return
-    const { data, error } = await supabase.from('projects').insert({ user_id: user.id, name: name.trim() }).select().single()
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({ user_id: user.id, name: name.trim(), description: description?.trim() || null, color: color || '#6366f1' })
+      .select()
+      .single()
     if (error || !data) throw error || new Error('Could not create project')
     setProjects((prev) => [data as Project, ...prev])
     setCurrentProjectId(data.id)
+  }
+
+  const updateProject = async (id: string, patch: { name?: string; description?: string | null; color?: string }) => {
+    if (!user) return
+    const { data, error } = await supabase
+      .from('projects')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single()
+    if (error || !data) throw error || new Error('Could not update project')
+    setProjects((prev) => prev.map((p) => (p.id === id ? (data as Project) : p)))
   }
 
   const deleteProject = async (id: string) => {
@@ -208,6 +225,12 @@ export default function App() {
     await supabase.from('projects').delete().eq('id', id).eq('user_id', user.id)
     setProjects((prev) => prev.filter((p) => p.id !== id))
     if (currentProjectId === id) setCurrentProjectId(null)
+  }
+
+  const openNotesForProject = (id: string) => {
+    setCurrentProjectId(id)
+    setShowProjects(false)
+    setShowNotes(true)
   }
 
   const loadMessages = async (conversationId: string) => {
@@ -589,7 +612,7 @@ export default function App() {
         {showProjects && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setShowProjects(false)}>
             <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <ProjectsWorkspace dark={dark} projects={projects} conversations={conversations} currentProjectId={currentProjectId} onClose={() => setShowProjects(false)} onSelectProject={setCurrentProjectId} onCreateProject={createProject} onDeleteProject={deleteProject} onNewChat={() => { setShowProjects(false); startNewChat() }} />
+              <ProjectsWorkspace dark={dark} user={user} projects={projects} conversations={conversations} currentProjectId={currentProjectId} onClose={() => setShowProjects(false)} onSelectProject={setCurrentProjectId} onCreateProject={createProject} onUpdateProject={updateProject} onDeleteProject={deleteProject} onNewChat={() => { setShowProjects(false); startNewChat() }} onOpenNotesForProject={openNotesForProject} />
             </motion.div>
           </motion.div>
         )}
