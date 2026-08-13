@@ -3,7 +3,8 @@ import { loadConnectorsAndTools, runTool } from './lib/claudeTools.js';
 
 export const config = { maxDuration: 300 };
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL_TEXT = 'claude-sonnet-5';
+const MODEL_VOICE = 'claude-haiku-4-5-20251001';
 
 function stripEmDashes(s) {
   if (!s || typeof s !== 'string') return s;
@@ -121,8 +122,8 @@ function sseWrite(res, obj) {
   res.write(`data: ${JSON.stringify(obj)}\n\n`);
 }
 
-async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages };
+async function runClaude({ apiKey, model, system, messages, tools, maxTokens = 4096 }) {
+  const body = { model, max_tokens: maxTokens, system, messages };
   if (tools?.length) body.tools = tools;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -139,8 +140,8 @@ async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) 
   return response.json();
 }
 
-async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTokens = 4096 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages, stream: true };
+async function runClaudeStream({ apiKey, model, system, messages, tools, onDelta, maxTokens = 4096 }) {
+  const body = { model, max_tokens: maxTokens, system, messages, stream: true };
   if (tools?.length) body.tools = tools;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -287,12 +288,14 @@ export default async function handler(req, res) {
 
     const maxRounds = isVoice ? 2 : 24;
     const maxTokens = isVoice ? 400 : body?.projectId ? 12288 : 8192;
+    const model = isVoice ? MODEL_VOICE : MODEL_TEXT;
 
     for (let round = 0; round < maxRounds; round++) {
       let data;
       if (wantStream) {
         data = await runClaudeStream({
           apiKey,
+          model,
           system: systemPrompt,
           messages: anthropicMessages,
           tools: tools.length ? tools : undefined,
@@ -306,6 +309,7 @@ export default async function handler(req, res) {
       } else {
         data = await runClaude({
           apiKey,
+          model,
           system: systemPrompt,
           messages: anthropicMessages,
           tools: tools.length ? tools : undefined,
