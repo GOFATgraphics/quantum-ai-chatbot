@@ -3,7 +3,7 @@ import { loadConnectorsAndTools, runTool } from './lib/claudeTools.js';
 
 export const config = { maxDuration: 300 };
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = 'claude-sonnet-5';
 
 function stripEmDashes(s) {
   if (!s || typeof s !== 'string') return s;
@@ -85,7 +85,7 @@ async function loadProjectContext(userId, projectId) {
   }
 }
 
-function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
+function buildSystemPrompt({ connected, memory, project, firstName }) {
   const memoryBlock =
     memory?.length > 0
       ? `## What you know about this user (use aggressively)\n${memory
@@ -101,10 +101,6 @@ function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
     ? `The user's first name is ${firstName}. Address them by first name occasionally when natural.`
     : '';
 
-  const voiceBlock = voice
-    ? `## Voice mode (critical latency)\nYou are in a live spoken conversation. Reply in 1 or 2 short spoken sentences only. No markdown, no lists, no code, no links, no bullet points. Be warm, direct, and fast. Skip tool calls unless the user clearly needs email, calendar, drive, or a live fact. Prefer saved memory over tools when it answers the question.`
-    : '';
-
   const toolLines = ['- web_search', '- web_fetch', '- save_memory'];
   if (connected.gmail) toolLines.push('- Gmail tools');
   if (connected.drive) toolLines.push('- Drive tools');
@@ -114,15 +110,15 @@ function buildSystemPrompt({ connected, memory, project, firstName, voice }) {
   if (connected.outlook) toolLines.push('- Outlook tools');
   if (connected.excel) toolLines.push('- Excel tools');
 
-  return `You are **Quantumy**, an AI workspace operator. Direct, brief, outcome-focused. No filler, no emoji.\n\n**Reasoning & research (always on):** Think carefully on complex questions. Use web_search and web_fetch for current or uncertain facts. Cite sources with links in text mode.\n\n**Confirmation rule:** Reversible actions do immediately (sheet updates, drafts, search). Irreversible (send email, trash, invite attendees) summarize and wait for confirmation; use create_email_draft first, only send_email with user_confirmed=true after they say yes.\n\n**Multi-step ops (sheets + email):** Do not stall. Prefer the shortest tool path:\n1) search_sheets / search_drive to get spreadsheet_id\n2) read_sheet with range like "Master!A1:Z2" (or the named tab) to learn columns\n3) update_sheet with append:true and the same tab range (e.g. "Master!A:Z") mapping values in column order\n4) create_email_draft (not send) matching the user's requested style, then ask them to confirm send\nIf a tool errors, report it and continue with what you can. Never claim success without a successful tool_result.\n\n**Style (hard rules):**\n- Lead with outcomes. Clean Markdown in text mode. No pipe tables.\n- Never use em dashes (—) or en dashes (–) or double hyphens as dashes. Use commas, periods, colons, or parentheses instead.\n- Prefer short sentences over long clauses.\n\n**Memory (critical):** Actively use every saved fact below. Prefer memory over guessing. When they share stable facts, call save_memory immediately without asking permission.\n\n${nameLine}\n${voiceBlock}\n## Connected tools\n${toolLines.join('\n')}\n${memoryBlock}\n${projectBlock}`;
+  return `You are **Quantumy**, an AI workspace operator. Direct, brief, outcome-focused. No filler, no emoji.\n\n**Reasoning & research (always on):** Think carefully on complex questions. Use web_search and web_fetch for current or uncertain facts. Cite sources with links in text mode.\n\n**Confirmation rule:** Reversible actions do immediately (sheet updates, drafts, search). Irreversible (send email, trash, invite attendees) summarize and wait for confirmation; use create_email_draft first, only send_email with user_confirmed=true after they say yes.\n\n**Multi-step ops (sheets + email):** Do not stall. Prefer the shortest tool path:\n1) search_sheets / search_drive to get spreadsheet_id\n2) read_sheet with range like "Master!A1:Z2" (or the named tab) to learn columns\n3) update_sheet with append:true and the same tab range (e.g. "Master!A:Z") mapping values in column order\n4) create_email_draft (not send) matching the user's requested style, then ask them to confirm send\nIf a tool errors, report it and continue with what you can. Never claim success without a successful tool_result.\n\n**Style (hard rules):**\n- Lead with outcomes. Clean Markdown in text mode. No pipe tables.\n- Never use em dashes (—) or en dashes (–) or double hyphens as dashes. Use commas, periods, colons, or parentheses instead.\n- Prefer short sentences over long clauses.\n\n**Memory (critical):** Actively use every saved fact below. Prefer memory over guessing. When they share stable facts, call save_memory immediately without asking permission.\n\n${nameLine}\n## Connected tools\n${toolLines.join('\n')}\n${memoryBlock}\n${projectBlock}`;
 }
 
 function sseWrite(res, obj) {
   res.write(`data: ${JSON.stringify(obj)}\n\n`);
 }
 
-async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages };
+async function runClaude({ apiKey, model, system, messages, tools, maxTokens = 4096 }) {
+  const body = { model, max_tokens: maxTokens, system, messages };
   if (tools?.length) body.tools = tools;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -139,8 +135,8 @@ async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) 
   return response.json();
 }
 
-async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTokens = 4096 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages, stream: true };
+async function runClaudeStream({ apiKey, model, system, messages, tools, onDelta, maxTokens = 4096 }) {
+  const body = { model, max_tokens: maxTokens, system, messages, stream: true };
   if (tools?.length) body.tools = tools;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -243,7 +239,6 @@ export default async function handler(req, res) {
     if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'messages array is required' });
     const user = await getUserFromAuthHeader(req);
     wantStream = body?.stream === true;
-    const isVoice = !!body?.voice;
     let memory = [];
     let project = null;
     let connected = { gmail: false, drive: false, docs: false, sheets: false, calendar: false, outlook: false, excel: false };
@@ -258,16 +253,11 @@ export default async function handler(req, res) {
     memory = memoryResult;
     project = projectResult;
 
-    if (isVoice && Array.isArray(tools)) {
-      tools = tools.filter((t) => t?.name === 'save_memory');
-    }
-
     const systemPrompt = buildSystemPrompt({
       connected,
       memory,
       project,
       firstName: body?.firstName || null,
-      voice: isVoice,
     });
 
     let anthropicMessages = messages.map((m) => ({
@@ -285,14 +275,15 @@ export default async function handler(req, res) {
       try { sseWrite(res, { status: 'started' }); } catch (_) {}
     }
 
-    const maxRounds = isVoice ? 2 : 24;
-    const maxTokens = isVoice ? 400 : body?.projectId ? 12288 : 8192;
+    const maxRounds = 24;
+    const maxTokens = body?.projectId ? 12288 : 8192;
 
     for (let round = 0; round < maxRounds; round++) {
       let data;
       if (wantStream) {
         data = await runClaudeStream({
           apiKey,
+          model: MODEL,
           system: systemPrompt,
           messages: anthropicMessages,
           tools: tools.length ? tools : undefined,
@@ -306,6 +297,7 @@ export default async function handler(req, res) {
       } else {
         data = await runClaude({
           apiKey,
+          model: MODEL,
           system: systemPrompt,
           messages: anthropicMessages,
           tools: tools.length ? tools : undefined,

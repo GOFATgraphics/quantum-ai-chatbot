@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Plus, Square, AudioLines, Mic, MicOff, X, FileText, Image as ImageIcon } from 'lucide-react'
+import { Send, Plus, Square, Mic, MicOff, X, FileText, Image as ImageIcon } from 'lucide-react'
 
 export type PendingFile = {
   name: string
@@ -16,7 +16,6 @@ type Props = {
   onChange: (v: string) => void
   onSend: () => void
   onStop?: () => void
-  onSpeak?: () => void
   isLoading: boolean
   dark: boolean
   errorHint?: string | null
@@ -85,7 +84,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 export default function ChatInput({
-  value, onChange, onSend, onStop, onSpeak, isLoading, dark, errorHint,
+  value, onChange, onSend, onStop, isLoading, dark, errorHint,
   pendingFiles = [], onFilesChange, onFocusChange, language = 'en',
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -379,17 +378,11 @@ export default function ChatInput({
                   }`} aria-label="Stop generating">
                     <Square className="w-3 h-3 fill-current" /> Stop
                   </motion.button>
-                ) : hasText ? (
-                  <motion.button key="send" type="button" initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }} transition={{ duration: 0.15 }} whileTap={{ scale: 0.94 }} onClick={onSend} className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition ${
+                ) : (
+                  <motion.button key="send" type="button" disabled={!hasText} initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }} transition={{ duration: 0.15 }} whileTap={{ scale: 0.94 }} onClick={onSend} className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition disabled:opacity-40 ${
                     dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
                   }`} aria-label="Send">
                     <Send className="w-3.5 h-3.5" /> Send
-                  </motion.button>
-                ) : (
-                  <motion.button key="speak" type="button" initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }} transition={{ duration: 0.15 }} whileTap={{ scale: 0.94 }} onClick={onSpeak} className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition ${
-                    dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
-                  }`} aria-label="Start live voice conversation">
-                    <AudioLines className="w-4 h-4" /> Speak
                   </motion.button>
                 )}
               </AnimatePresence>
