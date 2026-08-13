@@ -3,10 +3,16 @@ import { createRoot } from 'react-dom/client'
 import { Analytics } from '@vercel/analytics/react'
 import App from './App.tsx'
 import AdminApp from './admin/AdminApp.tsx'
+import { useCodeBlockCopy } from './hooks/useCodeBlockCopy'
 import './index.css'
 import './index-part2.css'
 import './animations.css'
 import './chat-glow-modes.css'
+
+function CodeCopyBoot({ children }: { children: React.ReactNode }) {
+  useCodeBlockCopy()
+  return <>{children}</>
+}
 
 const isAdminPath =
   typeof window !== 'undefined' &&
@@ -14,8 +20,10 @@ const isAdminPath =
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {isAdminPath ? <AdminApp /> : <App />}
-    <Analytics />
+    <CodeCopyBoot>
+      {isAdminPath ? <AdminApp /> : <App />}
+      <Analytics />
+    </CodeCopyBoot>
   </StrictMode>,
 )
 
