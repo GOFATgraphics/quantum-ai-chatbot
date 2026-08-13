@@ -1,5 +1,23 @@
 /** Lightweight markdown → HTML for chat bubbles (sanitized) */
 
+/** Decode percent-encoded blobs so paste-ready blocks show readable text */
+function decodeForDisplay(raw: string): string {
+  const s = String(raw || '')
+  if ((s.match(/%[0-9A-Fa-f]{2}/g) || []).length < 3) return s
+  try {
+    let out = s
+    for (let i = 0; i < 3; i++) {
+      if (!/%[0-9A-Fa-f]{2}/.test(out)) break
+      const next = decodeURIComponent(out.replace(/\+/g, ' '))
+      if (next === out) break
+      out = next
+    }
+    return out.includes(' ') || out.includes('\n') ? out : s
+  } catch {
+    return s
+  }
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&' + 'amp;')
@@ -28,7 +46,7 @@ function extractFences(text: string): { text: string; blocks: { lang: string; co
 
 function renderCodeBlock(lang: string, code: string, index: number): string {
   const safeLang = escapeHtml(lang || 'text')
-  const safeCode = escapeHtml(code)
+  const safeCode = escapeHtml(decodeForDisplay(code))
   return (
     `<div class="md-codeblock" data-code-index="${index}">` +
     `<div class="md-codeblock-bar">` +
@@ -144,7 +162,6 @@ export function formatMarkdown(text: string): string {
     const line = raw.trimEnd()
     const trimmed = line.trim()
 
-    // After HTML escape, % stays %, so placeholder is intact
     const m = trimmed.match(/^%%CODEBLOCK_(\d+)%%$/)
     if (m) {
       closeLists()
