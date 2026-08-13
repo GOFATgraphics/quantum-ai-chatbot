@@ -598,7 +598,7 @@ export default function App() {
         {showNotes && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setShowNotes(false)}>
             <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <Notes dark={dark} user={user} onClose={() => setShowNotes(false)} />
+              <Notes dark={dark} user={user} projects={projects} currentProjectId={currentProjectId} onClose={() => setShowNotes(false)} />
             </motion.div>
           </motion.div>
         )}

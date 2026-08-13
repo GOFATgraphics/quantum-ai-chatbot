@@ -353,12 +353,17 @@ export const SAVE_MEMORY_TOOL = {
 export const SAVE_NOTE_TOOL = {
   name: 'save_note',
   description:
-    'Save a short, explicit note or action item. Only call this when the user directly asks to save/add a note (e.g. "add a note", "note this", "save this as a note"). Never infer or save a note on your own judgment; for facts about the user to remember and use unprompted, use save_memory instead.',
+    'Save a short, explicit note or action item. Only call this when the user directly asks to save/add a note (e.g. "add a note", "note this", "save this as a note"). Never infer or save a note on your own judgment; for facts about the user to remember and use unprompted, use save_memory instead. If the user is currently inside a project, the note is filed under it automatically; pass project only to explicitly save into a different project by name.',
   input_schema: {
     type: 'object',
     properties: {
       note: { type: 'string', description: 'The note text' },
-      project: { type: 'string', description: 'Optional project or tag to file this note under' },
+      project: { type: 'string', description: 'Optional: file this note under a specific project by name, overriding the current active project' },
+      note_type: { type: 'string', description: '"action_item" (default), "trade_note", "decision", or "alert"' },
+      priority: { type: 'string', description: '"low", "medium" (default), or "high"' },
+      due_date: { type: 'string', description: 'Optional ISO 8601 date/time this note is due or should be followed up by' },
+      tags: { type: 'array', items: { type: 'string' }, description: 'Optional short tags for filtering' },
+      trade_ref: { type: 'string', description: 'Optional reference (e.g. a trade/row id) this note is about, for later lookup in a connected sheet' },
     },
     required: ['note'],
   },
@@ -366,14 +371,46 @@ export const SAVE_NOTE_TOOL = {
 
 export const LIST_NOTES_TOOL = {
   name: 'list_notes',
-  description: "List the user's saved notes, optionally filtered by project and/or status.",
+  description:
+    "List the user's saved notes. If the user is currently inside a project, defaults to that project's notes plus global notes; pass project to look at a different project by name, or \"all\" to ignore project scoping entirely.",
   input_schema: {
     type: 'object',
     properties: {
-      project: { type: 'string', description: 'Filter to notes tagged with this project' },
-      status: { type: 'string', description: '"open" or "done"; omit for all' },
+      project: { type: 'string', description: 'Filter to a specific project by name, or "all" for every project' },
+      status: { type: 'string', description: '"open", "done", or "dismissed"; omit for all' },
+      note_type: { type: 'string', description: 'Filter to "action_item", "trade_note", "decision", or "alert"' },
+      overdue: { type: 'boolean', description: 'If true, only notes that are open and past their due_date' },
+      tag: { type: 'string', description: 'Filter to notes carrying this tag' },
     },
     required: [],
+  },
+};
+
+export const UPDATE_NOTE_TOOL = {
+  name: 'update_note',
+  description:
+    'Update an existing note\'s status, priority, or due date — e.g. "mark this done", "dismiss that note". Needs the note_id from a prior save_note or list_notes result.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      note_id: { type: 'string' },
+      status: { type: 'string', description: '"open", "done", or "dismissed"' },
+      priority: { type: 'string', description: '"low", "medium", or "high"' },
+      due_date: { type: 'string', description: 'ISO 8601 date/time, or empty string to clear it' },
+    },
+    required: ['note_id'],
+  },
+};
+
+export const DELETE_NOTE_TOOL = {
+  name: 'delete_note',
+  description: 'Delete a note. Needs the note_id from a prior save_note or list_notes result.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      note_id: { type: 'string' },
+    },
+    required: ['note_id'],
   },
 };
 
@@ -474,7 +511,20 @@ function gmailNotConnected(id) {
   };
 }
 
-export async function runTool(block, user) {
+/** Case-insensitive project lookup by name, scoped to the user. Returns { id, name } or null. */
+async function resolveProjectByName(admin, userId, name) {
+  const clean = String(name || '').trim();
+  if (!clean) return null;
+  const { data } = await admin
+    .from('projects')
+    .select('id, name')
+    .eq('user_id', userId)
+    .ilike('name', clean)
+    .maybeSingle();
+  return data || null;
+}
+
+export async function runTool(block, user, context = {}) {
   const id = block.id;
   const name = block.name;
   const input = block.input || {};
@@ -889,12 +939,38 @@ export async function runTool(block, user) {
           is_error: true,
         };
       const admin = getAdminClient();
+      let projectId = null;
+      let projectName = null;
+      if (input.project) {
+        const resolved = await resolveProjectByName(admin, user.id, input.project);
+        if (resolved) {
+          projectId = resolved.id;
+          projectName = resolved.name;
+        } else {
+          projectName = String(input.project).trim();
+        }
+      } else if (context.projectId) {
+        projectId = context.projectId;
+        projectName = context.projectName || null;
+      }
+      const noteType = ['action_item', 'trade_note', 'decision', 'alert'].includes(input.note_type)
+        ? input.note_type
+        : 'action_item';
+      const priority = ['low', 'medium', 'high'].includes(input.priority) ? input.priority : 'medium';
+      const dueDate = input.due_date ? new Date(input.due_date).toISOString() : null;
+      const tags = Array.isArray(input.tags) ? input.tags.map(String).slice(0, 10) : null;
       const { data, error } = await admin
         .from('notes')
         .insert({
           user_id: user.id,
           note,
-          project: input.project ? String(input.project).trim() : null,
+          project: projectName,
+          project_id: projectId,
+          note_type: noteType,
+          priority,
+          due_date: dueDate,
+          tags,
+          trade_ref: input.trade_ref ? String(input.trade_ref).trim() : null,
         })
         .select()
         .single();
@@ -903,14 +979,26 @@ export async function runTool(block, user) {
       return {
         type: 'tool_result',
         tool_use_id: id,
-        content: `Saved note${data.project ? ` (${data.project})` : ''}: ${data.note}`,
+        content: `Saved note (id ${data.id})${data.project ? ` [${data.project}]` : ''}: ${data.note}`,
       };
     }
     if (name === 'list_notes' && user) {
       const admin = getAdminClient();
       let query = admin.from('notes').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-      if (input.project) query = query.ilike('project', `%${String(input.project).trim()}%`);
+
+      const wantsAll = typeof input.project === 'string' && input.project.trim().toLowerCase() === 'all';
+      if (input.project && !wantsAll) {
+        const resolved = await resolveProjectByName(admin, user.id, input.project);
+        query = resolved ? query.eq('project_id', resolved.id) : query.ilike('project', `%${String(input.project).trim()}%`);
+      } else if (!wantsAll && context.projectId) {
+        query = query.or(`project_id.eq.${context.projectId},project_id.is.null`);
+      }
+
       if (input.status) query = query.eq('status', String(input.status).trim());
+      if (input.note_type) query = query.eq('note_type', String(input.note_type).trim());
+      if (input.tag) query = query.contains('tags', [String(input.tag).trim()]);
+      if (input.overdue) query = query.eq('status', 'open').lt('due_date', new Date().toISOString());
+
       const { data, error } = await query.limit(100);
       if (error)
         return { type: 'tool_result', tool_use_id: id, content: `Could not list notes: ${error.message}`, is_error: true };
@@ -919,6 +1007,44 @@ export async function runTool(block, user) {
         tool_use_id: id,
         content: JSON.stringify({ count: data?.length || 0, notes: data || [] }),
       };
+    }
+    if (name === 'update_note' && user) {
+      const noteId = String(input.note_id || '').trim();
+      if (!noteId)
+        return { type: 'tool_result', tool_use_id: id, content: 'note_id is required.', is_error: true };
+      const patch = { updated_at: new Date().toISOString() };
+      if (input.status && ['open', 'done', 'dismissed'].includes(input.status)) patch.status = input.status;
+      if (input.priority && ['low', 'medium', 'high'].includes(input.priority)) patch.priority = input.priority;
+      if (input.due_date !== undefined) patch.due_date = input.due_date ? new Date(input.due_date).toISOString() : null;
+      const admin = getAdminClient();
+      const { data, error } = await admin
+        .from('notes')
+        .update(patch)
+        .eq('id', noteId)
+        .eq('user_id', user.id)
+        .select()
+        .maybeSingle();
+      if (error)
+        return { type: 'tool_result', tool_use_id: id, content: `Could not update note: ${error.message}`, is_error: true };
+      if (!data)
+        return { type: 'tool_result', tool_use_id: id, content: 'No note found with that id.', is_error: true };
+      return { type: 'tool_result', tool_use_id: id, content: `Updated note: ${data.note} (status: ${data.status})` };
+    }
+    if (name === 'delete_note' && user) {
+      const noteId = String(input.note_id || '').trim();
+      if (!noteId)
+        return { type: 'tool_result', tool_use_id: id, content: 'note_id is required.', is_error: true };
+      const admin = getAdminClient();
+      const { error, count } = await admin
+        .from('notes')
+        .delete({ count: 'exact' })
+        .eq('id', noteId)
+        .eq('user_id', user.id);
+      if (error)
+        return { type: 'tool_result', tool_use_id: id, content: `Could not delete note: ${error.message}`, is_error: true };
+      if (!count)
+        return { type: 'tool_result', tool_use_id: id, content: 'No note found with that id.', is_error: true };
+      return { type: 'tool_result', tool_use_id: id, content: 'Note deleted.' };
     }
     return {
       type: 'tool_result',
@@ -948,7 +1074,15 @@ export async function loadConnectorsAndTools(user) {
     outlook: false,
     excel: false,
   };
-  const tools = [ANTHROPIC_WEB_SEARCH_TOOL, ANTHROPIC_WEB_FETCH_TOOL, SAVE_MEMORY_TOOL, SAVE_NOTE_TOOL, LIST_NOTES_TOOL];
+  const tools = [
+    ANTHROPIC_WEB_SEARCH_TOOL,
+    ANTHROPIC_WEB_FETCH_TOOL,
+    SAVE_MEMORY_TOOL,
+    SAVE_NOTE_TOOL,
+    LIST_NOTES_TOOL,
+    UPDATE_NOTE_TOOL,
+    DELETE_NOTE_TOOL,
+  ];
   if (!user) return { connected, tools };
 
   const [gmailTok, driveTok, docsTok, sheetsTok, calTok, outlookTok, excelTok] = await Promise.all([
