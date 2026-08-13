@@ -254,3 +254,79 @@ html:not(.glass-on) .glass-header {
 html:not(.glass-on).dark .glass-header {
   background: transparent !important;
 }
+
+/* Fenced code blocks — copy-friendly */
+.md-codeblock {
+  margin: 0.75rem 0 1rem;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #0f172a;
+  max-width: 100%;
+}
+html.dark .md-codeblock {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #0b0f19;
+}
+.md-codeblock-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.md-codeblock-lang {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.65);
+}
+.md-codeblock-copy {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  color: rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.md-codeblock-copy:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.md-codeblock-copy[data-copied="1"] {
+  color: #86efac;
+}
+.md-pre {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.md-code-block {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #e2e8f0;
+  white-space: pre;
+  display: block;
+}
+.md-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0.12em 0.35em;
+  border-radius: 5px;
+  background: rgba(99, 102, 241, 0.12);
+}
+html.dark .md-code {
+  background: rgba(129, 140, 248, 0.18);
+}
+.ai-content pre.md-pre,
+.ai-content .md-codeblock {
+  max-width: 100%;
+}
