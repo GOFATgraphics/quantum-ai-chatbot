@@ -1,13 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Plus, Square, AudioLines, Mic, MicOff, X, FileText, Image as ImageIcon } from 'lucide-react'
-import { supabase } from '../lib/supabase'
-
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  return token ? { Authorization: 'Bearer ' + token } : {}
-}
+import { Send, Plus, Square, X, FileText, Image as ImageIcon } from 'lucide-react'
 
 export type PendingFile = {
   name: string
@@ -16,21 +9,17 @@ export type PendingFile = {
   dataUrl?: string
 }
 
-export type VoiceLanguage = 'en' | 'ha'
-
 type Props = {
   value: string
   onChange: (v: string) => void
   onSend: () => void
   onStop?: () => void
-  onSpeak?: () => void
   isLoading: boolean
   dark: boolean
   errorHint?: string | null
   pendingFiles?: PendingFile[]
   onFilesChange?: (files: PendingFile[]) => void
   onFocusChange?: (focused: boolean) => void
-  language?: VoiceLanguage
 }
 
 function readAsDataURL(file: File): Promise<string> {
@@ -80,47 +69,13 @@ async function compressImageDataUrl(file: File, maxSide = 1280, quality = 0.82):
   })
 }
 
-async function blobToBase64(blob: Blob): Promise<string> {
-  const buf = await blob.arrayBuffer()
-  let binary = ''
-  const bytes = new Uint8Array(buf)
-  const chunk = 0x8000
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
-  }
-  return btoa(binary)
-}
-
 export default function ChatInput({
-  value, onChange, onSend, onStop, onSpeak, isLoading, dark, errorHint,
-  pendingFiles = [], onFilesChange, onFocusChange, language = 'en',
+  value, onChange, onSend, onStop, isLoading, dark, errorHint,
+  pendingFiles = [], onFilesChange, onFocusChange,
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [listening, setListening] = useState(false)
-  const [speechSupported, setSpeechSupported] = useState(false)
   const [focused, setFocused] = useState(false)
-  const [dictating, setDictating] = useState(false)
-  const mediaRecRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const baseValueRef = useRef('')
-
-  useEffect(() => {
-    setSpeechSupported(
-      typeof window !== 'undefined' &&
-        !!navigator.mediaDevices?.getUserMedia &&
-        typeof MediaRecorder !== 'undefined',
-    )
-    return () => {
-      try {
-        mediaRecRef.current?.stop()
-      } catch {
-        /* ignore */
-      }
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-    }
-  }, [])
 
   useEffect(() => {
     const el = textareaRef.current
@@ -132,75 +87,6 @@ export default function ChatInput({
   const setComposerFocus = (next: boolean) => {
     setFocused(next)
     onFocusChange?.(next)
-  }
-
-  const stopDictation = () => {
-    try {
-      if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
-        mediaRecRef.current.stop()
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const toggleListen = async () => {
-    if (isLoading || dictating) return
-    if (listening) {
-      stopDictation()
-      return
-    }
-    baseValueRef.current = value
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      const mime =
-        MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : MediaRecorder.isTypeSupported('audio/webm')
-            ? 'audio/webm'
-            : ''
-      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
-      chunksRef.current = []
-      rec.ondataavailable = (e) => {
-        if (e.data?.size) chunksRef.current.push(e.data)
-      }
-      rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
-        streamRef.current = null
-        setListening(false)
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
-        chunksRef.current = []
-        if (blob.size < 400) return
-        setDictating(true)
-        try {
-          const audioBase64 = await blobToBase64(blob)
-          const res = await fetch('/api/stt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-            body: JSON.stringify({
-              audioBase64,
-              mimeType: blob.type || 'audio/webm',
-              language,
-            }),
-          })
-          const data = await res.json().catch(() => ({}))
-          if (res.ok && data.text) {
-            const next = (baseValueRef.current + ' ' + data.text).replace(/\s+/g, ' ').trim()
-            onChange(next)
-          }
-        } catch {
-          /* ignore */
-        } finally {
-          setDictating(false)
-        }
-      }
-      mediaRecRef.current = rec
-      rec.start()
-      setListening(true)
-    } catch {
-      setListening(false)
-    }
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -253,16 +139,7 @@ export default function ChatInput({
   }
 
   const toolBtn = `glass-btn ${dark ? 'text-slate-200' : 'text-slate-600'}`
-  const placeholder =
-    listening
-      ? language === 'ha'
-        ? 'Ina saurare…'
-        : 'Listening…'
-      : dictating
-        ? language === 'ha'
-          ? 'Ana fassara…'
-          : 'Transcribing…'
-        : 'Ask anything'
+  const placeholder = 'Ask anything'
 
   return (
     <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
@@ -285,7 +162,7 @@ export default function ChatInput({
 
         <motion.div
           animate={{
-            boxShadow: focused || listening
+            boxShadow: focused
               ? dark
                 ? '0 0 0 1px rgba(129,140,248,0.35), 0 8px 28px -6px rgba(99,102,241,0.25)'
                 : '0 0 0 1px rgba(165,180,252,0.55), 0 8px 28px -6px rgba(79,70,229,0.15)'
@@ -357,24 +234,6 @@ export default function ChatInput({
                 <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={onPickFiles} disabled={isLoading} title="Attach files" className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${toolBtn}`} aria-label="Add attachment">
                   <Plus className="w-[18px] h-[18px]" />
                 </motion.button>
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.92 }}
-                  onClick={() => void toggleListen()}
-                  disabled={!speechSupported || isLoading || dictating}
-                  title={listening ? 'Stop dictation' : 'Dictate with mic'}
-                  className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${
-                    listening || dictating
-                      ? dark
-                        ? 'bg-rose-500/25 text-rose-200 ring-1 ring-rose-400/40'
-                        : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
-                      : toolBtn
-                  }`}
-                  aria-label={listening ? 'Stop listening' : 'Speech to text'}
-                  aria-pressed={listening}
-                >
-                  {listening ? <MicOff className="w-[18px] h-[18px]" /> : <Mic className="w-[18px] h-[18px]" />}
-                </motion.button>
               </div>
             </div>
 
@@ -386,17 +245,11 @@ export default function ChatInput({
                   }`} aria-label="Stop generating">
                     <Square className="w-3 h-3 fill-current" /> Stop
                   </motion.button>
-                ) : hasText ? (
-                  <motion.button key="send" type="button" initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }} transition={{ duration: 0.15 }} whileTap={{ scale: 0.94 }} onClick={onSend} className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition ${
+                ) : (
+                  <motion.button key="send" type="button" initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }} transition={{ duration: 0.15 }} whileTap={{ scale: 0.94 }} onClick={onSend} disabled={!hasText} className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition disabled:opacity-40 ${
                     dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
                   }`} aria-label="Send">
                     <Send className="w-3.5 h-3.5" /> Send
-                  </motion.button>
-                ) : (
-                  <motion.button key="speak" type="button" initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }} transition={{ duration: 0.15 }} whileTap={{ scale: 0.94 }} onClick={onSpeak} className={`h-10 px-4 rounded-full flex items-center gap-1.5 text-[14px] font-semibold transition ${
-                    dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black shadow-md shadow-slate-900/20'
-                  }`} aria-label="Start live voice conversation">
-                    <AudioLines className="w-4 h-4" /> Speak
                   </motion.button>
                 )}
               </AnimatePresence>
