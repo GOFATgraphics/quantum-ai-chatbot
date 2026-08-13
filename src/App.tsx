@@ -14,6 +14,7 @@ import ChatInput, { type PendingFile, type VoiceLanguage } from './components/Ch
 import InstallPWA from './components/InstallPWA'
 import CommandPalette from './components/CommandPalette'
 import ProjectsWorkspace from './components/ProjectsWorkspace'
+import ProjectDashboard from './components/ProjectDashboard'
 import Notes from './components/Notes'
 
 const MODEL = { id: 'quantumy', name: 'Quantumy', anthropic: 'claude-sonnet-5' as const }
@@ -73,6 +74,7 @@ export default function App() {
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [showProjects, setShowProjects] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
+  const [openProjectId, setOpenProjectId] = useState<string | null>(null)
   const [glowDone, setGlowDone] = useState(false)
   const [composerFocused, setComposerFocused] = useState(false)
   const [voiceLanguage] = useState<VoiceLanguage>(() => {
@@ -231,6 +233,19 @@ export default function App() {
     setCurrentProjectId(id)
     setShowProjects(false)
     setShowNotes(true)
+  }
+
+  const newChatInProject = (id: string) => {
+    setCurrentProjectId(id)
+    setOpenProjectId(null)
+    setShowProjects(false)
+    startNewChat()
+  }
+
+  const selectChatFromDashboard = (id: string) => {
+    setOpenProjectId(null)
+    setShowProjects(false)
+    loadMessages(id)
   }
 
   const loadMessages = async (conversationId: string) => {
@@ -612,7 +627,26 @@ export default function App() {
         {showProjects && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setShowProjects(false)}>
             <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <ProjectsWorkspace dark={dark} user={user} projects={projects} conversations={conversations} currentProjectId={currentProjectId} onClose={() => setShowProjects(false)} onSelectProject={setCurrentProjectId} onCreateProject={createProject} onUpdateProject={updateProject} onDeleteProject={deleteProject} onNewChat={() => { setShowProjects(false); startNewChat() }} onOpenNotesForProject={openNotesForProject} />
+              <ProjectsWorkspace dark={dark} user={user} projects={projects} conversations={conversations} currentProjectId={currentProjectId} onClose={() => setShowProjects(false)} onSelectProject={setCurrentProjectId} onCreateProject={createProject} onUpdateProject={updateProject} onDeleteProject={deleteProject} onNewChat={() => { setShowProjects(false); startNewChat() }} onOpenNotesForProject={openNotesForProject} onOpenDashboard={(id) => { setCurrentProjectId(id); setOpenProjectId(id) }} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {openProjectId && projects.find((p) => p.id === openProjectId) && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setOpenProjectId(null)}>
+            <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[880px] h-[min(94dvh,860px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <ProjectDashboard
+                dark={dark}
+                user={user}
+                project={projects.find((p) => p.id === openProjectId)!}
+                conversations={conversations}
+                onClose={() => setOpenProjectId(null)}
+                onUpdateProject={updateProject}
+                onDeleteProject={deleteProject}
+                onSelectChat={selectChatFromDashboard}
+                onNewChatInProject={() => newChatInProject(openProjectId)}
+              />
             </motion.div>
           </motion.div>
         )}

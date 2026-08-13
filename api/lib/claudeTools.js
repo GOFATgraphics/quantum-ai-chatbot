@@ -339,12 +339,13 @@ export const EXCEL_TOOL = {
 
 export const SAVE_MEMORY_TOOL = {
   name: 'save_memory',
-  description: 'Save a lasting fact about the user.',
+  description:
+    'Save a lasting fact about the user, or a recurring behavioral pattern noticed across multiple interactions (e.g. always wants a draft before sending, prefers short answers, always checks the Master sheet first). Use category "behavior" for patterns, distinct from stated facts. These are visible and editable by the user in Settings, never hidden.',
   input_schema: {
     type: 'object',
     properties: {
       fact: { type: 'string' },
-      category: { type: 'string' },
+      category: { type: 'string', description: '"general", "preference", "instruction", "work", "people", "project", or "behavior" for a noticed interaction pattern' },
     },
     required: ['fact'],
   },

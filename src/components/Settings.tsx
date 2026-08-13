@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Moon, Sun, Brain, Plus, Trash2, Loader2,
+  Moon, Sun, Brain, Plus, Trash2, Loader2, Pencil,
   Link2, Sparkles, X, Check, ChevronRight, ChevronLeft,
   Bell, Globe, LayoutGrid, Settings2, Search,
 } from 'lucide-react'
@@ -37,6 +37,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   work: 'Work',
   people: 'People',
   project: 'Project',
+  behavior: 'Behavior pattern',
 }
 
 function Toggle({
@@ -159,9 +160,12 @@ export default function Settings({
   const [memories, setMemories] = useState<UserMemory[]>([])
   const [loadingMem, setLoadingMem] = useState(false)
   const [newFact, setNewFact] = useState('')
-  const [newCategory, setNewCategory] = useState<'preference' | 'instruction' | 'general'>('preference')
+  const [newCategory, setNewCategory] = useState<'preference' | 'instruction' | 'general' | 'behavior'>('preference')
   const [savingMem, setSavingMem] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+  const [savingEditId, setSavingEditId] = useState<string | null>(null)
   const [memoryOn, setMemoryOn] = useState(meta.memory_enabled !== false)
   const [notifOn, setNotifOn] = useState(false)
 
@@ -247,6 +251,29 @@ export default function Settings({
       setMemories((p) => p.filter((m) => m.id !== id))
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const startEditMemory = (m: UserMemory) => {
+    setEditingId(m.id)
+    setEditText(m.fact)
+  }
+
+  const saveEditMemory = async (id: string) => {
+    const fact = editText.trim()
+    if (!fact) return
+    setSavingEditId(id)
+    try {
+      const { error } = await supabase
+        .from('user_memory')
+        .update({ fact, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (!error) {
+        setMemories((p) => p.map((m) => (m.id === id ? { ...m, fact } : m)))
+        setEditingId(null)
+      }
+    } finally {
+      setSavingEditId(null)
     }
   }
 
@@ -697,6 +724,7 @@ export default function Settings({
                     <option value="preference">Preference</option>
                     <option value="instruction">Instruction</option>
                     <option value="general">General</option>
+                    <option value="behavior">Behavior pattern</option>
                   </select>
                   <button
                     type="button"
@@ -731,29 +759,75 @@ export default function Settings({
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[15px] ${textMain}`}>{m.fact}</p>
-                      <p className={`text-[12px] mt-0.5 ${textMuted}`}>
-                        {CATEGORY_LABEL[m.category || 'general'] || m.category}
-                        {' · '}
-                        {m.source === 'user' ? 'You' : 'From chat'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteMemory(m.id)}
-                      disabled={deletingId === m.id}
-                      className={`p-1.5 rounded-lg ${
-                        dark
-                          ? 'text-white/30 hover:text-red-400'
-                          : 'text-slate-400 hover:text-red-500'
-                      }`}
-                    >
-                      {deletingId === m.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      {editingId === m.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            autoFocus
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Escape' && setEditingId(null)}
+                            rows={2}
+                            className={`w-full resize-none rounded-lg px-2.5 py-1.5 text-[14px] outline-none glass-panel ${textMain}`}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className={`h-8 px-3 rounded-lg text-[13px] font-medium ${textMuted}`}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => saveEditMemory(m.id)}
+                              disabled={!editText.trim() || savingEditId === m.id}
+                              className="h-8 px-3 rounded-lg text-[13px] font-medium bg-blue-500 text-white disabled:opacity-40 flex items-center gap-1.5"
+                            >
+                              {savingEditId === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                              Save
+                            </button>
+                          </div>
+                        </div>
                       ) : (
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <>
+                          <p className={`text-[15px] ${textMain}`}>{m.fact}</p>
+                          <p className={`text-[12px] mt-0.5 ${textMuted}`}>
+                            {CATEGORY_LABEL[m.category || 'general'] || m.category}
+                            {' · '}
+                            {m.source === 'user' ? 'You' : 'From chat'}
+                          </p>
+                        </>
                       )}
-                    </button>
+                    </div>
+                    {editingId !== m.id && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => startEditMemory(m)}
+                          className={`p-1.5 rounded-lg ${dark ? 'text-white/30 hover:text-blue-400' : 'text-slate-400 hover:text-blue-500'}`}
+                          aria-label="Edit memory"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteMemory(m.id)}
+                          disabled={deletingId === m.id}
+                          className={`p-1.5 rounded-lg ${
+                            dark
+                              ? 'text-white/30 hover:text-red-400'
+                              : 'text-slate-400 hover:text-red-500'
+                          }`}
+                          aria-label="Delete memory"
+                        >
+                          {deletingId === m.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </GroupCard>

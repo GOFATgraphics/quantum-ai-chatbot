@@ -19,6 +19,7 @@ type Props = {
   onDeleteProject: (id: string) => void | Promise<void>
   onNewChat?: () => void
   onOpenNotesForProject: (id: string) => void
+  onOpenDashboard: (id: string) => void
 }
 
 const COLORS = ['#6366f1', '#f43f5e', '#f59e0b', '#10b981', '#0ea5e9', '#8b5cf6', '#f97316', '#64748b']
@@ -36,6 +37,7 @@ export default function ProjectsWorkspace({
   onDeleteProject,
   onNewChat,
   onOpenNotesForProject,
+  onOpenDashboard,
 }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -276,7 +278,7 @@ export default function ProjectsWorkspace({
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => pick(p.id)}
+                    onClick={() => onOpenDashboard(p.id)}
                     className="flex-1 flex items-center gap-3 px-3.5 py-3 text-left min-w-0"
                   >
                     <div
