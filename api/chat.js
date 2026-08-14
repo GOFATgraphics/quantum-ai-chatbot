@@ -319,8 +319,11 @@ export default async function handler(req, res) {
     }
 
     const maxRounds = 24;
-    const maxTokens = 16000;
-    const MAX_CONTINUATIONS = 4;
+    // Kept moderate on purpose: the auto-continuation loop below is what actually
+    // guards against truncation now, so a very high single-shot ceiling here would
+    // only inflate worst-case cost (ceiling x continuations) without helping.
+    const maxTokens = 8192;
+    const MAX_CONTINUATIONS = 2;
     let continuations = 0;
     let accumulatedText = '';
 
