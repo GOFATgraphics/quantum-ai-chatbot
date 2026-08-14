@@ -319,7 +319,10 @@ export default async function handler(req, res) {
     }
 
     const maxRounds = 24;
-    const maxTokens = body?.projectId ? 12288 : 8192;
+    const maxTokens = 16000;
+    const MAX_CONTINUATIONS = 4;
+    let continuations = 0;
+    let accumulatedText = '';
 
     for (let round = 0; round < maxRounds; round++) {
       let data;
@@ -348,17 +351,29 @@ export default async function handler(req, res) {
       const content = data.content || [];
       const clientToolBlocks = content.filter((b) => b.type === 'tool_use' && b.name);
       if (clientToolBlocks.length === 0) {
-        const textOut =
-          (wantStream ? data.text : extractText(content)) ||
-          extractText(content) ||
-          'Sorry, I could not generate a response.';
+        const textOut = (wantStream ? data.text : extractText(content)) || extractText(content) || '';
+        accumulatedText += textOut;
+        if (data.stop_reason === 'max_tokens' && continuations < MAX_CONTINUATIONS) {
+          continuations += 1;
+          anthropicMessages = [
+            ...anthropicMessages,
+            { role: 'assistant', content },
+            {
+              role: 'user',
+              content:
+                'Continue exactly where you left off, mid-sentence or mid-code-block if needed. Do not repeat anything already written, do not add any preamble or acknowledgement.',
+            },
+          ];
+          continue;
+        }
+        const finalText = accumulatedText || 'Sorry, I could not generate a response.';
         if (wantStream) {
-          sseWrite(res, { content: stripEmDashes(textOut) });
+          sseWrite(res, { content: stripEmDashes(finalText) });
           sseWrite(res, { done: true });
           res.write('data: [DONE]\n\n');
           return res.end();
         }
-        return res.status(200).json({ content: stripEmDashes(textOut) });
+        return res.status(200).json({ content: stripEmDashes(finalText) });
       }
       if (wantStream) {
         try {

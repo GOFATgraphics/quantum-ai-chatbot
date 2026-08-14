@@ -31,6 +31,26 @@ function stripMarkdown(text: string) {
     .trim()
 }
 
+/** Clean markdown for copy/share: unlike stripMarkdown (for TTS), keeps code content and paragraph structure intact so pasted text reads well in an email or doc. */
+function stripMarkdownForCopy(text: string) {
+  return text
+    .replace(/—/g, ', ')
+    .replace(/–/g, '-')
+    .replace(/―/g, ', ')
+    .replace(/```[a-zA-Z0-9_+-]*[ \t]*\r?\n([\s\S]*?)```/g, (_m, code) => `\n${String(code).replace(/\r?\n$/, '')}\n`)
+    .replace(/```([^`\n]+)```/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '$1 ($2)')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '$1')
+    .replace(/^[ \t]*[-•]\s+/gm, '- ')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 /** Split into ~380-char spoken chunks on sentence boundaries for fast first audio. */
 function chunkForSpeech(text: string, maxLen = 380): string[] {
   const plain = text.trim()
@@ -123,7 +143,7 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(content)
+      await navigator.clipboard.writeText(stripMarkdownForCopy(content))
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
@@ -246,10 +266,11 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
 
   const share = async () => {
     try {
+      const plain = stripMarkdownForCopy(content)
       if (navigator.share) {
-        await navigator.share({ text: content })
+        await navigator.share({ text: plain })
       } else {
-        await navigator.clipboard.writeText(content)
+        await navigator.clipboard.writeText(plain)
         setCopied(true)
         setTimeout(() => setCopied(false), 1500)
       }
