@@ -29,10 +29,10 @@ function escapeHtml(text: string): string {
 function extractFences(text: string): { text: string; blocks: { lang: string; code: string }[] } {
   const blocks: { lang: string; code: string }[] = []
   let replaced = text.replace(
-    /```([a-zA-Z0-9_+-]*)[ \t]*\r?\n([\s\S]*?)```/g,
+    /```([a-zA-Z0-9_+-]*)[ \t]*\r?\n([\s\S]*?)\r?\n```(?=\r?\n|$)/g,
     (_m, lang, body) => {
       const i = blocks.length
-      blocks.push({ lang: String(lang || '').trim(), code: String(body).replace(/\r?\n$/, '') })
+      blocks.push({ lang: String(lang || '').trim(), code: String(body) })
       return `\n%%CODEBLOCK_${i}%%\n`
     }
   )
