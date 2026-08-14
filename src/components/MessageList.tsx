@@ -1,4 +1,4 @@
-import { useState, type RefObject, useEffect, useMemo, useRef } from 'react'
+import { useState, type RefObject, useEffect, useMemo, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FileText } from 'lucide-react'
@@ -186,6 +186,28 @@ function UserBubble({ content, dark }: { content: string; dark: boolean }) {
   )
 }
 
+/**
+ * Memoized so a growing streaming message doesn't force every other message in
+ * the thread to re-run formatMarkdown on each delta — only this bubble's own
+ * content changing triggers a recompute.
+ */
+const AssistantContent = memo(function AssistantContent({
+  content,
+  isStreamingThis,
+}: {
+  content: string
+  isStreamingThis: boolean
+}) {
+  const html = useMemo(() => formatMarkdown(content), [content])
+  if (!content) return null
+  return (
+    <div className="ai-content overflow-x-hidden break-words max-w-full">
+      <span dangerouslySetInnerHTML={{ __html: html }} />
+      {isStreamingThis && <span className="stream-caret" aria-hidden />}
+    </div>
+  )
+})
+
 type Props = {
   messages: ChatMessage[]
   isLoading: boolean
@@ -198,6 +220,7 @@ type Props = {
   onSuggestion?: (text: string) => void
   thoughtSeconds?: number | null
   toolStatus?: string | null
+  suggestions?: string[]
 }
 
 export default function MessageList({
@@ -211,6 +234,7 @@ export default function MessageList({
   onSuggestion,
   thoughtSeconds,
   toolStatus,
+  suggestions = [],
 }: Props) {
   const last = messages[messages.length - 1]
   const streaming =
@@ -294,20 +318,6 @@ export default function MessageList({
     scrollChatToBottomAfterLayout(messagesEndRef.current, { force: true, behavior: 'auto' })
   }, [isLoading === true ? '1' : '0', messagesEndRef])
 
-  const suggestions = useMemo(() => {
-    if (isLoading || !last?.content || last.role !== 'assistant') return [] as string[]
-    const c = last.content.toLowerCase()
-    const picks: string[] = []
-    if (/email|gmail|inbox|mail/.test(c)) picks.push('Summarize unread emails', 'Draft a reply')
-    if (/doc|drive|file|sheet/.test(c)) picks.push('Open related files', 'Summarize key points')
-    if (/calendar|meeting|schedule/.test(c)) picks.push('What is next on my calendar?')
-    if (/code|bug|error|function/.test(c)) picks.push('Explain this step by step', 'Suggest a fix')
-    if (picks.length < 2) {
-      picks.push('Go deeper on this', 'Give me next steps', 'Make a shorter version')
-    }
-    return Array.from(new Set(picks)).slice(0, 3)
-  }, [isLoading, last?.id, last?.content, last?.role])
-
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-5 py-4 pb-6 space-y-6 overflow-x-hidden w-full max-w-full">
       <AnimatePresence initial={false} mode="popLayout">
@@ -339,21 +349,7 @@ export default function MessageList({
                       dark ? 'text-slate-100' : 'text-slate-900'
                     }`}
                   >
-                    {msg.content ? (
-                      <div className="ai-content overflow-x-hidden break-words max-w-full">
-                        <span
-                          dangerouslySetInnerHTML={{
-                            __html: formatMarkdown(msg.content),
-                          }}
-                        />
-                        {isStreamingThis && (
-                          <span
-                            className="stream-caret"
-                            aria-hidden
-                          />
-                        )}
-                      </div>
-                    ) : null}
+                    <AssistantContent content={msg.content} isStreamingThis={isStreamingThis} />
                   </div>
                   {msg.content && !isStreamingThis && (
                     <>

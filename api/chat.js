@@ -335,7 +335,11 @@ export default async function handler(req, res) {
           maxTokens,
           onDelta: (delta) => {
             try {
-              sseWrite(res, { delta: stripEmDashes(delta) });
+              // Raw, unstripped: stripEmDashes needs to see whole words/phrases, and
+              // Anthropic's delta chunks split mid-token, so per-chunk stripping can
+              // miss patterns straddling a chunk boundary. The final { content } event
+              // below carries the fully-stripped text and overwrites this on the client.
+              sseWrite(res, { delta });
             } catch (_) {}
           },
         });

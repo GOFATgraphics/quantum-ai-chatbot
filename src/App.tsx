@@ -72,6 +72,7 @@ export default function App() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const thinkStartedAt = useRef<number | null>(null)
   const [thoughtSeconds, setThoughtSeconds] = useState<number | null>(null)
+  const [suggestions, setSuggestions] = useState<string[]>([])
   const [showSettings, setShowSettings] = useState(false)
   const [showConnectors, setShowConnectors] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
@@ -263,6 +264,7 @@ export default function App() {
     setComposerFocused(false)
     setIsLoading(false)
     setToolStatus(null)
+    setSuggestions([])
     const cached = messagesCacheRef.current.get(conversationId)
     if (cached) {
       setMessages(cached)
@@ -288,6 +290,7 @@ export default function App() {
     abortRef.current = null
     setIsLoading(false)
     setMessagesLoading(false)
+    setSuggestions([])
     setCurrentConversationId(null)
     setMessages([])
     setMobileSidebar(false)
@@ -333,6 +336,21 @@ export default function App() {
       await supabase.from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', conversationId)
       setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, title } : c)))
     } catch { /* best-effort */ }
+  }
+
+  const fetchSuggestions = async (userText: string, assistantText: string) => {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) headers.Authorization = 'Bearer ' + session.access_token
+      const res = await fetch('/api/suggestions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ userText, assistantText: assistantText.slice(0, 1500) }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      if (Array.isArray(data?.suggestions) && data.suggestions.length) setSuggestions(data.suggestions)
+    } catch { /* best-effort, leave suggestions empty */ }
   }
 
   const saveMessage = async (conversationId: string, role: 'user' | 'assistant', content: string) => {
@@ -496,6 +514,7 @@ export default function App() {
     setToolStatus(null)
     setComposerFocused(false)
     setIsLoading(true)
+    setSuggestions([])
     thinkStartedAt.current = Date.now()
     setThoughtSeconds(null)
     let convId: string | null = null
@@ -506,6 +525,7 @@ export default function App() {
       if (reply && reply.trim()) {
         await saveMessage(convId, 'assistant', reply)
         if (history.length === 0) await refineConversationTitle(convId, content, reply)
+        void fetchSuggestions(content, reply)
       } else {
         setMessages((p) => p.filter((m) => m.id !== assistantId))
       }
@@ -628,6 +648,7 @@ export default function App() {
                 toolStatus={toolStatus}
                 onRegenerate={() => { if (lastUserPrompt) handleSend(lastUserPrompt) }}
                 onSuggestion={(s) => { setInput(s); void handleSend(s) }}
+                suggestions={suggestions}
               />
             </main>
           )}

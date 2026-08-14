@@ -70,6 +70,13 @@ export function formatMarkdown(text: string): string {
   let inOl = false
   let inTable = false
   let tableRows: string[][] = []
+  // A single pipe-containing line (prose with a "|", a shell pipe, a regex alternation)
+  // is not a table on its own — hold it here until the next line confirms it with a
+  // real separator row (---|---), matching how every other markdown renderer decides.
+  let tableCandidate: string[] | null = null
+
+  const isSepRow = (cells: string[]) =>
+    cells.every((c) => /^:?-{2,}:?$/.test(c.trim()) || c.trim() === '')
 
   const closeLists = () => {
     if (inUl) {
@@ -82,15 +89,20 @@ export function formatMarkdown(text: string): string {
     }
   }
 
+  const flushCandidateAsParagraph = () => {
+    if (!tableCandidate) return
+    closeLists()
+    out.push(`<p class="md-p">${inline(tableCandidate.join(' | '))}</p>`)
+    tableCandidate = null
+  }
+
   const flushTable = () => {
     if (!inTable || tableRows.length === 0) {
       inTable = false
       tableRows = []
       return
     }
-    const isSep = (cells: string[]) =>
-      cells.every((c) => /^:?-{2,}:?$/.test(c.trim()) || c.trim() === '')
-    const rows = tableRows.filter((r) => !isSep(r))
+    const rows = tableRows.filter((r) => !isSepRow(r))
     if (rows.length === 0) {
       inTable = false
       tableRows = []
@@ -172,24 +184,36 @@ export function formatMarkdown(text: string): string {
       continue
     }
 
-    if (trimmed.includes('|') && /^\|?.+\|.+\|?$/.test(trimmed)) {
-      closeLists()
+    const pipeLine = trimmed.includes('|') && /^\|?.+\|.+\|?$/.test(trimmed)
+    if (pipeLine) {
       const cells = trimmed
         .replace(/^\|/, '')
         .replace(/\|$/, '')
         .split('|')
         .map((c) => c.trim())
       if (cells.length >= 2) {
-        if (!inTable) {
-          inTable = true
-          tableRows = []
+        if (inTable) {
+          tableRows.push(cells)
+          continue
         }
-        tableRows.push(cells)
+        if (tableCandidate) {
+          if (isSepRow(cells)) {
+            closeLists()
+            inTable = true
+            tableRows = [tableCandidate]
+            tableCandidate = null
+          } else {
+            flushCandidateAsParagraph()
+            tableCandidate = cells
+          }
+        } else {
+          tableCandidate = cells
+        }
         continue
       }
-    } else if (inTable) {
-      flushTable()
     }
+    flushCandidateAsParagraph()
+    if (inTable) flushTable()
 
     if (/^---+$/.test(trimmed) || /^\*\*\*+$/.test(trimmed)) {
       closeLists()
@@ -216,7 +240,7 @@ export function formatMarkdown(text: string): string {
       continue
     }
 
-    const ul = trimmed.match(/^[-•]\s+(.+)$/)
+    const ul = trimmed.match(/^[-•*]\s+(.+)$/)
     if (ul) {
       if (inOl) {
         out.push('</ol>')
@@ -254,6 +278,7 @@ export function formatMarkdown(text: string): string {
     out.push(`<p class="md-p">${inline(trimmed)}</p>`)
   }
 
+  flushCandidateAsParagraph()
   flushTable()
   closeLists()
   return out.join('')
