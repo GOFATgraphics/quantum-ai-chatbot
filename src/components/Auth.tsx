@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { Loader2, ArrowRight } from 'lucide-react'
 import Logo from './Logo'
+import { GoogleIcon } from './BrandIcons'
 
 type Props = {
   onSuccess: () => void
@@ -13,6 +14,7 @@ export default function Auth({ onSuccess }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -37,6 +39,23 @@ export default function Auth({ onSuccess }: Props) {
       setError(err.message || 'Something went wrong')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      })
+      if (error) throw error
+      // Browser redirects to Google now; onSuccess fires on return via the auth listener.
+    } catch (err: any) {
+      setError(err.message || 'Could not start Google sign-in')
+      setGoogleLoading(false)
     }
   }
 
@@ -77,6 +96,28 @@ export default function Auth({ onSuccess }: Props) {
               <p className="mt-1 text-sm text-slate-400">
                 {mode === 'login' ? 'Sign in to continue' : 'Start in under a minute'}
               </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading || loading}
+              className="w-full h-12 rounded-2xl bg-white text-slate-800 text-[15px] font-medium flex items-center justify-center gap-2.5 hover:bg-slate-100 transition disabled:opacity-60"
+            >
+              {googleLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <GoogleIcon size={18} />
+                  Continue with Google
+                </>
+              )}
+            </button>
+
+            <div className="flex items-center gap-3 my-5">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">or</span>
+              <div className="h-px flex-1 bg-white/10" />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3.5">
