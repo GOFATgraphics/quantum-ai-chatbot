@@ -9,8 +9,14 @@ import { SignJWT, importPKCS8 } from 'jose';
 const RISC_AUDIENCE = 'https://risc.googleapis.com/google.identity.risc.v1beta.RiscManagementService';
 
 function normalizePrivateKey(raw) {
+  let key = String(raw || '').trim();
+  // Dashboard UIs sometimes preserve literal wrapping quotes when a value is
+  // pasted from a snippet that included them (e.g. a .env-style example).
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1).trim();
+  }
   // Env vars commonly store PEM keys with literal "\n" instead of real newlines.
-  return raw.includes('\\n') ? raw.replace(/\\n/g, '\n') : raw;
+  return key.includes('\\n') ? key.replace(/\\n/g, '\n') : key;
 }
 
 export async function getRiscBearerToken() {
