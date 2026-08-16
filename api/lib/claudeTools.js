@@ -1,4 +1,5 @@
 /** Tool defs + execution for chat connectors */
+import { randomUUID } from 'crypto';
 import { getAdminClient } from './supabaseAdmin.js';
 import {
   getGoogleConfig,
@@ -363,8 +364,9 @@ export const SAVE_NOTE_TOOL = {
       note_type: { type: 'string', description: '"action_item" (default), "trade_note", "decision", or "alert"' },
       priority: { type: 'string', description: '"low", "medium" (default), or "high"' },
       due_date: { type: 'string', description: 'Optional ISO 8601 date/time this note is due or should be followed up by' },
-      tags: { type: 'array', items: { type: 'string' }, description: 'Optional short tags for filtering' },
+      tags: { type: 'array', items: { type: 'string' }, description: 'Optional short topic tags for grouping/filtering' },
       trade_ref: { type: 'string', description: 'Optional reference (e.g. a trade/row id) this note is about, for later lookup in a connected sheet' },
+      checklist: { type: 'array', items: { type: 'string' }, description: 'Optional sub-steps to break this note into a checklist' },
     },
     required: ['note'],
   },
@@ -398,6 +400,7 @@ export const UPDATE_NOTE_TOOL = {
       status: { type: 'string', description: '"open", "done", or "dismissed"' },
       priority: { type: 'string', description: '"low", "medium", or "high"' },
       due_date: { type: 'string', description: 'ISO 8601 date/time, or empty string to clear it' },
+      checklist: { type: 'array', items: { type: 'string' }, description: 'Replaces the whole checklist with these steps, e.g. when the user asks to add or change checklist items' },
     },
     required: ['note_id'],
   },
@@ -960,6 +963,13 @@ export async function runTool(block, user, context = {}) {
       const priority = ['low', 'medium', 'high'].includes(input.priority) ? input.priority : 'medium';
       const dueDate = input.due_date ? new Date(input.due_date).toISOString() : null;
       const tags = Array.isArray(input.tags) ? input.tags.map(String).slice(0, 10) : null;
+      const checklist = Array.isArray(input.checklist)
+        ? input.checklist
+            .map((t) => String(t).trim())
+            .filter(Boolean)
+            .slice(0, 30)
+            .map((text) => ({ id: randomUUID(), text, done: false }))
+        : [];
       const { data, error } = await admin
         .from('notes')
         .insert({
@@ -972,6 +982,7 @@ export async function runTool(block, user, context = {}) {
           due_date: dueDate,
           tags,
           trade_ref: input.trade_ref ? String(input.trade_ref).trim() : null,
+          checklist,
         })
         .select()
         .single();
@@ -1017,6 +1028,13 @@ export async function runTool(block, user, context = {}) {
       if (input.status && ['open', 'done', 'dismissed'].includes(input.status)) patch.status = input.status;
       if (input.priority && ['low', 'medium', 'high'].includes(input.priority)) patch.priority = input.priority;
       if (input.due_date !== undefined) patch.due_date = input.due_date ? new Date(input.due_date).toISOString() : null;
+      if (Array.isArray(input.checklist)) {
+        patch.checklist = input.checklist
+          .map((t) => String(t).trim())
+          .filter(Boolean)
+          .slice(0, 30)
+          .map((text) => ({ id: randomUUID(), text, done: false }));
+      }
       const admin = getAdminClient();
       const { data, error } = await admin
         .from('notes')

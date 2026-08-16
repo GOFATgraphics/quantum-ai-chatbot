@@ -53,6 +53,7 @@ export type UserMemory = {
 
 export type NoteType = 'action_item' | 'trade_note' | 'decision' | 'alert'
 export type NotePriority = 'low' | 'medium' | 'high'
+export type ChecklistItem = { id: string; text: string; done: boolean }
 
 export type Note = {
   id: string
@@ -66,6 +67,7 @@ export type Note = {
   due_date: string | null
   tags: string[] | null
   trade_ref: string | null
+  checklist: ChecklistItem[]
   last_reminded_at: string | null
   created_at: string
   updated_at: string
