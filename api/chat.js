@@ -26,6 +26,26 @@ function extractText(blocks) {
   return stripEmDashes(blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim());
 }
 
+// Long-lived conversations resend their full history on every message with no
+// cap, so a thread that grows to hundreds of exchanges (or has a few large
+// pasted files in it) gets proportionally more expensive forever. Keep the
+// most recent messages up to a character budget (~4 chars/token, so this is
+// roughly a 40k-token ceiling on history alone), always keeping at least the
+// current turn even if it alone exceeds the budget.
+const MAX_HISTORY_CHARS = 160_000;
+function trimHistory(msgs) {
+  if (msgs.length <= 1) return msgs;
+  let total = 0;
+  const kept = [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const len = typeof msgs[i].content === 'string' ? msgs[i].content.length : JSON.stringify(msgs[i].content).length;
+    if (kept.length > 0 && total + len > MAX_HISTORY_CHARS) break;
+    kept.unshift(msgs[i]);
+    total += len;
+  }
+  return kept;
+}
+
 function toAnthropicContent(content) {
   const str = String(content || '');
   const imgRe = /!\[([^\]]*)\]\((data:image\/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=\s]+))\)/g;
@@ -303,10 +323,12 @@ export default async function handler(req, res) {
       firstName: body?.firstName || null,
     });
 
-    let anthropicMessages = messages.map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.role === 'assistant' ? String(m.content) : toAnthropicContent(m.content),
-    }));
+    let anthropicMessages = trimHistory(
+      messages.map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.role === 'assistant' ? String(m.content) : toAnthropicContent(m.content),
+      }))
+    );
 
     if (wantStream) {
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
