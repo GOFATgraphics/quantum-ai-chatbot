@@ -16,6 +16,7 @@ import CommandPalette from './components/CommandPalette'
 import ProjectsWorkspace from './components/ProjectsWorkspace'
 import ProjectDashboard from './components/ProjectDashboard'
 import NotesDashboard from './components/NotesDashboard'
+import Sheet from './components/Sheet'
 
 const MODEL = { id: 'quantumy', name: 'Quantumy', anthropic: 'claude-sonnet-5' as const }
 
@@ -66,6 +67,7 @@ export default function App() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const [loadingConversations, setLoadingConversations] = useState(true)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
@@ -190,6 +192,7 @@ export default function App() {
     if (!user) return
     const { data } = await supabase.from('conversations').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(50)
     if (data) setConversations(data as Conversation[])
+    setLoadingConversations(false)
   }, [user])
 
   const loadProjects = useCallback(async () => {
@@ -576,7 +579,7 @@ export default function App() {
   if (!session || !user) return <Auth onSuccess={() => {}} />
 
   const sidebarProps = {
-    dark, user, conversations, projects, currentConversationId, currentProjectId, deletingId,
+    dark, user, conversations, loadingConversations, projects, currentConversationId, currentProjectId, deletingId,
     onNewChat: startNewChat, onSelectChat: loadMessages, onDeleteChat: deleteConversation,
     onOpenSettings: () => { setShowSettings(true); setMobileSidebar(false) },
     onOpenConnectors: () => { setShowConnectors(true); setMobileSidebar(false) },
@@ -674,61 +677,33 @@ export default function App() {
         <InstallPWA dark={dark} />
       </div>
       <CommandPalette open={showCommandPalette} onClose={() => setShowCommandPalette(false)} dark={dark} conversations={conversations} projects={projects} currentConversationId={currentConversationId} currentProjectId={currentProjectId} onNewChat={startNewChat} onSelectChat={loadMessages} onSelectProject={setCurrentProjectId} onOpenSettings={() => setShowSettings(true)} onOpenConnectors={() => setShowConnectors(true)} onToggleTheme={() => setDark((d) => !d)} />
-      <AnimatePresence>
-        {showSettings && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setShowSettings(false)}>
-            <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <Settings dark={dark} glass={glass} user={user} onClose={() => setShowSettings(false)} onSignOut={async () => { await supabase.auth.signOut(); setShowSettings(false) }} onToggleTheme={() => setDark((d) => !d)} onToggleGlass={() => setGlass((g) => !g)} onOpenConnectors={() => { setShowSettings(false); setShowConnectors(true) }} onProfileUpdated={(name) => { setGreetingLine(creativeGreeting(name)); supabase.auth.getSession().then(({ data }) => setSession(data.session)) }} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showConnectors && session?.access_token && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setShowConnectors(false)}>
-            <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <Connectors dark={dark} accessToken={session.access_token} onClose={() => setShowConnectors(false)} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showProjects && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setShowProjects(false)}>
-            <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[430px] h-[min(92dvh,720px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <ProjectsWorkspace dark={dark} user={user} projects={projects} conversations={conversations} currentProjectId={currentProjectId} onClose={() => setShowProjects(false)} onSelectProject={setCurrentProjectId} onCreateProject={createProject} onUpdateProject={updateProject} onDeleteProject={deleteProject} onNewChat={() => { setShowProjects(false); startNewChat() }} onOpenNotesForProject={openNotesForProject} onOpenDashboard={(id) => { setCurrentProjectId(id); setOpenProjectId(id) }} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
+      <Sheet open={showSettings} onClose={() => setShowSettings(false)} label="Settings">
+        <Settings dark={dark} glass={glass} user={user} onClose={() => setShowSettings(false)} onSignOut={async () => { await supabase.auth.signOut(); setShowSettings(false) }} onToggleTheme={() => setDark((d) => !d)} onToggleGlass={() => setGlass((g) => !g)} onOpenConnectors={() => { setShowSettings(false); setShowConnectors(true) }} onProfileUpdated={(name) => { setGreetingLine(creativeGreeting(name)); supabase.auth.getSession().then(({ data }) => setSession(data.session)) }} />
+      </Sheet>
+      <Sheet open={!!(showConnectors && session?.access_token)} onClose={() => setShowConnectors(false)} label="Connectors">
+        {session?.access_token && <Connectors dark={dark} accessToken={session.access_token} onClose={() => setShowConnectors(false)} />}
+      </Sheet>
+      <Sheet open={showProjects} onClose={() => setShowProjects(false)} label="Projects">
+        <ProjectsWorkspace dark={dark} user={user} projects={projects} conversations={conversations} currentProjectId={currentProjectId} onClose={() => setShowProjects(false)} onSelectProject={setCurrentProjectId} onCreateProject={createProject} onUpdateProject={updateProject} onDeleteProject={deleteProject} onNewChat={() => { setShowProjects(false); startNewChat() }} onOpenNotesForProject={openNotesForProject} onOpenDashboard={(id) => { setCurrentProjectId(id); setOpenProjectId(id) }} />
+      </Sheet>
+      <Sheet open={!!(openProjectId && projects.find((p) => p.id === openProjectId))} onClose={() => setOpenProjectId(null)} label="Project dashboard" width="wide">
         {openProjectId && projects.find((p) => p.id === openProjectId) && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setOpenProjectId(null)}>
-            <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[880px] h-[min(94dvh,860px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <ProjectDashboard
-                dark={dark}
-                user={user}
-                project={projects.find((p) => p.id === openProjectId)!}
-                conversations={conversations}
-                onClose={() => setOpenProjectId(null)}
-                onUpdateProject={updateProject}
-                onDeleteProject={deleteProject}
-                onSelectChat={selectChatFromDashboard}
-                onNewChatInProject={() => newChatInProject(openProjectId)}
-              />
-            </motion.div>
-          </motion.div>
+          <ProjectDashboard
+            dark={dark}
+            user={user}
+            project={projects.find((p) => p.id === openProjectId)!}
+            conversations={conversations}
+            onClose={() => setOpenProjectId(null)}
+            onUpdateProject={updateProject}
+            onDeleteProject={deleteProject}
+            onSelectChat={selectChatFromDashboard}
+            onNewChatInProject={() => newChatInProject(openProjectId)}
+          />
         )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showNotes && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50" onClick={() => setShowNotes(false)}>
-            <motion.div initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 24 }} className="glass-sheet w-full sm:max-w-[880px] h-[min(94dvh,860px)] rounded-t-[28px] sm:rounded-[28px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <NotesDashboard dark={dark} user={user} projects={projects} currentProjectId={currentProjectId} onClose={() => setShowNotes(false)} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </Sheet>
+      <Sheet open={showNotes} onClose={() => setShowNotes(false)} label="Notes" width="wide">
+        <NotesDashboard dark={dark} user={user} projects={projects} currentProjectId={currentProjectId} onClose={() => setShowNotes(false)} />
+      </Sheet>
     </div>
   )
 }

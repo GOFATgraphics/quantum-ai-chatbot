@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import {
   X, FolderKanban, Pencil, Trash2, Check, Loader2, MessageSquare,
-  Plus, AlertTriangle, ChevronRight,
+  Plus, ChevronRight, AlertCircle,
 } from 'lucide-react'
-import { supabase, type Conversation, type Project, type Note, type NoteType, type NotePriority } from '../lib/supabase'
+import { supabase, type Conversation, type Project, type Note, type NoteType, type NotePriority, type ChecklistItem } from '../lib/supabase'
 import type { User } from '@supabase/supabase-js'
+import NoteRow from './NoteRow'
+import StatTile from './StatTile'
+import { NOTE_TYPE_LABEL } from '../lib/noteHelpers'
 
 type Props = {
   dark: boolean
@@ -21,19 +24,6 @@ type Props = {
 
 const COLORS = ['#6366f1', '#f43f5e', '#f59e0b', '#10b981', '#0ea5e9', '#8b5cf6', '#f97316', '#64748b']
 
-const NOTE_TYPE_LABEL: Record<NoteType, string> = {
-  action_item: 'Action',
-  trade_note: 'Trade',
-  decision: 'Decision',
-  alert: 'Alert',
-}
-
-const PRIORITY_DOT: Record<NotePriority, string> = {
-  high: 'bg-rose-500',
-  medium: 'bg-amber-500',
-  low: 'bg-slate-400',
-}
-
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
   const min = Math.floor(ms / 60_000)
@@ -44,15 +34,6 @@ function timeAgo(iso: string): string {
   const day = Math.floor(hr / 24)
   if (day < 30) return `${day}d ago`
   return new Date(iso).toLocaleDateString()
-}
-
-function dueLabel(iso: string): { text: string; overdue: boolean } {
-  const ms = new Date(iso).getTime() - Date.now()
-  const overdue = ms < 0
-  const days = Math.round(Math.abs(ms) / 86_400_000)
-  if (overdue) return { text: days === 0 ? 'due today' : `${days}d overdue`, overdue: true }
-  if (days === 0) return { text: 'due today', overdue: false }
-  return { text: `due in ${days}d`, overdue: false }
 }
 
 export default function ProjectDashboard({
@@ -70,6 +51,8 @@ export default function ProjectDashboard({
   const [loadingNotes, setLoadingNotes] = useState(true)
   const [noteFilter, setNoteFilter] = useState<'open' | 'done' | 'all'>('open')
   const [busyNoteId, setBusyNoteId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [error, setError] = useState<string | null>(null)
 
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(project.name)
@@ -146,9 +129,12 @@ export default function ProjectDashboard({
     const n = name.trim()
     if (!n || savingEdit) return
     setSavingEdit(true)
+    setError(null)
     try {
       await onUpdateProject(project.id, { name: n, description: description.trim() || null, color })
       setEditing(false)
+    } catch {
+      setError('Could not save changes. Try again.')
     } finally {
       setSavingEdit(false)
     }
@@ -158,8 +144,9 @@ export default function ProjectDashboard({
     const n = noteText.trim()
     if (!n || savingNote) return
     setSavingNote(true)
+    setError(null)
     try {
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabase
         .from('notes')
         .insert({
           user_id: user.id,
@@ -172,14 +159,15 @@ export default function ProjectDashboard({
         })
         .select()
         .single()
-      if (!error && data) {
-        setNotes((p) => [data as Note, ...p])
-        setShowNoteForm(false)
-        setNoteText('')
-        setNoteType('action_item')
-        setNotePriority('medium')
-        setNoteDue('')
-      }
+      if (dbError || !data) throw dbError || new Error('Insert failed')
+      setNotes((p) => [data as Note, ...p])
+      setShowNoteForm(false)
+      setNoteText('')
+      setNoteType('action_item')
+      setNotePriority('medium')
+      setNoteDue('')
+    } catch {
+      setError('Could not save note. Try again.')
     } finally {
       setSavingNote(false)
     }
@@ -187,9 +175,13 @@ export default function ProjectDashboard({
 
   const setNoteStatus = async (n: Note, status: Note['status']) => {
     setBusyNoteId(n.id)
+    setError(null)
     try {
-      const { error } = await supabase.from('notes').update({ status, updated_at: new Date().toISOString() }).eq('id', n.id)
-      if (!error) setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, status } : x)))
+      const { error: dbError } = await supabase.from('notes').update({ status, updated_at: new Date().toISOString() }).eq('id', n.id)
+      if (dbError) throw dbError
+      setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, status } : x)))
+    } catch {
+      setError('Could not update note. Try again.')
     } finally {
       setBusyNoteId(null)
     }
@@ -197,19 +189,41 @@ export default function ProjectDashboard({
 
   const removeNote = async (id: string) => {
     setBusyNoteId(id)
+    setError(null)
     try {
-      const { error } = await supabase.from('notes').delete().eq('id', id)
-      if (!error) setNotes((p) => p.filter((x) => x.id !== id))
+      const { error: dbError } = await supabase.from('notes').delete().eq('id', id)
+      if (dbError) throw dbError
+      setNotes((p) => p.filter((x) => x.id !== id))
+    } catch {
+      setError('Could not delete note. Try again.')
     } finally {
       setBusyNoteId(null)
     }
   }
 
+  const updateChecklist = async (n: Note, checklist: ChecklistItem[]) => {
+    setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, checklist } : x)))
+    const { error: dbError } = await supabase.from('notes').update({ checklist, updated_at: new Date().toISOString() }).eq('id', n.id)
+    if (dbError) setError('Could not update checklist. Try again.')
+  }
+
+  const toggleExpanded = (id: string) => {
+    setExpanded((p) => {
+      const next = new Set(p)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   const doDelete = async () => {
     setDeleting(true)
+    setError(null)
     try {
       await onDeleteProject(project.id)
       onClose()
+    } catch {
+      setError('Could not delete project. Try again.')
     } finally {
       setDeleting(false)
     }
@@ -277,7 +291,7 @@ export default function ProjectDashboard({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${hover}`}
+            className={`glass-btn w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${hover}`}
             aria-label="Edit project"
           >
             <Pencil className={`w-4 h-4 ${dark ? 'text-slate-300' : 'text-slate-600'}`} />
@@ -286,7 +300,7 @@ export default function ProjectDashboard({
         <button
           type="button"
           onClick={onClose}
-          className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${hover}`}
+          className={`glass-btn w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${hover}`}
           aria-label="Close project dashboard"
         >
           <X className={`w-5 h-5 ${dark ? 'text-slate-300' : 'text-slate-600'}`} />
@@ -294,19 +308,17 @@ export default function ProjectDashboard({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6">
+        {error && (
+          <div className={`mb-4 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[13px] ${dark ? 'bg-rose-500/10 text-rose-300 ring-1 ring-rose-400/25' : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'}`}>
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {error}
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-2.5 mb-5">
-          <div className={`rounded-2xl px-3 py-3 ${card}`}>
-            <p className="text-2xl font-semibold tabular-nums">{projectChats.length}</p>
-            <p className={`text-[12px] ${muted}`}>Chats</p>
-          </div>
-          <div className={`rounded-2xl px-3 py-3 ${card}`}>
-            <p className="text-2xl font-semibold tabular-nums">{openNotes.length}</p>
-            <p className={`text-[12px] ${muted}`}>Open notes</p>
-          </div>
-          <div className={`rounded-2xl px-3 py-3 ${overdueNotes.length > 0 ? (dark ? 'bg-rose-500/10 ring-1 ring-rose-400/25' : 'bg-rose-50 ring-1 ring-rose-200') : card}`}>
-            <p className={`text-2xl font-semibold tabular-nums ${overdueNotes.length > 0 ? 'text-rose-500' : ''}`}>{overdueNotes.length}</p>
-            <p className={`text-[12px] ${overdueNotes.length > 0 ? 'text-rose-500/80' : muted}`}>Overdue</p>
-          </div>
+          <StatTile dark={dark} value={projectChats.length} label="Chats" />
+          <StatTile dark={dark} value={openNotes.length} label="Open notes" />
+          <StatTile dark={dark} value={overdueNotes.length} label="Overdue" alert={overdueNotes.length > 0} />
         </div>
 
         <button
@@ -320,7 +332,7 @@ export default function ProjectDashboard({
           New chat in this project
         </button>
 
-        <div className="grid sm:grid-cols-2 gap-5">
+        <div className="grid md:grid-cols-2 gap-5">
           <div>
             <p className={`text-xs font-medium uppercase tracking-wide mb-2 px-1 ${muted}`}>Recent chats</p>
             {projectChats.length === 0 ? (
@@ -332,7 +344,7 @@ export default function ProjectDashboard({
                     key={c.id}
                     type="button"
                     onClick={() => onSelectChat(c.id)}
-                    className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left ${hover}`}
+                    className={`group w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left ${hover}`}
                   >
                     <MessageSquare className={`w-4 h-4 shrink-0 ${muted}`} />
                     <span className="flex-1 min-w-0 truncate text-[14px]">{c.title || 'Untitled chat'}</span>
@@ -350,7 +362,7 @@ export default function ProjectDashboard({
               <button
                 type="button"
                 onClick={() => setShowNoteForm((s) => !s)}
-                className={`text-[12px] font-medium flex items-center gap-1 ${dark ? 'text-indigo-300' : 'text-indigo-600'}`}
+                className={`text-[12px] font-medium flex items-center gap-1 min-h-[28px] ${dark ? 'text-indigo-300' : 'text-indigo-600'}`}
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add
@@ -415,58 +427,25 @@ export default function ProjectDashboard({
               <p className={`text-sm px-1 py-4 ${muted}`}>No notes here yet.</p>
             ) : (
               <AnimatePresence initial={false}>
-                {filteredNotes.map((n) => {
-                  const due = n.due_date ? dueLabel(n.due_date) : null
-                  const isOverdue = !!due?.overdue && n.status === 'open'
-                  return (
-                    <motion.div
-                      key={n.id}
-                      layout
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                      className={`group flex items-start gap-2.5 rounded-xl px-3 py-2.5 mb-1 ${
-                        isOverdue ? (dark ? 'bg-rose-500/[0.07]' : 'bg-rose-50/70') : hover
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setNoteStatus(n, n.status === 'open' ? 'done' : 'open')}
-                        disabled={busyNoteId === n.id}
-                        className={`mt-0.5 w-4.5 h-4.5 rounded-full flex items-center justify-center shrink-0 transition ${
-                          n.status === 'done' ? 'bg-emerald-500 text-white' : dark ? 'ring-1 ring-white/25' : 'ring-1 ring-slate-300'
-                        }`}
-                        aria-label="Toggle note status"
-                      >
-                        {n.status === 'done' && <Check className="w-2.5 h-2.5" />}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-[13px] leading-snug ${n.status !== 'open' ? `line-through ${muted}` : ''}`}>{n.note}</p>
-                        <div className={`flex flex-wrap items-center gap-1 mt-1 text-[11px] ${muted}`}>
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[n.priority]}`} />
-                            {NOTE_TYPE_LABEL[n.note_type]}
-                          </span>
-                          {due && (
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${isOverdue ? 'bg-rose-500/15 text-rose-500' : dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>
-                              {isOverdue && <AlertTriangle className="w-3 h-3" />}
-                              {due.text}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeNote(n.id)}
-                        disabled={busyNoteId === n.id}
-                        className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center text-slate-400 hover:text-red-500 disabled:opacity-40 shrink-0"
-                        aria-label="Delete note"
-                      >
-                        {busyNoteId === n.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                      </button>
-                    </motion.div>
-                  )
-                })}
+                {filteredNotes.map((n) => (
+                  <NoteRow
+                    key={n.id}
+                    dark={dark}
+                    note={n}
+                    busy={busyNoteId === n.id}
+                    expanded={expanded.has(n.id)}
+                    onToggleExpanded={() => toggleExpanded(n.id)}
+                    onSetStatus={(status) => setNoteStatus(n, status)}
+                    onDelete={() => removeNote(n.id)}
+                    onToggleChecklistItem={(itemId) =>
+                      updateChecklist(n, n.checklist.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it)))
+                    }
+                    onRemoveChecklistItem={(itemId) => updateChecklist(n, n.checklist.filter((it) => it.id !== itemId))}
+                    onAddChecklistItem={(text) =>
+                      updateChecklist(n, [...n.checklist, { id: crypto.randomUUID(), text, done: false }])
+                    }
+                  />
+                ))}
               </AnimatePresence>
             )}
           </div>
@@ -477,7 +456,7 @@ export default function ProjectDashboard({
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="text-[13px] font-medium text-red-500/80 hover:text-red-500 flex items-center gap-1.5"
+              className="text-[13px] font-medium text-red-500/80 hover:text-red-500 flex items-center gap-1.5 min-h-[28px]"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Delete project

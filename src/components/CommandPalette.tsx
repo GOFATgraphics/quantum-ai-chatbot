@@ -185,7 +185,7 @@ export default function CommandPalette({
   let flatIndex = -1
 
   const panel = dark
-    ? 'bg-[#1c1c1e]/border-white/10 text-slate-100'
+    ? 'bg-[#1c1c1e] border-white/10 text-slate-100'
     : 'bg-white border-black/10 text-slate-900'
   const inputCls = dark
     ? 'text-slate-100 placeholder:text-slate-500'

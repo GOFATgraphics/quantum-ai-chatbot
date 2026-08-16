@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  X, Plus, Trash2, FolderKanban, Check, ChevronRight, Loader2, Pencil, StickyNote,
+  X, Plus, Trash2, FolderKanban, Check, ChevronRight, Loader2, Pencil, StickyNote, AlertCircle,
 } from 'lucide-react'
 import { supabase, type Conversation, type Project } from '../lib/supabase'
 import type { User } from '@supabase/supabase-js'
@@ -47,6 +47,7 @@ export default function ProjectsWorkspace({
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [openNoteCounts, setOpenNoteCounts] = useState<Map<string, number>>(new Map())
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -107,6 +108,7 @@ export default function ProjectsWorkspace({
     const n = name.trim()
     if (!n || saving) return
     setSaving(true)
+    setError(null)
     try {
       if (editingId) {
         await onUpdateProject(editingId, { name: n, description: description.trim() || null, color })
@@ -114,6 +116,8 @@ export default function ProjectsWorkspace({
         await onCreateProject(n, description.trim(), color)
       }
       resetForm()
+    } catch {
+      setError(editingId ? 'Could not save changes. Try again.' : 'Could not create project. Try again.')
     } finally {
       setSaving(false)
     }
@@ -121,8 +125,11 @@ export default function ProjectsWorkspace({
 
   const remove = async (id: string) => {
     setDeletingId(id)
+    setError(null)
     try {
       await onDeleteProject(id)
+    } catch {
+      setError('Could not delete project. Try again.')
     } finally {
       setDeletingId(null)
     }
@@ -146,7 +153,7 @@ export default function ProjectsWorkspace({
         <button
           type="button"
           onClick={onClose}
-          className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center ${hover}`}
+          className={`glass-btn w-11 h-11 rounded-full flex items-center justify-center ${hover}`}
           aria-label="Close projects"
         >
           <X className={`w-5 h-5 ${dark ? 'text-slate-300' : 'text-slate-600'}`} />
@@ -154,6 +161,12 @@ export default function ProjectsWorkspace({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6">
+        {error && (
+          <div className={`mb-4 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[13px] ${dark ? 'bg-rose-500/10 text-rose-300 ring-1 ring-rose-400/25' : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'}`}>
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {error}
+          </div>
+        )}
         <div className="mb-4">
           {!showForm ? (
             <button

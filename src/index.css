@@ -4,6 +4,16 @@
 
 * { -webkit-tap-highlight-color: transparent; }
 
+/* Keyboard-navigation focus ring — visible only for keyboard/AT users, never on mouse/touch */
+:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+html.dark :focus-visible {
+  outline-color: rgba(129, 140, 248, 0.8);
+}
+
 html { scroll-behavior: auto; }
 html, body, #root {
   height: 100%;

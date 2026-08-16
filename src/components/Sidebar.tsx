@@ -12,6 +12,7 @@ type Props = {
   dark: boolean
   user: User
   conversations: Conversation[]
+  loadingConversations?: boolean
   projects: Project[]
   currentConversationId: string | null
   currentProjectId: string | null
@@ -30,7 +31,7 @@ type Props = {
 }
 
 export default function Sidebar({
-  dark, user, conversations, projects, currentConversationId, currentProjectId,
+  dark, user, conversations, loadingConversations, projects, currentConversationId, currentProjectId,
   deletingId, onNewChat, onSelectChat, onDeleteChat, onOpenSettings, onOpenConnectors,
   onOpenProjects, onOpenNotes, onSelectProject, onOpenCommandPalette, onClose, showClose,
 }: Props) {
@@ -216,7 +217,11 @@ export default function Sidebar({
               </motion.div>
             ))}
           </AnimatePresence>
-          {filtered.length === 0 && (
+          {filtered.length === 0 && loadingConversations ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className={`w-4 h-4 animate-spin ${muted}`} />
+            </div>
+          ) : filtered.length === 0 && (
             <p className={`px-3 py-4 text-sm ${muted}`}>
               {query.trim()
                 ? 'No matching chats'

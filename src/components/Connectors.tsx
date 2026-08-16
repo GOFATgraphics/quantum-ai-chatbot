@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, Check, AlertCircle } from 'lucide-react'
 import { supabase, CONNECTOR_CATALOG, type Connector } from '../lib/supabase'
 import {
   GmailIcon, DriveIcon, SheetsIcon, DocsIcon, CalendarIcon, OutlookIcon, ExcelIcon,
@@ -30,12 +30,12 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
   const [selected, setSelected] = useState<string | null>(null)
   const [justConnected, setJustConnected] = useState<string | null>(null)
 
-  const bg = dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
-  const textMain = dark ? 'text-white' : 'text-slate-900'
-  const textMuted = dark ? 'text-white/40' : 'text-slate-500'
-  const card = dark ? 'bg-[#1c1c1e]' : 'bg-white shadow-sm'
-  const rowBorder = dark ? 'border-white/[0.06]' : 'border-black/[0.06]'
-  const iconBg = dark ? 'bg-white/[0.08]' : 'bg-[#f0f0f5]'
+  const textMain = dark ? 'text-slate-100' : 'text-slate-900'
+  const textMuted = dark ? 'text-slate-400' : 'text-slate-500'
+  const hover = dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'
+  const card = dark ? 'bg-white/[0.04] ring-1 ring-white/10' : 'bg-black/[0.02] ring-1 ring-black/5'
+  const rowBorder = dark ? 'border-white/[0.08]' : 'border-black/[0.06]'
+  const iconBg = dark ? 'bg-white/[0.08]' : 'bg-black/[0.04]'
 
   const load = async () => {
     setLoading(true)
@@ -140,19 +140,17 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
   const selectedConn = selected ? getConnected(selected) : null
 
   return (
-    <div className={`flex flex-col h-full min-h-0 ${bg}`}>
-      <div className="relative flex items-center justify-center h-[52px] shrink-0 px-4">
+    <div className={`flex flex-col h-full min-h-0 ${textMain}`}>
+      <div className="relative flex items-center justify-center h-[56px] shrink-0 px-4">
         <button
           type="button"
           onClick={() => (selected ? setSelected(null) : onClose?.())}
-          className={`absolute left-4 w-9 h-9 rounded-full flex items-center justify-center ${
-            dark ? 'bg-white/10 text-white' : 'bg-white text-slate-800 shadow-sm'
-          }`}
+          className={`glass-btn absolute left-3 w-11 h-11 rounded-full flex items-center justify-center ${hover}`}
           aria-label="Back"
         >
           <ChevronLeft className="w-5 h-5" strokeWidth={2.25} />
         </button>
-        <h2 className={`text-[17px] font-semibold tracking-tight ${textMain}`}>
+        <h2 className="text-[17px] font-semibold tracking-tight">
           {selectedItem ? selectedItem.name : 'Connectors'}
         </h2>
       </div>
@@ -184,10 +182,11 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`rounded-2xl px-4 py-3 text-[14px] ${
-              dark ? 'bg-amber-500/10 text-amber-200' : 'bg-amber-50 text-amber-800'
+            className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-[14px] ${
+              dark ? 'bg-rose-500/10 text-rose-300 ring-1 ring-rose-400/25' : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
             }`}
           >
+            <AlertCircle className="w-4 h-4 shrink-0" />
             {error}
           </motion.div>
         )}
@@ -214,7 +213,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
               >
                 {BRAND[selectedItem.provider]}
               </motion.div>
-              <p className={`mt-3 text-[18px] font-semibold ${textMain}`}>{selectedItem.name}</p>
+              <p className="mt-3 text-[18px] font-semibold">{selectedItem.name}</p>
               <p className={`text-[14px] mt-1 ${textMuted}`}>
                 {selectedConn?.account_email || selectedItem.description}
               </p>
@@ -224,7 +223,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
               type="button"
               onClick={() => disconnect(selectedItem.provider)}
               disabled={busy === selectedItem.provider}
-              className="w-full h-12 rounded-2xl text-[16px] font-medium text-red-500 bg-red-500/10 active:bg-red-500/15 disabled:opacity-50"
+              className="w-full h-12 rounded-2xl text-[16px] font-medium text-red-500 bg-red-500/10 hover:bg-red-500/15 disabled:opacity-50"
             >
               {busy === selectedItem.provider ? (
                 <Loader2 className="w-4 h-4 animate-spin inline" />
@@ -238,7 +237,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
             {connectedList.length > 0 && (
               <div>
                 <p className={`text-[13px] font-medium px-1 mb-2 ${textMuted}`}>Connected</p>
-                <div className={`rounded-[20px] overflow-hidden ${card}`}>
+                <div className={`rounded-[20px] overflow-hidden glass-panel`}>
                   {connectedList.map((item, i) => (
                     <motion.button
                       key={item.provider}
@@ -248,7 +247,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                       transition={{ delay: i * 0.04, duration: 0.25 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setSelected(item.provider)}
-                      className={`w-full flex items-center gap-3.5 px-3.5 py-[14px] text-left active:opacity-80 ${
+                      className={`glass-btn w-full flex items-center gap-3.5 px-3.5 py-[14px] text-left ${
                         i < connectedList.length - 1 ? `border-b ${rowBorder}` : ''
                       }`}
                     >
@@ -257,10 +256,8 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                       >
                         {BRAND[item.provider]}
                       </div>
-                      <p className={`flex-1 text-[16px] font-medium ${textMain}`}>{item.name}</p>
-                      <ChevronRight
-                        className={`w-[18px] h-[18px] shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`}
-                      />
+                      <p className="flex-1 text-[16px] font-medium">{item.name}</p>
+                      <ChevronRight className={`w-[18px] h-[18px] shrink-0 ${textMuted}`} />
                     </motion.button>
                   ))}
                 </div>
@@ -270,7 +267,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
             {suggestedList.length > 0 && (
               <div>
                 <p className={`text-[13px] font-medium px-1 mb-2 ${textMuted}`}>Suggested</p>
-                <div className={`rounded-[20px] overflow-hidden ${card}`}>
+                <div className={`rounded-[20px] overflow-hidden glass-panel`}>
                   {suggestedList.map((item, i) => {
                     const isBusy = busy === item.provider
                     return (
@@ -288,16 +285,14 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                         >
                           {BRAND[item.provider]}
                         </div>
-                        <p className={`flex-1 text-[16px] font-medium ${textMain}`}>{item.name}</p>
+                        <p className="flex-1 text-[16px] font-medium">{item.name}</p>
                         <motion.button
                           type="button"
                           whileTap={{ scale: 0.94 }}
                           onClick={() => connect(item.provider)}
                           disabled={isBusy}
-                          className={`shrink-0 h-[30px] px-3.5 rounded-full text-[13px] font-medium transition disabled:opacity-50 ${
-                            dark
-                              ? 'bg-white/10 text-white active:bg-white/15'
-                              : 'bg-[#e8e8ed] text-slate-800 active:bg-[#dddde3]'
+                          className={`glass-btn shrink-0 h-9 px-3.5 rounded-full text-[13px] font-medium transition disabled:opacity-50 ${
+                            dark ? 'bg-white/10 text-slate-100' : 'bg-black/[0.05] text-slate-700'
                           }`}
                         >
                           {isBusy ? (
