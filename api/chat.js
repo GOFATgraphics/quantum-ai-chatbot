@@ -4,7 +4,7 @@ import { allowRequest } from './lib/rateLimit.js';
 
 export const config = { maxDuration: 300 };
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-haiku-4-5-20251001';
 // Generous enough that no real conversation hits it; stops a runaway loop or abuse from one account.
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
