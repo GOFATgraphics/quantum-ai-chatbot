@@ -5,12 +5,11 @@ type Props = {
   className?: string
   /**
    * Explicit theme override.
-   * - true  → pearl mark (for dark backgrounds)
-   * - false → dark sphere (for light backgrounds)
-   * - omit  → auto-follow html.dark / system theme
+   * - true  → light mark (for dark backgrounds)
+   * - false → dark mark (for light backgrounds)
+   * - omit  → auto-follow html.dark
    */
   dark?: boolean
-  /** Subtle floating animation */
   animated?: boolean
 }
 
@@ -19,7 +18,7 @@ function readIsDark(): boolean {
   return document.documentElement.classList.contains('dark')
 }
 
-/** Quantumy brand mark — orbital sphere with quantum core */
+/** Quantumy brand mark — monochrome orbital sphere */
 export default function Logo({ size = 32, className = '', dark, animated = false }: Props) {
   const [autoDark, setAutoDark] = useState(readIsDark)
 
@@ -48,8 +47,8 @@ export default function Logo({ size = 32, className = '', dark, animated = false
       fetchPriority={size >= 48 ? 'high' : 'auto'}
       style={{
         filter: isDark
-          ? 'drop-shadow(0 2px 12px rgba(255, 255, 255, 0.14))'
-          : 'drop-shadow(0 2px 10px rgba(0, 0, 0, 0.16))',
+          ? 'drop-shadow(0 2px 12px rgba(255,255,255,0.12))'
+          : 'drop-shadow(0 2px 10px rgba(0,0,0,0.18))',
       }}
     />
   )
