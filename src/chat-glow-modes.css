@@ -1,4 +1,4 @@
-/* Quantumy chat glow modes: idle (bottom), thinking (top + large pulse), done (none) */
+/* Quantumy chat glow modes — Grok neutral white/gray */
 .chat-glow--idle .chat-glow-orb-a,
 .chat-glow--idle .chat-glow-orb-b,
 .chat-glow--idle .chat-glow-orb-c {
@@ -29,7 +29,6 @@
   opacity: 0.85 !important;
 }
 
-/* While AI is responding — large, visible, strongly pulsing gradient across the top */
 .chat-glow--thinking .chat-glow-orb-a,
 .chat-glow--thinking .chat-glow-orb-b,
 .chat-glow--thinking .chat-glow-orb-c {
@@ -67,23 +66,24 @@
   animation: chat-glow-pulse-c 3.2s ease-in-out infinite !important;
 }
 
+/* Neutral monochrome thinking glow */
 html:not(.dark) .chat-glow--thinking .chat-glow-orb-a {
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.85) 0%, rgba(167, 139, 250, 0.45) 40%, transparent 70%) !important;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.05) 40%, transparent 70%) !important;
 }
 html:not(.dark) .chat-glow--thinking .chat-glow-orb-b {
-  background: radial-gradient(circle, rgba(196, 181, 253, 0.8) 0%, rgba(56, 189, 248, 0.4) 45%, transparent 70%) !important;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.04) 45%, transparent 70%) !important;
 }
 html:not(.dark) .chat-glow--thinking .chat-glow-orb-c {
-  background: radial-gradient(circle, rgba(165, 180, 252, 0.75) 0%, rgba(139, 92, 246, 0.35) 45%, transparent 70%) !important;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.09) 0%, rgba(0, 0, 0, 0.03) 45%, transparent 70%) !important;
 }
 html.dark .chat-glow--thinking .chat-glow-orb-a {
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.7) 0%, rgba(139, 92, 246, 0.4) 40%, transparent 70%) !important;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%) !important;
 }
 html.dark .chat-glow--thinking .chat-glow-orb-b {
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.6) 0%, rgba(56, 189, 248, 0.3) 45%, transparent 70%) !important;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.04) 45%, transparent 70%) !important;
 }
 html.dark .chat-glow--thinking .chat-glow-orb-c {
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.65) 0%, rgba(99, 102, 241, 0.3) 45%, transparent 70%) !important;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 45%, transparent 70%) !important;
 }
 
 .chat-glow--done .chat-glow-orb {
