@@ -138,8 +138,8 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
     ? 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.08]'
     : 'text-slate-400 hover:text-slate-700 hover:bg-black/[0.04]'
   const active = dark
-    ? 'text-indigo-300 bg-indigo-500/15'
-    : 'text-indigo-600 bg-indigo-50'
+    ? 'text-white bg-white/15'
+    : 'text-neutral-900 bg-neutral-100'
 
   const copy = async () => {
     try {
