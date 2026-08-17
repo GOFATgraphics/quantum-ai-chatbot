@@ -97,7 +97,7 @@ export default function EmptyState({ greeting, dark, composing = false }: Props)
         </div>
 
         <h1
-          className={`text-[1.75rem] sm:text-[2rem] font-semibold tracking-[-0.025em] leading-[1.25] max-w-md ${
+          className={`empty-greeting text-[1.75rem] sm:text-[2.05rem] font-semibold tracking-[-0.03em] leading-[1.22] max-w-md ${
             dark ? 'text-white' : 'text-slate-900'
           }`}
         >
