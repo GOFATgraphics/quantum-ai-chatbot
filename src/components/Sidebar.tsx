@@ -60,8 +60,8 @@ export default function Sidebar({
   const muted = dark ? 'text-slate-400' : 'text-slate-500'
   const hover = dark ? 'hover:bg-white/[0.08]' : 'hover:bg-black/[0.04]'
   const active = dark
-    ? 'bg-indigo-500/20 text-indigo-200'
-    : 'bg-indigo-50 text-indigo-700'
+    ? 'bg-white/10 text-white'
+    : 'bg-black/[0.06] text-black'
   const newChat = dark
     ? 'glass-btn bg-white/[0.08] hover:bg-white/[0.14]'
     : 'glass-btn bg-white/60 hover:bg-white/80'
@@ -131,7 +131,7 @@ export default function Sidebar({
         <div className="px-3 mt-3 shrink-0">
           <div
             className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] ${
-              dark ? 'bg-indigo-500/15 text-indigo-200' : 'bg-indigo-50 text-indigo-700'
+              dark ? 'bg-white/10 text-white' : 'bg-black/[0.06] text-black'
             }`}
           >
             <FolderKanban className="w-3.5 h-3.5 shrink-0 opacity-80" />
@@ -235,7 +235,7 @@ export default function Sidebar({
           onClick={onOpenSettings}
           className={`glass-panel w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 transition ${hover}`}
         >
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-sm font-semibold shrink-0">
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${dark ? 'bg-white text-black' : 'bg-black text-white'}`}>
             {initial}
           </div>
           <div className="flex-1 min-w-0 text-left">
