@@ -178,8 +178,10 @@ export default function ThinkingStatus({
 
       {liveTool && (
         <div
-          className={`ml-1 flex items-center gap-2 text-[13px] font-semibold ${
-            dark ? 'text-indigo-300' : 'text-indigo-600'
+          className={`ml-1 inline-flex items-center gap-2 text-[13px] font-semibold px-2.5 py-1 rounded-full w-fit ${
+            dark
+              ? 'text-indigo-200 bg-indigo-500/15 ring-1 ring-indigo-400/20'
+              : 'text-indigo-700 bg-indigo-50 ring-1 ring-indigo-200/60'
           }`}
         >
           <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
