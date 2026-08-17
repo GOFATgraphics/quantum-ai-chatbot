@@ -322,6 +322,7 @@ function sendSseError(res, message) {
 }
 
 export default async function handler(req, res) {
+  const tStart = Date.now(); // TEMP: chasing a 2.2s-reported vs ~7s-perceived latency gap
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -380,6 +381,7 @@ export default async function handler(req, res) {
         trimmedHistoryChars: JSON.stringify(anthropicMessages).length,
         trimmedHistoryMsgCount: anthropicMessages.length,
         incomingMsgCount: messages.length,
+        preWorkMs: Date.now() - tStart,
       });
     } catch (_) {}
 
@@ -401,6 +403,7 @@ export default async function handler(req, res) {
     const MAX_CONTINUATIONS = 2;
     let continuations = 0;
     let accumulatedText = '';
+    let tFirstDelta = null; // TEMP: see tStart above
 
     for (let round = 0; round < maxRounds; round++) {
       let data;
@@ -413,6 +416,10 @@ export default async function handler(req, res) {
           maxTokens,
           onDelta: (delta) => {
             try {
+              if (tFirstDelta === null) {
+                tFirstDelta = Date.now();
+                console.log('chat.js timing: first delta', { msSinceStart: tFirstDelta - tStart, round });
+              }
               // Raw, unstripped: stripEmDashes needs to see whole words/phrases, and
               // Anthropic's delta chunks split mid-token, so per-chunk stripping can
               // miss patterns straddling a chunk boundary. The final { content } event
@@ -450,6 +457,13 @@ export default async function handler(req, res) {
         }
         const finalText = accumulatedText || 'Sorry, I could not generate a response.';
         if (wantStream) {
+          try {
+            console.log('chat.js timing: complete', {
+              totalMs: Date.now() - tStart,
+              firstDeltaMs: tFirstDelta ? tFirstDelta - tStart : null,
+              streamingMs: tFirstDelta ? Date.now() - tFirstDelta : null,
+            });
+          } catch (_) {}
           sseWrite(res, { content: stripEmDashes(finalText) });
           sseWrite(res, { done: true });
           res.write('data: [DONE]\n\n');
