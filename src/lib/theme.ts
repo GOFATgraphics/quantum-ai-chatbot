@@ -17,13 +17,13 @@ function applyThemeDom(dark: boolean, themeMode: ThemeMode) {
   root.style.setProperty('color-scheme', dark ? 'dark' : 'light')
   const appRoot = document.getElementById('root')
   if (appRoot) {
-    appRoot.style.background = dark ? '#111114' : 'transparent'
-    appRoot.style.color = dark ? '#ececf1' : ''
+    appRoot.style.background = dark ? '#212121' : 'transparent'
+    appRoot.style.color = dark ? '#d1d1d1' : ''
   }
-  document.body.style.backgroundColor = dark ? '#111114' : ''
-  document.body.style.color = dark ? '#f1f5f9' : ''
+  document.body.style.backgroundColor = dark ? '#212121' : ''
+  document.body.style.color = dark ? '#d1d1d1' : ''
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', dark ? '#111114' : '#eef2ff')
+  if (meta) meta.setAttribute('content', dark ? '#212121' : '#d1d1d1')
   try {
     localStorage.setItem('quantumy-theme', themeMode)
   } catch { /* ignore */ }

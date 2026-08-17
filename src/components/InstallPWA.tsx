@@ -56,12 +56,12 @@ export default function InstallPWA({ dark }: Props) {
   if (!visible) return null
 
   const card = dark
-    ? 'bg-[#12121a]/95 border-white/10 text-slate-100'
-    : 'bg-white/95 border-slate-200 text-slate-900'
+    ? 'bg-[#1a1a1a] border-white/10 text-slate-100'
+    : 'bg-white border-slate-200 text-slate-900'
 
   return (
     <div className="fixed bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] left-3 right-3 sm:left-auto sm:right-6 sm:w-[340px] z-40">
-      <div className={`rounded-2xl border shadow-xl backdrop-blur-xl px-4 py-3.5 ${card}`}>
+      <div className={`rounded-2xl border shadow-xl px-4 py-3.5 ${card}`}>
         <div className="flex items-start gap-3">
           <img src="/logo.svg" alt="" width={36} height={36} className="shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">

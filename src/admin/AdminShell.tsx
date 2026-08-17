@@ -98,11 +98,11 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
   )
 
   return (
-    <div className={'min-h-dvh flex ' + (dark ? 'bg-[#0c0c10] text-slate-100' : 'bg-slate-50 text-slate-900')}>
+    <div className={'min-h-dvh flex ' + (dark ? 'bg-[#131313] text-slate-100' : 'bg-slate-50 text-slate-900')}>
       <aside
         className={
           'hidden md:flex w-60 shrink-0 flex-col border-r ' +
-          (dark ? 'bg-[#111114] border-white/5' : 'bg-white border-slate-200')
+          (dark ? 'bg-[#1a1a1a] border-white/5' : 'bg-white border-slate-200')
         }
       >
         {navContent}
@@ -114,7 +114,7 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
           <aside
             className={
               'fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] flex flex-col md:hidden shadow-2xl ' +
-              (dark ? 'bg-[#111114]' : 'bg-white')
+              (dark ? 'bg-[#1a1a1a]' : 'bg-white')
             }
           >
             <div className="absolute top-3 right-3">
@@ -137,8 +137,8 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
       <div className="flex-1 flex flex-col min-w-0">
         <header
           className={
-            'h-14 shrink-0 flex items-center gap-3 px-4 border-b backdrop-blur-sm ' +
-            (dark ? 'border-white/5 bg-[#111114]/80' : 'border-slate-200 bg-white/80')
+            'h-14 shrink-0 flex items-center gap-3 px-4 border-b ' +
+            (dark ? 'border-white/5 bg-[#1a1a1a]' : 'border-slate-200 bg-white')
           }
         >
           <button

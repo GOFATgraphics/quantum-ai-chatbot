@@ -22,7 +22,7 @@ type Props = {
   onOpenDashboard: (id: string) => void
 }
 
-const COLORS = ['#6366f1', '#f43f5e', '#f59e0b', '#10b981', '#0ea5e9', '#8b5cf6', '#f97316', '#64748b']
+const COLORS = ['#e8e8e8', '#d1d1d1', '#afafaf', '#8c8c8c', '#737373', '#595959', '#4a4a4a', '#212121']
 
 export default function ProjectsWorkspace({
   dark,

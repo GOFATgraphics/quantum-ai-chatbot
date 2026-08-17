@@ -208,7 +208,7 @@ export default function App() {
     if (!user) return
     const { data, error } = await supabase
       .from('projects')
-      .insert({ user_id: user.id, name: name.trim(), description: description?.trim() || null, color: color || '#6366f1' })
+      .insert({ user_id: user.id, name: name.trim(), description: description?.trim() || null, color: color || '#e8e8e8' })
       .select()
       .single()
     if (error || !data) throw error || new Error('Could not create project')
@@ -597,7 +597,7 @@ export default function App() {
         {mobileSidebar && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/25 z-40 lg:hidden" onClick={() => setMobileSidebar(false)} />
-            <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }} transition={{ type: 'spring', damping: 32, stiffness: 360 }} className={'fixed inset-y-0 left-0 z-50 w-[min(320px,90vw)] lg:hidden shadow-2xl ' + (dark ? 'bg-[#16161f]' : 'bg-white')}>
+            <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }} transition={{ type: 'spring', damping: 32, stiffness: 360 }} className={'fixed inset-y-0 left-0 z-50 w-[min(320px,90vw)] lg:hidden shadow-2xl ' + (dark ? 'bg-[#1a1a1a]' : 'bg-white')}>
               <Sidebar {...sidebarProps} showClose onClose={() => setMobileSidebar(false)} />
             </motion.div>
           </>
