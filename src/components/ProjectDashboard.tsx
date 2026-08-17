@@ -9,6 +9,7 @@ import type { User } from '@supabase/supabase-js'
 import NoteRow from './NoteRow'
 import StatTile from './StatTile'
 import { NOTE_TYPE_LABEL } from '../lib/noteHelpers'
+import { NOTES_ENABLED } from '../lib/features'
 
 type Props = {
   dark: boolean
@@ -77,6 +78,10 @@ export default function ProjectDashboard({
   }, [project])
 
   useEffect(() => {
+    if (!NOTES_ENABLED) {
+      setLoadingNotes(false)
+      return
+    }
     let cancelled = false
     setLoadingNotes(true)
     ;(async () => {
@@ -315,10 +320,10 @@ export default function ProjectDashboard({
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2.5 mb-5">
+        <div className={`grid gap-2.5 mb-5 ${NOTES_ENABLED ? 'grid-cols-3' : 'grid-cols-1'}`}>
           <StatTile dark={dark} value={projectChats.length} label="Chats" />
-          <StatTile dark={dark} value={openNotes.length} label="Open notes" />
-          <StatTile dark={dark} value={overdueNotes.length} label="Overdue" alert={overdueNotes.length > 0} />
+          {NOTES_ENABLED && <StatTile dark={dark} value={openNotes.length} label="Open notes" />}
+          {NOTES_ENABLED && <StatTile dark={dark} value={overdueNotes.length} label="Overdue" alert={overdueNotes.length > 0} />}
         </div>
 
         <button
@@ -332,7 +337,7 @@ export default function ProjectDashboard({
           New chat in this project
         </button>
 
-        <div className="grid md:grid-cols-2 gap-5">
+        <div className={`grid gap-5 ${NOTES_ENABLED ? 'md:grid-cols-2' : ''}`}>
           <div>
             <p className={`text-xs font-medium uppercase tracking-wide mb-2 px-1 ${muted}`}>Recent chats</p>
             {projectChats.length === 0 ? (
@@ -356,6 +361,7 @@ export default function ProjectDashboard({
             )}
           </div>
 
+          {NOTES_ENABLED && (
           <div>
             <div className="flex items-center justify-between mb-2 px-1">
               <p className={`text-xs font-medium uppercase tracking-wide ${muted}`}>Notes</p>
@@ -449,6 +455,7 @@ export default function ProjectDashboard({
               </AnimatePresence>
             )}
           </div>
+          )}
         </div>
 
         <div className={`mt-8 pt-4 border-t ${dark ? 'border-white/10' : 'border-black/10'}`}>

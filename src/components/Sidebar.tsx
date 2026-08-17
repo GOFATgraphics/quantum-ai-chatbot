@@ -23,7 +23,7 @@ type Props = {
   onOpenSettings: () => void
   onOpenConnectors: () => void
   onOpenProjects: () => void
-  onOpenNotes: () => void
+  onOpenNotes?: () => void
   onSelectProject: (id: string | null) => void
   onOpenCommandPalette?: () => void
   onClose?: () => void
@@ -122,10 +122,12 @@ export default function Sidebar({
           <ChevronRight className={`w-4 h-4 shrink-0 ${muted}`} />
         </button>
 
-        <button type="button" onClick={onOpenNotes} className={row}>
-          <StickyNote className="w-[18px] h-[18px]" />
-          <span className="flex-1 text-left">Notes</span>
-        </button>
+        {onOpenNotes && (
+          <button type="button" onClick={onOpenNotes} className={row}>
+            <StickyNote className="w-[18px] h-[18px]" />
+            <span className="flex-1 text-left">Notes</span>
+          </button>
+        )}
       </div>
 
       {activeProject && (

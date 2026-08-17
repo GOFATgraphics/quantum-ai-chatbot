@@ -18,7 +18,7 @@ type Props = {
   onUpdateProject: (id: string, patch: { name?: string; description?: string | null; color?: string }) => void | Promise<void>
   onDeleteProject: (id: string) => void | Promise<void>
   onNewChat?: () => void
-  onOpenNotesForProject: (id: string) => void
+  onOpenNotesForProject?: (id: string) => void
   onOpenDashboard: (id: string) => void
 }
 
@@ -316,15 +316,17 @@ export default function ProjectsWorkspace({
                       <ChevronRight className={`w-4 h-4 shrink-0 opacity-0 group-hover:opacity-60 ${muted}`} />
                     )}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onOpenNotesForProject(p.id)}
-                    className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-400 hover:text-amber-500 shrink-0"
-                    aria-label={`View notes for ${p.name}`}
-                    title="View notes"
-                  >
-                    <StickyNote className="w-4 h-4" />
-                  </button>
+                  {onOpenNotesForProject && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenNotesForProject(p.id)}
+                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-400 hover:text-amber-500 shrink-0"
+                      aria-label={`View notes for ${p.name}`}
+                      title="View notes"
+                    >
+                      <StickyNote className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => startEdit(p)}

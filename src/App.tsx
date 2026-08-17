@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, Loader2, PenLine, Sun, Moon } from 'lucide-react'
 import { supabase, type Conversation, type DbMessage, type Project, makeChatTitle } from './lib/supabase'
 import { useTheme } from './lib/theme'
+import { NOTES_ENABLED } from './lib/features'
 import Auth from './components/Auth'
 import Sidebar from './components/Sidebar'
 import Settings from './components/Settings'
@@ -584,7 +585,7 @@ export default function App() {
     onOpenSettings: () => { setShowSettings(true); setMobileSidebar(false) },
     onOpenConnectors: () => { setShowConnectors(true); setMobileSidebar(false) },
     onOpenProjects: () => { setShowProjects(true); setMobileSidebar(false) },
-    onOpenNotes: () => { setShowNotes(true); setMobileSidebar(false) },
+    onOpenNotes: NOTES_ENABLED ? () => { setShowNotes(true); setMobileSidebar(false) } : undefined,
     onSelectProject: setCurrentProjectId,
     onOpenCommandPalette: () => { setShowCommandPalette(true); setMobileSidebar(false) },
   }
@@ -684,7 +685,7 @@ export default function App() {
         {session?.access_token && <Connectors dark={dark} accessToken={session.access_token} onClose={() => setShowConnectors(false)} />}
       </Sheet>
       <Sheet open={showProjects} onClose={() => setShowProjects(false)} label="Projects">
-        <ProjectsWorkspace dark={dark} user={user} projects={projects} conversations={conversations} currentProjectId={currentProjectId} onClose={() => setShowProjects(false)} onSelectProject={setCurrentProjectId} onCreateProject={createProject} onUpdateProject={updateProject} onDeleteProject={deleteProject} onNewChat={() => { setShowProjects(false); startNewChat() }} onOpenNotesForProject={openNotesForProject} onOpenDashboard={(id) => { setCurrentProjectId(id); setOpenProjectId(id) }} />
+        <ProjectsWorkspace dark={dark} user={user} projects={projects} conversations={conversations} currentProjectId={currentProjectId} onClose={() => setShowProjects(false)} onSelectProject={setCurrentProjectId} onCreateProject={createProject} onUpdateProject={updateProject} onDeleteProject={deleteProject} onNewChat={() => { setShowProjects(false); startNewChat() }} onOpenNotesForProject={NOTES_ENABLED ? openNotesForProject : undefined} onOpenDashboard={(id) => { setCurrentProjectId(id); setOpenProjectId(id) }} />
       </Sheet>
       <Sheet open={!!(openProjectId && projects.find((p) => p.id === openProjectId))} onClose={() => setOpenProjectId(null)} label="Project dashboard" width="wide">
         {openProjectId && projects.find((p) => p.id === openProjectId) && (
