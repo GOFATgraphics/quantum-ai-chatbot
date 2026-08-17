@@ -29,12 +29,14 @@ function extractText(blocks) {
 // Long-lived conversations resend their full history on every message with no
 // cap, so a thread that grows to hundreds of exchanges (or has a few large
 // pasted files in it) gets proportionally more expensive forever. Keep the
-// most recent messages up to a character budget (~4 chars/token, so this is
-// roughly a 12k-token ceiling on history alone), always keeping at least the
+// most recent messages up to a character budget, always keeping at least the
 // current turn even if it alone exceeds the budget.
-// First-cut value pending stage 2 (memory doing more of the continuity work).
-// Watch real usage after shipping before tightening further.
-const MAX_HISTORY_CHARS = 48_000;
+// Real production data (2026-08-17) showed ~1.46 chars/token overall, but
+// that was dominated by dense JSON tool schemas; history is mostly plain
+// conversational text, so ~2.5 chars/token is a more realistic estimate here
+// (roughly a 12k-token ceiling on history alone). Still an approximation —
+// watch real usage after shipping before tightening further.
+const MAX_HISTORY_CHARS = 30_000;
 function trimHistory(msgs) {
   if (msgs.length <= 1) return msgs;
   let total = 0;
@@ -130,8 +132,13 @@ function buildStaticSystemPrompt({ connected }) {
 // can blow the token budget just as badly as too many short ones — this
 // caps by size too, keeping the most recently updated facts first (the
 // query already orders that way) and dropping older ones once the budget
-// is hit. First-cut value pending stage 2 (real pruning instead of a cap).
-const MAX_MEMORY_CHARS = 12_000;
+// is hit. Retightened 2026-08-17: production data showed ~1.46 chars/token
+// overall (vs. the ~4:1 this was first set against), so the original 12,000
+// was roughly 3x more generous in real tokens than intended. Using ~2.5
+// chars/token here (facts are mostly plain sentences, not dense JSON like
+// the tool schemas that skewed the measured ratio). First-cut value pending
+// stage 2 (real pruning instead of a cap).
+const MAX_MEMORY_CHARS = 7_500;
 function trimMemory(memory) {
   if (!memory?.length) return memory;
   let total = 0;
