@@ -360,6 +360,22 @@ export default async function handler(req, res) {
       }))
     );
 
+    // TEMP diagnostic — chasing an unexplained high token floor on empty
+    // conversations. Remove once the size breakdown below is confirmed.
+    try {
+      console.log('chat.js size breakdown', {
+        staticPromptChars: systemPrompt.staticPrompt.length,
+        dynamicContextChars: systemPrompt.dynamicContext.length,
+        toolsChars: JSON.stringify(tools).length,
+        toolCount: tools.length,
+        memoryFactCount: memory.length,
+        memoryFactsCharsRaw: memory.reduce((s, m) => s + (m.fact?.length || 0), 0),
+        trimmedHistoryChars: JSON.stringify(anthropicMessages).length,
+        trimmedHistoryMsgCount: anthropicMessages.length,
+        incomingMsgCount: messages.length,
+      });
+    } catch (_) {}
+
     if (wantStream) {
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
