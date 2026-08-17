@@ -185,7 +185,7 @@ export default function CommandPalette({
   let flatIndex = -1
 
   const panel = dark
-    ? 'bg-[#1c1c1e]/border-white/10 text-slate-100'
+    ? 'bg-[#262626] border-white/10 text-slate-100'
     : 'bg-white border-black/10 text-slate-900'
   const inputCls = dark
     ? 'text-slate-100 placeholder:text-slate-500'
@@ -204,7 +204,7 @@ export default function CommandPalette({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
         >
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
+          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
           <motion.div
             role="dialog"
             aria-modal="true"

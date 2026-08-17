@@ -5,7 +5,7 @@
  * requests — verify it so this endpoint can't be triggered by anyone else.
  */
 import { getAdminClient } from '../lib/supabaseAdmin.js';
-import { getValidToken } from '../lib/claudeTools.js';
+import { getValidToken, NOTES_ENABLED } from '../lib/claudeTools.js';
 import { sendGmail } from '../lib/google.js';
 
 const REMIND_EVERY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -17,6 +17,9 @@ export default async function handler(req, res) {
   if (!expected || auth !== `Bearer ${expected}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
+  // Notes feature is paused pending relaunch; skip so no one gets emailed
+  // about a note they currently have no UI to open or dismiss.
+  if (!NOTES_ENABLED) return res.status(200).json({ skipped: 'notes_disabled' });
 
   const admin = getAdminClient();
   const nowIso = new Date().toISOString();

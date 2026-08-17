@@ -59,7 +59,7 @@ function Toggle({
         onChange()
       }}
       className={`relative w-12 h-7 rounded-full shrink-0 transition-colors ${
-        on ? 'bg-blue-500' : dark ? 'bg-white/20' : 'bg-slate-300'
+        on ? 'bg-indigo-600' : dark ? 'bg-white/20' : 'bg-slate-300'
       }`}
     >
       <span
@@ -496,7 +496,7 @@ export default function Settings({
                   type="button"
                   onClick={saveProfile}
                   disabled={savingProfile}
-                  className="w-full h-11 rounded-xl bg-blue-500 text-white text-[16px] font-medium disabled:opacity-50"
+                  className="w-full h-11 rounded-xl bg-indigo-600 text-white text-[16px] font-medium disabled:opacity-50"
                 >
                   {savingProfile ? (
                     <Loader2 className="w-4 h-4 animate-spin inline" />
@@ -635,7 +635,7 @@ export default function Settings({
                   type="button"
                   onClick={saveProfile}
                   disabled={savingProfile}
-                  className="mt-3 w-full h-11 rounded-xl bg-blue-500 text-white text-[16px] font-medium disabled:opacity-50"
+                  className="mt-3 w-full h-11 rounded-xl bg-indigo-600 text-white text-[16px] font-medium disabled:opacity-50"
                 >
                   {savingProfile ? (
                     <Loader2 className="w-4 h-4 animate-spin inline" />
@@ -685,7 +685,7 @@ export default function Settings({
             <button
               type="button"
               onClick={onOpenConnectors}
-              className="w-full h-11 rounded-xl bg-blue-500 text-white text-[16px] font-medium flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-xl bg-indigo-600 text-white text-[16px] font-medium flex items-center justify-center gap-2"
             >
               <Link2 className="w-4 h-4" />
               Manage connectors
@@ -730,7 +730,7 @@ export default function Settings({
                     type="button"
                     onClick={addMemory}
                     disabled={savingMem || !newFact.trim()}
-                    className="h-11 px-4 rounded-xl bg-blue-500 text-white text-[15px] font-medium disabled:opacity-40 flex items-center gap-1.5"
+                    className="h-11 px-4 rounded-xl bg-indigo-600 text-white text-[15px] font-medium disabled:opacity-40 flex items-center gap-1.5"
                   >
                     {savingMem ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                     Add
@@ -781,7 +781,7 @@ export default function Settings({
                               type="button"
                               onClick={() => saveEditMemory(m.id)}
                               disabled={!editText.trim() || savingEditId === m.id}
-                              className="h-8 px-3 rounded-lg text-[13px] font-medium bg-blue-500 text-white disabled:opacity-40 flex items-center gap-1.5"
+                              className="h-8 px-3 rounded-lg text-[13px] font-medium bg-indigo-600 text-white disabled:opacity-40 flex items-center gap-1.5"
                             >
                               {savingEditId === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                               Save
@@ -804,7 +804,7 @@ export default function Settings({
                         <button
                           type="button"
                           onClick={() => startEditMemory(m)}
-                          className={`p-1.5 rounded-lg ${dark ? 'text-white/30 hover:text-blue-400' : 'text-slate-400 hover:text-blue-500'}`}
+                          className={`p-1.5 rounded-lg ${dark ? 'text-white/45 hover:text-indigo-400' : 'text-slate-400 hover:text-indigo-500'}`}
                           aria-label="Edit memory"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -815,7 +815,7 @@ export default function Settings({
                           disabled={deletingId === m.id}
                           className={`p-1.5 rounded-lg ${
                             dark
-                              ? 'text-white/30 hover:text-red-400'
+                              ? 'text-white/45 hover:text-red-400'
                               : 'text-slate-400 hover:text-red-500'
                           }`}
                           aria-label="Delete memory"

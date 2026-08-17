@@ -60,7 +60,7 @@ export default function AdminApp() {
       <div
         className={
           'min-h-dvh flex flex-col items-center justify-center gap-4 ' +
-          (dark ? 'bg-[#0c0c10]' : 'bg-slate-50')
+          (dark ? 'bg-[#131313]' : 'bg-slate-50')
         }
       >
         <Logo size={48} dark={dark} />
@@ -79,7 +79,7 @@ export default function AdminApp() {
       <div
         className={
           'min-h-dvh flex flex-col items-center justify-center px-6 ' +
-          (dark ? 'bg-[#0c0c10] text-slate-100' : 'bg-slate-50 text-slate-900')
+          (dark ? 'bg-[#131313] text-slate-100' : 'bg-slate-50 text-slate-900')
         }
       >
         <div

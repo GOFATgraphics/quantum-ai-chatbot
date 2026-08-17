@@ -60,7 +60,7 @@ export default function Auth({ onSuccess }: Props) {
   }
 
   return (
-    <div className="min-h-dvh w-full flex flex-col items-center justify-center relative overflow-hidden bg-[#05050a] px-5 py-10">
+    <div className="min-h-dvh w-full flex flex-col items-center justify-center relative overflow-hidden bg-[#131313] px-5 py-10">
       {/* Soft ambient glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[480px] h-[320px] rounded-full bg-indigo-600/20 blur-[100px]" />
@@ -87,8 +87,7 @@ export default function Auth({ onSuccess }: Props) {
 
         {/* Card */}
         <div className="relative">
-          <div className="absolute -inset-px rounded-[24px] bg-gradient-to-b from-white/15 via-white/5 to-transparent opacity-70" />
-          <div className="relative rounded-[24px] bg-white/[0.04] backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl shadow-black/40">
+          <div className="relative bg-[#1a1a1a] border-2 border-white/80 p-6 sm:p-7 shadow-2xl">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-white tracking-tight">
                 {mode === 'login' ? 'Welcome back' : 'Create your account'}

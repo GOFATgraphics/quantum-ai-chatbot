@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  X, Plus, Trash2, StickyNote, Check, Loader2, EyeOff, AlertTriangle,
-  ChevronDown, ChevronRight, Tag, ListChecks,
-} from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
+import { X, Plus, StickyNote, Check, Loader2, Tag, AlertCircle } from 'lucide-react'
 import { supabase, type Note, type NoteType, type NotePriority, type Project, type ChecklistItem } from '../lib/supabase'
 import type { User } from '@supabase/supabase-js'
+import NoteRow from './NoteRow'
+import StatTile from './StatTile'
+import { NOTE_TYPE_LABEL } from '../lib/noteHelpers'
 
 type Props = {
   dark: boolean
@@ -17,28 +17,8 @@ type Props = {
 
 type StatusFilter = 'open' | 'done' | 'dismissed' | 'all'
 const UNTAGGED = '__untagged__'
-
-const NOTE_TYPE_LABEL: Record<NoteType, string> = {
-  action_item: 'Action',
-  trade_note: 'Trade',
-  decision: 'Decision',
-  alert: 'Alert',
-}
-
-const PRIORITY_DOT: Record<NotePriority, string> = {
-  high: 'bg-rose-500',
-  medium: 'bg-amber-500',
-  low: 'bg-slate-400',
-}
-
-function dueLabel(iso: string): { text: string; overdue: boolean } {
-  const ms = new Date(iso).getTime() - Date.now()
-  const overdue = ms < 0
-  const days = Math.round(Math.abs(ms) / 86_400_000)
-  if (overdue) return { text: days === 0 ? 'due today' : `${days}d overdue`, overdue: true }
-  if (days === 0) return { text: 'due today', overdue: false }
-  return { text: `due in ${days}d`, overdue: false }
-}
+// Hints there's more to scroll without needing to detect overflow in JS.
+const SCROLL_FADE = { WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)', maskImage: 'linear-gradient(to right, black calc(100% - 24px), transparent)' }
 
 export default function NotesDashboard({ dark, user, projects, currentProjectId, onClose }: Props) {
   const [notes, setNotes] = useState<Note[]>([])
@@ -48,6 +28,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
   const [topicFilter, setTopicFilter] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const [showForm, setShowForm] = useState(false)
   const [text, setText] = useState('')
@@ -58,9 +39,6 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
   const [tagsInput, setTagsInput] = useState('')
   const [checklistInput, setChecklistInput] = useState('')
   const [saving, setSaving] = useState(false)
-
-  const [addingItemTo, setAddingItemTo] = useState<string | null>(null)
-  const [newItemText, setNewItemText] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -157,6 +135,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
     const n = text.trim()
     if (!n || saving) return
     setSaving(true)
+    setError(null)
     try {
       const matchedProject = projectName.trim()
         ? projects.find((p) => p.name.toLowerCase() === projectName.trim().toLowerCase())
@@ -170,7 +149,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
         .map((l) => l.trim())
         .filter(Boolean)
         .map((t) => ({ id: crypto.randomUUID(), text: t, done: false }))
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabase
         .from('notes')
         .insert({
           user_id: user.id,
@@ -185,10 +164,11 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
         })
         .select()
         .single()
-      if (!error && data) {
-        setNotes((p) => [data as Note, ...p])
-        resetForm()
-      }
+      if (dbError || !data) throw dbError || new Error('Insert failed')
+      setNotes((p) => [data as Note, ...p])
+      resetForm()
+    } catch {
+      setError('Could not save note. Try again.')
     } finally {
       setSaving(false)
     }
@@ -196,12 +176,16 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
 
   const setStatus = async (n: Note, status: Note['status']) => {
     setBusyId(n.id)
+    setError(null)
     try {
-      const { error } = await supabase
+      const { error: dbError } = await supabase
         .from('notes')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', n.id)
-      if (!error) setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, status } : x)))
+      if (dbError) throw dbError
+      setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, status } : x)))
+    } catch {
+      setError('Could not update note. Try again.')
     } finally {
       setBusyId(null)
     }
@@ -209,34 +193,22 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
 
   const remove = async (id: string) => {
     setBusyId(id)
+    setError(null)
     try {
-      const { error } = await supabase.from('notes').delete().eq('id', id)
-      if (!error) setNotes((p) => p.filter((x) => x.id !== id))
+      const { error: dbError } = await supabase.from('notes').delete().eq('id', id)
+      if (dbError) throw dbError
+      setNotes((p) => p.filter((x) => x.id !== id))
+    } catch {
+      setError('Could not delete note. Try again.')
     } finally {
       setBusyId(null)
     }
   }
 
-  const toggleChecklistItem = async (n: Note, itemId: string) => {
-    const newChecklist = n.checklist.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it))
-    setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, checklist: newChecklist } : x)))
-    await supabase.from('notes').update({ checklist: newChecklist, updated_at: new Date().toISOString() }).eq('id', n.id)
-  }
-
-  const removeChecklistItem = async (n: Note, itemId: string) => {
-    const newChecklist = n.checklist.filter((it) => it.id !== itemId)
-    setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, checklist: newChecklist } : x)))
-    await supabase.from('notes').update({ checklist: newChecklist, updated_at: new Date().toISOString() }).eq('id', n.id)
-  }
-
-  const addChecklistItem = async (n: Note) => {
-    const t = newItemText.trim()
-    if (!t) return
-    const newChecklist = [...n.checklist, { id: crypto.randomUUID(), text: t, done: false }]
-    setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, checklist: newChecklist } : x)))
-    setNewItemText('')
-    setAddingItemTo(null)
-    await supabase.from('notes').update({ checklist: newChecklist, updated_at: new Date().toISOString() }).eq('id', n.id)
+  const updateChecklist = async (n: Note, checklist: ChecklistItem[]) => {
+    setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, checklist } : x)))
+    const { error: dbError } = await supabase.from('notes').update({ checklist, updated_at: new Date().toISOString() }).eq('id', n.id)
+    if (dbError) setError('Could not update checklist. Try again.')
   }
 
   const toggleExpanded = (id: string) => {
@@ -246,177 +218,6 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
       else next.add(id)
       return next
     })
-  }
-
-  const NoteRow = ({ n }: { n: Note }) => {
-    const due = n.due_date ? dueLabel(n.due_date) : null
-    const isOverdue = !!due?.overdue && n.status === 'open'
-    const isExpanded = expanded.has(n.id)
-    const checklistDone = n.checklist.filter((it) => it.done).length
-    const projectObj = n.project_id ? projects.find((p) => p.id === n.project_id) : null
-    return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-        className={`group rounded-2xl mb-1.5 px-3.5 py-3 ${isOverdue ? (dark ? 'bg-rose-500/[0.07]' : 'bg-rose-50/70') : hover}`}
-      >
-        <div className="flex items-start gap-3">
-          <button
-            type="button"
-            onClick={() => setStatus(n, n.status === 'open' ? 'done' : 'open')}
-            disabled={busyId === n.id}
-            aria-label={n.status === 'open' ? 'Mark done' : 'Mark open'}
-            className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition ${
-              n.status === 'done'
-                ? 'bg-emerald-500 text-white'
-                : n.status === 'dismissed'
-                  ? dark ? 'bg-white/10 text-slate-500' : 'bg-black/[0.06] text-slate-400'
-                  : dark ? 'ring-1 ring-white/25' : 'ring-1 ring-slate-300'
-            }`}
-          >
-            {n.status === 'done' && <Check className="w-3 h-3" />}
-            {n.status === 'dismissed' && <EyeOff className="w-3 h-3" />}
-          </button>
-          <div className="flex-1 min-w-0">
-            <p className={`text-[14px] leading-snug ${n.status !== 'open' ? `line-through ${muted}` : ''}`}>{n.note}</p>
-            <div className={`flex flex-wrap items-center gap-1.5 mt-1.5 text-[12px] ${muted}`}>
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[n.priority]}`} />
-                {NOTE_TYPE_LABEL[n.note_type]}
-              </span>
-              {projectObj && (
-                <span className={`px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>{projectObj.name}</span>
-              )}
-              {n.trade_ref && (
-                <span className={`px-1.5 py-0.5 rounded-md font-mono ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>{n.trade_ref}</span>
-              )}
-              {due && (
-                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${isOverdue ? 'bg-rose-500/15 text-rose-500' : dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>
-                  {isOverdue && <AlertTriangle className="w-3 h-3" />}
-                  {due.text}
-                </span>
-              )}
-              {n.tags && n.tags.length > 0 && !topicFilter && (
-                <span className="flex items-center gap-1 flex-wrap">
-                  {n.tags.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setTopicFilter(t)}
-                      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md ${dark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-600'}`}
-                    >
-                      <Tag className="w-2.5 h-2.5" />
-                      {t}
-                    </button>
-                  ))}
-                </span>
-              )}
-              {n.checklist.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => toggleExpanded(n.id)}
-                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}
-                >
-                  <ListChecks className="w-3 h-3" />
-                  {checklistDone}/{n.checklist.length}
-                  {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                </button>
-              )}
-              {n.checklist.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddingItemTo(n.id)
-                    toggleExpanded(n.id)
-                  }}
-                  className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-indigo-500"
-                >
-                  <Plus className="w-3 h-3" />
-                  Checklist
-                </button>
-              )}
-            </div>
-
-            {isExpanded && (
-              <div className="mt-2 space-y-1 pl-1">
-                {n.checklist.map((item) => (
-                  <div key={item.id} className="flex items-center gap-2 group/item">
-                    <button
-                      type="button"
-                      onClick={() => toggleChecklistItem(n, item.id)}
-                      className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
-                        item.done ? 'bg-emerald-500 text-white' : dark ? 'ring-1 ring-white/25' : 'ring-1 ring-slate-300'
-                      }`}
-                    >
-                      {item.done && <Check className="w-2.5 h-2.5" />}
-                    </button>
-                    <span className={`text-[13px] flex-1 ${item.done ? `line-through ${muted}` : ''}`}>{item.text}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeChecklistItem(n, item.id)}
-                      className="opacity-0 group-hover/item:opacity-100 text-slate-400 hover:text-red-500"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {addingItemTo === n.id ? (
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      autoFocus
-                      value={newItemText}
-                      onChange={(e) => setNewItemText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') addChecklistItem(n)
-                        if (e.key === 'Escape') setAddingItemTo(null)
-                      }}
-                      placeholder="New step"
-                      className={`flex-1 h-8 rounded-lg px-2 text-[13px] outline-none glass-panel ${dark ? 'text-slate-100' : 'text-slate-900'}`}
-                    />
-                    <button type="button" onClick={() => addChecklistItem(n)} className="text-indigo-500 text-[13px] font-medium">
-                      Add
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setAddingItemTo(n.id)}
-                    className={`text-[12px] font-medium flex items-center gap-1 pt-1 ${dark ? 'text-indigo-300' : 'text-indigo-600'}`}
-                  >
-                    <Plus className="w-3 h-3" />
-                    Add step
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            {n.status !== 'dismissed' && (
-              <button
-                type="button"
-                onClick={() => setStatus(n, 'dismissed')}
-                disabled={busyId === n.id}
-                className="opacity-0 sm:group-hover:opacity-100 p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center text-slate-400 hover:text-slate-600 disabled:opacity-40"
-                aria-label="Dismiss note"
-              >
-                <EyeOff className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => remove(n.id)}
-              disabled={busyId === n.id}
-              className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center text-slate-400 hover:text-red-500 disabled:opacity-40"
-              aria-label="Delete note"
-            >
-              {busyId === n.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    )
   }
 
   return (
@@ -432,7 +233,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
         <button
           type="button"
           onClick={onClose}
-          className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${hover}`}
+          className={`glass-btn w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${hover}`}
           aria-label="Close notes"
         >
           <X className={`w-5 h-5 ${dark ? 'text-slate-300' : 'text-slate-600'}`} />
@@ -440,19 +241,17 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6">
+        {error && (
+          <div className={`mb-4 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[13px] ${dark ? 'bg-rose-500/10 text-rose-300 ring-1 ring-rose-400/25' : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'}`}>
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {error}
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-2.5 mb-5">
-          <div className={`rounded-2xl px-3 py-3 ${card}`}>
-            <p className="text-2xl font-semibold tabular-nums">{stats.open}</p>
-            <p className={`text-[12px] ${muted}`}>Open notes</p>
-          </div>
-          <div className={`rounded-2xl px-3 py-3 ${stats.overdue > 0 ? (dark ? 'bg-rose-500/10 ring-1 ring-rose-400/25' : 'bg-rose-50 ring-1 ring-rose-200') : card}`}>
-            <p className={`text-2xl font-semibold tabular-nums ${stats.overdue > 0 ? 'text-rose-500' : ''}`}>{stats.overdue}</p>
-            <p className={`text-[12px] ${stats.overdue > 0 ? 'text-rose-500/80' : muted}`}>Overdue</p>
-          </div>
-          <div className={`rounded-2xl px-3 py-3 ${card}`}>
-            <p className="text-2xl font-semibold tabular-nums">{stats.topics}</p>
-            <p className={`text-[12px] ${muted}`}>Topics</p>
-          </div>
+          <StatTile dark={dark} value={stats.open} label="Open notes" />
+          <StatTile dark={dark} value={stats.overdue} label="Overdue" alert={stats.overdue > 0} />
+          <StatTile dark={dark} value={stats.topics} label="Topics" />
         </div>
 
         <div className="mb-4">
@@ -522,7 +321,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto">
+        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto" style={SCROLL_FADE}>
           {(['open', 'done', 'dismissed', 'all'] as StatusFilter[]).map((s) => (
             <button key={s} type="button" onClick={() => setStatusFilter(s)} className={`${chip} ${statusFilter === s ? chipActive : hover}`}>
               {s === 'open' ? 'Open' : s === 'done' ? 'Done' : s === 'dismissed' ? 'Dismissed' : 'All'}
@@ -544,7 +343,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
         </div>
 
         {topics.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-4 overflow-x-auto">
+          <div className="flex items-center gap-1.5 mb-4 overflow-x-auto" style={SCROLL_FADE}>
             <button type="button" onClick={() => setTopicFilter(null)} className={`${chip} ${!topicFilter ? chipActive : hover}`}>
               All topics
             </button>
@@ -572,7 +371,28 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
           </p>
         ) : topicFilter || !grouped ? (
           <AnimatePresence initial={false}>
-            {filtered.map((n) => <NoteRow key={n.id} n={n} />)}
+            {filtered.map((n) => (
+              <NoteRow
+                key={n.id}
+                dark={dark}
+                note={n}
+                busy={busyId === n.id}
+                expanded={expanded.has(n.id)}
+                onToggleExpanded={() => toggleExpanded(n.id)}
+                onSetStatus={(status) => setStatus(n, status)}
+                onDismiss={() => setStatus(n, 'dismissed')}
+                onDelete={() => remove(n.id)}
+                onToggleChecklistItem={(itemId) =>
+                  updateChecklist(n, n.checklist.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it)))
+                }
+                onRemoveChecklistItem={(itemId) => updateChecklist(n, n.checklist.filter((it) => it.id !== itemId))}
+                onAddChecklistItem={(itemText) =>
+                  updateChecklist(n, [...n.checklist, { id: crypto.randomUUID(), text: itemText, done: false }])
+                }
+                projectName={n.project_id ? projects.find((p) => p.id === n.project_id)?.name : null}
+                onTagClick={(t) => setTopicFilter(t)}
+              />
+            ))}
           </AnimatePresence>
         ) : (
           <div className="space-y-5">
@@ -586,7 +406,27 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
                   <span className={`text-xs ${muted}`}>({rows.length})</span>
                 </div>
                 <AnimatePresence initial={false}>
-                  {rows.map((n) => <NoteRow key={n.id} n={n} />)}
+                  {rows.map((n) => (
+                    <NoteRow
+                      key={n.id}
+                      dark={dark}
+                      note={n}
+                      busy={busyId === n.id}
+                      expanded={expanded.has(n.id)}
+                      onToggleExpanded={() => toggleExpanded(n.id)}
+                      onSetStatus={(status) => setStatus(n, status)}
+                      onDismiss={() => setStatus(n, 'dismissed')}
+                      onDelete={() => remove(n.id)}
+                      onToggleChecklistItem={(itemId) =>
+                        updateChecklist(n, n.checklist.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it)))
+                      }
+                      onRemoveChecklistItem={(itemId) => updateChecklist(n, n.checklist.filter((it) => it.id !== itemId))}
+                      onAddChecklistItem={(itemText) =>
+                        updateChecklist(n, [...n.checklist, { id: crypto.randomUUID(), text: itemText, done: false }])
+                      }
+                      projectName={n.project_id ? projects.find((p) => p.id === n.project_id)?.name : null}
+                    />
+                  ))}
                 </AnimatePresence>
               </div>
             ))}

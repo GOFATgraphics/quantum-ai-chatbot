@@ -20,11 +20,7 @@ export default function Logo({ size = 32, className = '', dark = false, animated
       draggable={false}
       decoding="async"
       fetchPriority={size >= 48 ? 'high' : 'auto'}
-      style={{
-        filter: dark
-          ? 'drop-shadow(0 4px 16px rgba(129, 140, 248, 0.35))'
-          : 'drop-shadow(0 4px 14px rgba(79, 70, 229, 0.22))',
-      }}
+      style={{ filter: 'grayscale(1)' }}
     />
   )
 }

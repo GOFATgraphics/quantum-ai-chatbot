@@ -35,6 +35,9 @@ import {
 } from './microsoft.js';
 import { READ_DRIVE_FILE_TOOL, LIST_DRIVE_FOLDER_TOOL, handleReadDriveFile, handleListDriveFolder } from './driveRead.js';
 
+// Notes feature is paused pending relaunch. Flip to re-enable; nothing else to change.
+export const NOTES_ENABLED = false;
+
 /** Anthropic server-side tools — executed by Anthropic, not by us */
 export const ANTHROPIC_WEB_SEARCH_TOOL = {
   type: 'web_search_20260209',
@@ -1093,15 +1096,8 @@ export async function loadConnectorsAndTools(user) {
     outlook: false,
     excel: false,
   };
-  const tools = [
-    ANTHROPIC_WEB_SEARCH_TOOL,
-    ANTHROPIC_WEB_FETCH_TOOL,
-    SAVE_MEMORY_TOOL,
-    SAVE_NOTE_TOOL,
-    LIST_NOTES_TOOL,
-    UPDATE_NOTE_TOOL,
-    DELETE_NOTE_TOOL,
-  ];
+  const tools = [ANTHROPIC_WEB_SEARCH_TOOL, ANTHROPIC_WEB_FETCH_TOOL, SAVE_MEMORY_TOOL];
+  if (NOTES_ENABLED) tools.push(SAVE_NOTE_TOOL, LIST_NOTES_TOOL, UPDATE_NOTE_TOOL, DELETE_NOTE_TOOL);
   if (!user) return { connected, tools };
 
   const [gmailTok, driveTok, docsTok, sheetsTok, calTok, outlookTok, excelTok] = await Promise.all([

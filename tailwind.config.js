@@ -1,4 +1,38 @@
 /** @type {import('tailwindcss').Config} */
+
+// Brutalist / Shadowplay — pure grayscale, no hue anywhere. Anchored on the
+// 4-swatch brand palette at conventional Tailwind stops (200/400/700/900),
+// interpolated for the rest so the app's existing shade usage (400/500/600
+// etc.) still reads as a coherent scale instead of 4 flat bands.
+//   #D1D1D1 -> 200   (light-mode surface/border)
+//   #8C8C8C -> 400   (light-mode muted text, dark-mode secondary)
+//   #4A4A4A -> 700   (dark-mode border/surface)
+//   #212121 -> 900   (dark-mode background)
+const grayscale = {
+  50:  '#fafafa',
+  100: '#e8e8e8',
+  200: '#d1d1d1',
+  300: '#afafaf',
+  400: '#8c8c8c',
+  500: '#737373',
+  600: '#595959',
+  700: '#4a4a4a',
+  800: '#333333',
+  900: '#212121',
+  950: '#131313',
+}
+
+// Every hue the app uses (accents, errors, success, warnings) collapses onto
+// this same ramp — strict monochrome means a "rose-500" error and an
+// "emerald-500" success render as the identical gray, differentiated only
+// by icon/weight/position, never by color.
+const monoFamilies = ['indigo', 'violet', 'sky', 'rose', 'emerald', 'amber', 'orange', 'slate', 'quantum']
+const colors = Object.fromEntries(monoFamilies.map((name) => [name, grayscale]))
+
+// Hard, zero-blur offset shadows instead of soft blurred ones — the
+// signature brutalist "sticker" shadow, not a glass drop-shadow.
+const hardShadow = (px) => `${px}px ${px}px 0 0 rgba(0,0,0,0.9)`
+
 export default {
   content: [
     "./index.html",
@@ -10,33 +44,31 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
-      colors: {
-        quantum: {
-          50:  '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
-        },
+      colors,
+      borderRadius: {
+        none: '0',
+        sm: '0',
+        DEFAULT: '0',
+        md: '0',
+        lg: '0',
+        xl: '0',
+        '2xl': '0',
+        '3xl': '0',
+        full: '9999px', // legitimate circles (avatars, status dots) stay round
       },
       boxShadow: {
-        soft: '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
-        bubble: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)',
-        glow: '0 0 0 1px rgba(99, 102, 241, 0.12), 0 8px 32px -8px rgba(79, 70, 229, 0.35)',
-        'glow-lg': '0 0 0 1px rgba(99, 102, 241, 0.18), 0 16px 48px -12px rgba(79, 70, 229, 0.45)',
-        'input-focus': '0 0 0 3px rgba(99, 102, 241, 0.18), 0 12px 40px rgba(79, 70, 229, 0.1)',
+        sm: hardShadow(2),
+        DEFAULT: hardShadow(3),
+        md: hardShadow(3),
+        lg: hardShadow(4),
+        xl: hardShadow(5),
+        '2xl': hardShadow(6),
+        inner: 'inset 0 0 0 1px rgba(0,0,0,0.9)',
+        none: 'none',
       },
       animation: {
         'pulse-dot': 'pulse-dot 1.4s infinite ease-in-out both',
         'float': 'float 5s ease-in-out infinite',
-        'shimmer': 'shimmer 2.2s linear infinite',
-        'orbit': 'orbit 8s linear infinite',
       },
       keyframes: {
         'pulse-dot': {
@@ -47,17 +79,6 @@ export default {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-6px)' },
         },
-        shimmer: {
-          '0%': { backgroundPosition: '-200% 0' },
-          '100%': { backgroundPosition: '200% 0' },
-        },
-        orbit: {
-          '0%': { transform: 'rotate(0deg)' },
-          '100%': { transform: 'rotate(360deg)' },
-        },
-      },
-      borderRadius: {
-        '4xl': '2rem',
       },
     },
   },

@@ -288,7 +288,7 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
         dark ? 'bg-white/[0.03]' : 'bg-black/[0.02]'
       }`}
     >
-      <button type="button" onClick={copy} className={`p-1.5 rounded-full transition ${muted}`} title="Copy">
+      <button type="button" onClick={copy} className={`p-1.5 rounded-full transition ${muted}`} title="Copy" aria-label={copied ? 'Copied' : 'Copy'}>
         <AnimatePresence mode="wait" initial={false}>
           {copied ? (
             <motion.span
@@ -323,11 +323,12 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
           onClick={onRegenerate}
           className={`p-1.5 rounded-full transition ${muted}`}
           title="Regenerate"
+          aria-label="Regenerate response"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </motion.button>
       )}
-      <button type="button" onClick={share} className={`p-1.5 rounded-full transition ${muted}`} title="Share">
+      <button type="button" onClick={share} className={`p-1.5 rounded-full transition ${muted}`} title="Share" aria-label="Share response">
         <Share2 className="w-3.5 h-3.5" />
       </button>
       <button
@@ -352,6 +353,7 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
         onClick={() => setLiked(liked === 'up' ? null : 'up')}
         className={`p-1.5 rounded-full transition ${liked === 'up' ? active : muted}`}
         title="Good response"
+        aria-label={liked === 'up' ? 'Marked as good response' : 'Mark as good response'}
       >
         <ThumbsUp className="w-3.5 h-3.5" />
       </motion.button>
@@ -361,6 +363,7 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
         onClick={() => setLiked(liked === 'down' ? null : 'down')}
         className={`p-1.5 rounded-full transition ${liked === 'down' ? active : muted}`}
         title="Bad response"
+        aria-label={liked === 'down' ? 'Marked as bad response' : 'Mark as bad response'}
       >
         <ThumbsDown className="w-3.5 h-3.5" />
       </motion.button>

@@ -4,6 +4,22 @@
 
 * { -webkit-tap-highlight-color: transparent; }
 
+/* Keyboard-navigation focus ring — visible only for keyboard/AT users, never on mouse/touch */
+:focus-visible {
+  outline: 2px solid rgba(33, 33, 33, 0.85);
+  outline-offset: 2px;
+  border-radius: 0;
+}
+html.dark :focus-visible {
+  outline-color: rgba(209, 209, 209, 0.9);
+}
+/* Composer textarea already gets its own focus treatment via
+   .composer-surface:focus-within (soft glow on the whole bar) — the
+   generic outline above stacks a second, harder-edged box on top of it. */
+.composer-surface textarea:focus-visible {
+  outline: none;
+}
+
 html { scroll-behavior: auto; }
 html, body, #root {
   height: 100%;
@@ -73,57 +89,27 @@ body {
   isolation: isolate;
 }
 
-body::before,
-body::after {
-  content: '';
-  position: fixed;
-  width: 70vmax;
-  height: 70vmax;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: -1;
-  filter: blur(80px);
-  will-change: transform, opacity;
-  opacity: 0.9;
+/* Brutalist / Shadowplay: flat grayscale canvas, no blurred glow orbs, no
+   gradients. Light mode uses the palette's lighter pair, dark mode the
+   darker pair — same 4-swatch scale, opposite ends. */
+/* Explicit on <html> itself too, not just body — on mobile, a shifted
+   visual viewport (keyboard, browser chrome collapse) can expose whatever
+   is painted behind the fixed app shell, and that's the html background. */
+html {
+  background-color: #d1d1d1;
 }
-
-body::before {
-  top: -25%;
-  left: -15%;
-  animation: bg-orb-a 16s ease-in-out infinite;
-}
-
-body::after {
-  bottom: -30%;
-  right: -20%;
-  animation: bg-orb-b 20s ease-in-out infinite;
-}
-
 html:not(.dark) body {
-  background-color: #f4f5fb;
-  color: #0f172a;
+  background-color: #d1d1d1;
+  color: #212121;
 }
-html:not(.dark) body::before {
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.65) 0%, rgba(167, 139, 250, 0.35) 40%, transparent 70%);
-}
-html:not(.dark) body::after {
-  background: radial-gradient(circle, rgba(196, 181, 253, 0.55) 0%, rgba(56, 189, 248, 0.25) 45%, transparent 70%);
-}
-
 html.dark,
 html.dark body,
 html.dark #root {
-  background-color: #111114 !important;
+  background-color: #212121 !important;
 }
 html.dark body {
-  background-color: #111114;
-  color: #f1f5f9;
-}
-html.dark body::before {
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, rgba(139, 92, 246, 0.2) 40%, transparent 70%);
-}
-html.dark body::after {
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.3) 0%, rgba(56, 189, 248, 0.12) 45%, transparent 70%);
+  background-color: #212121;
+  color: #d1d1d1;
 }
 
 #root {
@@ -133,140 +119,37 @@ html.dark body::after {
   height: 100dvh;
 }
 
-@keyframes bg-orb-a {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
-  33% { transform: translate3d(18vw, 14vh, 0) scale(1.2); opacity: 1; }
-  66% { transform: translate3d(8vw, 22vh, 0) scale(0.9); opacity: 0.7; }
-}
-@keyframes bg-orb-b {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.8; }
-  40% { transform: translate3d(-16vw, -12vh, 0) scale(1.25); opacity: 1; }
-  70% { transform: translate3d(-10vw, -20vh, 0) scale(0.95); opacity: 0.65; }
-}
-
-.chat-glow {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-.chat-glow-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(56px);
-  will-change: transform, opacity;
-}
-html:not(.dark) .chat-glow-orb-a {
-  width: min(60vw, 480px);
-  height: min(60vw, 480px);
-  top: -10%;
-  left: -8%;
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.7) 0%, rgba(167, 139, 250, 0.3) 45%, transparent 70%);
-  animation: chat-glow-drift-a 12s ease-in-out infinite;
-}
-html:not(.dark) .chat-glow-orb-b {
-  width: min(55vw, 420px);
-  height: min(55vw, 420px);
-  top: 30%;
-  right: -12%;
-  background: radial-gradient(circle, rgba(196, 181, 253, 0.65) 0%, rgba(56, 189, 248, 0.28) 50%, transparent 70%);
-  animation: chat-glow-drift-b 15s ease-in-out infinite;
-}
-html:not(.dark) .chat-glow-orb-c {
-  width: min(65vw, 500px);
-  height: min(65vw, 500px);
-  bottom: -14%;
-  left: 15%;
-  background: radial-gradient(circle, rgba(165, 180, 252, 0.6) 0%, rgba(139, 92, 246, 0.25) 50%, transparent 70%);
-  animation: chat-glow-drift-c 18s ease-in-out infinite;
-}
-html.dark .chat-glow-orb-a {
-  width: min(60vw, 480px);
-  height: min(60vw, 480px);
-  top: -10%;
-  left: -8%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.45) 0%, rgba(139, 92, 246, 0.2) 45%, transparent 70%);
-  animation: chat-glow-drift-a 12s ease-in-out infinite;
-}
-html.dark .chat-glow-orb-b {
-  width: min(55vw, 420px);
-  height: min(55vw, 420px);
-  top: 30%;
-  right: -12%;
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.35) 0%, rgba(56, 189, 248, 0.15) 50%, transparent 70%);
-  animation: chat-glow-drift-b 15s ease-in-out infinite;
-}
-html.dark .chat-glow-orb-c {
-  width: min(65vw, 500px);
-  height: min(65vw, 500px);
-  bottom: -14%;
-  left: 15%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.4) 0%, rgba(99, 102, 241, 0.15) 50%, transparent 70%);
-  animation: chat-glow-drift-c 18s ease-in-out infinite;
-}
-
-@keyframes chat-glow-drift-a {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
-  50% { transform: translate3d(12%, 10%, 0) scale(1.15); opacity: 1; }
-}
-@keyframes chat-glow-drift-b {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.8; }
-  50% { transform: translate3d(-14%, -8%, 0) scale(1.12); opacity: 1; }
-}
-@keyframes chat-glow-drift-c {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.65; }
-  30% { transform: translate3d(-16%, -20%, 0) scale(1.2); opacity: 0.95; }
-  60% { transform: translate3d(18%, -10%, 0) scale(1.08); opacity: 0.75; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body::before,
-  body::after,
-  .chat-glow-orb {
-    animation: none !important;
-  }
-}
-
 ::selection {
-  background: rgba(99, 102, 241, 0.25);
+  background: rgba(33, 33, 33, 0.25);
   color: inherit;
 }
 html.dark ::selection {
-  background: rgba(129, 140, 248, 0.35);
+  background: rgba(209, 209, 209, 0.3);
 }
 
-html.glass-on:not(.dark) .glass-header {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+/* Glass toggle is retired visually under the brutalist theme — flat solid
+   header with a hard border in both states, no blur either way. */
+.glass-header {
+  background: #d1d1d1;
+  border-bottom: 2px solid #212121;
 }
-html.glass-on.dark .glass-header {
-  background: rgba(17, 17, 20, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-html:not(.glass-on) .glass-header {
-  background: transparent !important;
-}
-html:not(.glass-on).dark .glass-header {
-  background: transparent !important;
+html.dark .glass-header {
+  background: #212121;
+  border-bottom: 2px solid #d1d1d1;
 }
 
 /* Fenced code blocks — copy-friendly */
 .md-codeblock {
   margin: 0.75rem 0 1rem;
-  border-radius: 12px;
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: #0f172a;
+  border: 2px solid #212121;
+  background: #1a1a1a;
   max-width: 100%;
 }
 html.dark .md-codeblock {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: #0b0f19;
+  border-color: #d1d1d1;
+  background: #131313;
 }
 .md-codeblock-bar {
   display: flex;
@@ -320,11 +203,11 @@ html.dark .md-codeblock {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.9em;
   padding: 0.12em 0.35em;
-  border-radius: 5px;
-  background: rgba(99, 102, 241, 0.12);
+  border-radius: 0;
+  background: rgba(33, 33, 33, 0.1);
 }
 html.dark .md-code {
-  background: rgba(129, 140, 248, 0.18);
+  background: rgba(209, 209, 209, 0.15);
 }
 .ai-content pre.md-pre,
 .ai-content .md-codeblock {

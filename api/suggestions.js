@@ -1,7 +1,7 @@
 import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
 import { allowRequest } from './lib/rateLimit.js';
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-haiku-4-5-20251001';
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
 
