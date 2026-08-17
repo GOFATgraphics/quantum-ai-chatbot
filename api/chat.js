@@ -30,9 +30,11 @@ function extractText(blocks) {
 // cap, so a thread that grows to hundreds of exchanges (or has a few large
 // pasted files in it) gets proportionally more expensive forever. Keep the
 // most recent messages up to a character budget (~4 chars/token, so this is
-// roughly a 40k-token ceiling on history alone), always keeping at least the
+// roughly a 12k-token ceiling on history alone), always keeping at least the
 // current turn even if it alone exceeds the budget.
-const MAX_HISTORY_CHARS = 160_000;
+// First-cut value pending stage 2 (memory doing more of the continuity work).
+// Watch real usage after shipping before tightening further.
+const MAX_HISTORY_CHARS = 48_000;
 function trimHistory(msgs) {
   if (msgs.length <= 1) return msgs;
   let total = 0;
