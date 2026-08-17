@@ -5,20 +5,23 @@ type Props = {
   className?: string
   /**
    * Explicit theme override.
-   * - true  → light mark (for dark backgrounds)
-   * - false → dark mark (for light backgrounds)
+   * - true  → white mark (dark backgrounds)
+   * - false → black mark (light backgrounds)
    * - omit  → auto-follow html.dark
    */
   dark?: boolean
   animated?: boolean
 }
 
+/** Cache-bust so browsers/SW pick up new monochrome assets */
+const ASSET_V = 'v9'
+
 function readIsDark(): boolean {
   if (typeof document === 'undefined') return false
   return document.documentElement.classList.contains('dark')
 }
 
-/** Quantumy brand mark — monochrome orbital sphere */
+/** Quantumy brand mark — pure black / white orbital sphere */
 export default function Logo({ size = 32, className = '', dark, animated = false }: Props) {
   const [autoDark, setAutoDark] = useState(readIsDark)
 
@@ -33,7 +36,7 @@ export default function Logo({ size = 32, className = '', dark, animated = false
   }, [dark])
 
   const isDark = dark !== undefined ? dark : autoDark
-  const src = isDark ? '/logo-dark.svg' : '/logo.svg'
+  const src = isDark ? `/logo-dark.svg?${ASSET_V}` : `/logo.svg?${ASSET_V}`
 
   return (
     <img
@@ -45,11 +48,6 @@ export default function Logo({ size = 32, className = '', dark, animated = false
       draggable={false}
       decoding="async"
       fetchPriority={size >= 48 ? 'high' : 'auto'}
-      style={{
-        filter: isDark
-          ? 'drop-shadow(0 2px 12px rgba(255,255,255,0.12))'
-          : 'drop-shadow(0 2px 10px rgba(0,0,0,0.18))',
-      }}
     />
   )
 }

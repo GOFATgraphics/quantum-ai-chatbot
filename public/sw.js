@@ -1,5 +1,5 @@
-/* Quantumy AI service worker — network-first so UI updates show up */
-const CACHE = 'quantumy-v7';
+/* Quantumy AI service worker — network-first so UI + icons update */
+const CACHE = 'quantumy-v9';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
@@ -24,11 +24,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Always network-first for HTML, JS, CSS, SVG icons/logos, and navigate
   if (
     request.mode === 'navigate' ||
     url.pathname.endsWith('.js') ||
     url.pathname.endsWith('.css') ||
     url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('.svg') ||
+    url.pathname.endsWith('.webmanifest') ||
     url.pathname === '/'
   ) {
     event.respondWith(
