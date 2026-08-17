@@ -1,42 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <!-- Planet Chase: planet + negative-space arrows as Saturn belt -->
-  <g fill="#0A0A0A">
-    <!-- Planet with arrow cutout -->
-    <path fill-rule="evenodd" d="
-      M64 16
-      C37.5 16 16 37.5 16 64
-      S37.5 112 64 112
-      S112 90.5 112 64
-      S90.5 16 64 16
-      Z
-      M34 54
-      H54
-      V42
-      L86 64
-      L54 86
-      V74
-      H34
-      Z
-    "/>
-    <!-- Left belt arrowhead -->
-    <path d="M8 70 L33 52 L38 60 L18 82 Z"/>
-    <!-- Right orbit node (ring) + tip -->
-    <path fill-rule="evenodd" d="
-      M98 34
-      a10 10 0 1 0 0.01 0
-      Z
-      M98 39
-      a5 5 0 1 1 0.01 0
-      Z
-    "/>
-    <path d="M105 36 L124 28 L114 50 Z"/>
-  </g>
-  <!-- Belt curve -->
-  <path
-    d="M18 80 C36 100 78 104 108 68 C113 62 116 54 116 48"
-    fill="none"
-    stroke="#0A0A0A"
-    stroke-width="12"
-    stroke-linecap="round"
-  />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" fill="none">
+  <defs>
+    <linearGradient id="ringL" x1="8%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a5b4fc"/>
+      <stop offset="45%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+    <radialGradient id="sphereL" cx="34%" cy="28%" r="72%">
+      <stop offset="0%" stop-color="#4a4a58"/>
+      <stop offset="45%" stop-color="#1a1a24"/>
+      <stop offset="100%" stop-color="#06060a"/>
+    </radialGradient>
+    <radialGradient id="glowL" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="58" fill="url(#glowL)"/>
+  <ellipse cx="64" cy="74" rx="52" ry="14" fill="none" stroke="url(#ringL)" stroke-width="6.5" transform="rotate(-22 64 64)" opacity="0.55"/>
+  <circle cx="64" cy="64" r="36" fill="url(#sphereL)"/>
+  <ellipse cx="52" cy="50" rx="12" ry="8" fill="#ffffff" opacity="0.12"/>
+  <ellipse cx="64" cy="54" rx="52" ry="14" fill="none" stroke="url(#ringL)" stroke-width="6.5" transform="rotate(-22 64 64)" opacity="0.95"/>
+  <circle cx="64" cy="64" r="6" fill="#a5b4fc" opacity="0.9"/>
+  <circle cx="64" cy="64" r="2.5" fill="#eef2ff"/>
 </svg>
