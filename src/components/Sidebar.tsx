@@ -189,7 +189,7 @@ export default function Sidebar({
                   ease: [0.22, 1, 0.36, 1],
                 }}
                 className={`group flex items-center gap-1 rounded-xl ${
-                  currentConversationId === c.id ? active : hover
+                  currentConversationId === c.id ? `${active} sidebar-chat-active` : hover
                 }`}
               >
                 <button
