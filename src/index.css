@@ -13,6 +13,12 @@
 html.dark :focus-visible {
   outline-color: rgba(129, 140, 248, 0.8);
 }
+/* Composer textarea already gets its own focus treatment via
+   .composer-surface:focus-within (soft glow on the whole bar) — the
+   generic outline above stacks a second, harder-edged box on top of it. */
+.composer-surface textarea:focus-visible {
+  outline: none;
+}
 
 html { scroll-behavior: auto; }
 html, body, #root {
