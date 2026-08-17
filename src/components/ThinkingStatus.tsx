@@ -108,7 +108,7 @@ export default function ThinkingStatus({
             <motion.span
               key={d}
               className={`block w-1.5 h-1.5 rounded-full ${
-                dark ? 'bg-indigo-300' : 'bg-indigo-500'
+                dark ? 'bg-white' : 'bg-neutral-900'
               }`}
               animate={
                 reduceMotion
@@ -162,7 +162,7 @@ export default function ThinkingStatus({
                   <Check className={`w-3.5 h-3.5 ${dark ? 'text-emerald-400' : 'text-emerald-600'}`} />
                 ) : current ? (
                   <Loader2
-                    className={`w-3.5 h-3.5 animate-spin ${dark ? 'text-indigo-300' : 'text-indigo-500'}`}
+                    className={`w-3.5 h-3.5 animate-spin ${dark ? 'text-white' : 'text-neutral-900'}`}
                   />
                 ) : (
                   <span
@@ -180,8 +180,8 @@ export default function ThinkingStatus({
         <div
           className={`ml-1 inline-flex items-center gap-2 text-[13px] font-semibold px-2.5 py-1 rounded-full w-fit ${
             dark
-              ? 'text-indigo-200 bg-indigo-500/15 ring-1 ring-indigo-400/20'
-              : 'text-indigo-700 bg-indigo-50 ring-1 ring-indigo-200/60'
+              ? 'text-neutral-200 bg-white/10 ring-1 ring-white/15'
+              : 'text-neutral-800 bg-neutral-100 ring-1 ring-black/10'
           }`}
         >
           <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
@@ -191,15 +191,15 @@ export default function ThinkingStatus({
 
       <div
         className={`ml-1 h-[2px] w-[min(180px,40%)] rounded-full overflow-hidden ${
-          dark ? 'bg-white/10' : 'bg-indigo-100'
+          dark ? 'bg-white/10' : 'bg-neutral-200'
         }`}
         aria-hidden
       >
         <motion.div
           className={`h-full w-1/3 rounded-full ${
             dark
-              ? 'bg-gradient-to-r from-indigo-400 via-violet-400 to-sky-400'
-              : 'bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500'
+              ? 'bg-gradient-to-r from-white via-neutral-300 to-neutral-500'
+              : 'bg-gradient-to-r from-neutral-900 via-neutral-600 to-neutral-400'
           }`}
           animate={reduceMotion ? { x: '100%' } : { x: ['-100%', '300%'] }}
           transition={
