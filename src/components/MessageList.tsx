@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FileText } from 'lucide-react'
 import MessageActions from './MessageActions'
+import UserMessageActions from './UserMessageActions'
 import ThinkingStatus from './ThinkingStatus'
 import { formatMarkdown } from '../lib/markdown'
 import {
@@ -58,6 +59,14 @@ function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; v
   return parts
 }
 
+function textOnlyFromContent(content: string) {
+  return parseUserContent(content)
+    .filter((s) => s.type === 'text')
+    .map((s) => s.value)
+    .join('\n\n')
+    .trim()
+}
+
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -99,98 +108,166 @@ function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClos
   )
 }
 
-function UserBubble({ content, dark }: { content: string; dark: boolean }) {
+function UserBubble({
+  content,
+  dark,
+  disabled,
+  onEdit,
+  onResend,
+}: {
+  content: string
+  dark: boolean
+  disabled?: boolean
+  onEdit?: (text: string) => void
+  onResend?: (text: string) => void
+}) {
   const [expanded, setExpanded] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null)
   const segments = parseUserContent(content)
 
-  const textOnly = segments
-    .filter((s) => s.type === 'text')
-    .map((s) => s.value)
-    .join('\n\n')
+  const textOnly = textOnlyFromContent(content)
   const long = textOnly.length > USER_SNIPPET_LEN
   const shownText = !long || expanded ? textOnly : textOnly.slice(0, USER_SNIPPET_LEN).trimEnd() + '…'
 
+  const startEdit = () => {
+    setDraft(textOnly)
+    setEditing(true)
+  }
+
+  const saveEdit = () => {
+    const next = draft.trim()
+    if (!next || next === textOnly) {
+      setEditing(false)
+      return
+    }
+    setEditing(false)
+    onEdit?.(next)
+  }
+
   return (
-    <div
-      className={`glass-bubble max-w-[85%] rounded-[22px] px-4 py-2.5 text-[15px] leading-[1.55] ${
-        dark ? 'text-slate-50' : 'text-slate-900'
-      }`}
-    >
-      <div className="space-y-2">
-        {segments.map((seg, i) => {
-          if (seg.type === 'image') {
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={(e) => {
+    <div className="flex flex-col items-end max-w-[85%]">
+      <div
+        className={`glass-bubble w-full rounded-[22px] px-4 py-2.5 text-[15px] leading-[1.55] ${
+          dark ? 'text-slate-50' : 'text-slate-900'
+        }`}
+      >
+        {editing ? (
+          <div className="space-y-2">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={Math.min(8, Math.max(2, draft.split('\n').length + 1))}
+              className={`w-full resize-none bg-transparent border-0 outline-none text-[15px] leading-[1.55] min-h-[48px] ${
+                dark ? 'text-slate-50' : 'text-slate-900'
+              }`}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setEditing(false)
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault()
-                  e.stopPropagation()
-                  setLightbox({ src: seg.value, alt: seg.alt || 'Attached image' })
-                }}
-                className="block overflow-hidden rounded-xl -mx-1 text-left w-full cursor-zoom-in"
-              >
-                <img
-                  src={seg.value}
-                  alt={seg.alt || 'Attached image'}
-                  className="max-w-full max-h-[280px] object-contain rounded-xl pointer-events-none"
-                  loading="lazy"
-                />
-              </button>
-            )
-          }
-          if (seg.type === 'file') {
-            const nameMatch =
-              seg.value.match(/\*\*([^*]+)\*\*/) ||
-              seg.value.match(/File:\s*([^\n-]+)/) ||
-              seg.value.match(/\[(?:File|Image) attached:\s*([^\]]+)\]/)
-            const name = nameMatch?.[1]?.trim() || 'Attachment'
-            return (
-              <div
-                key={i}
-                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium ${
-                  dark ? 'bg-white/10 text-slate-200' : 'bg-slate-100/80 text-slate-700'
+                  saveEdit()
+                }
+              }}
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className={`text-[13px] font-medium px-3 py-1.5 rounded-full transition ${
+                  dark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-600 hover:bg-black/5'
                 }`}
               >
-                <FileText className="w-4 h-4 shrink-0 opacity-70" />
-                <span className="truncate">{name}</span>
-              </div>
-            )
-          }
-          return null
-        })}
-        {shownText && (
-          <div className="whitespace-pre-wrap break-words">{shownText}</div>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={!draft.trim()}
+                className={`text-[13px] font-semibold px-3.5 py-1.5 rounded-full transition disabled:opacity-40 ${
+                  dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black'
+                }`}
+              >
+                Save & send
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {segments.map((seg, i) => {
+              if (seg.type === 'image') {
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setLightbox({ src: seg.value, alt: seg.alt || 'Attached image' })
+                    }}
+                    className="block overflow-hidden rounded-xl -mx-1 text-left w-full cursor-zoom-in"
+                  >
+                    <img
+                      src={seg.value}
+                      alt={seg.alt || 'Attached image'}
+                      className="max-w-full max-h-[280px] object-contain rounded-xl pointer-events-none"
+                      loading="lazy"
+                    />
+                  </button>
+                )
+              }
+              if (seg.type === 'file') {
+                const nameMatch =
+                  seg.value.match(/\*\*([^*]+)\*\*/) ||
+                  seg.value.match(/File:\s*([^\n-]+)/) ||
+                  seg.value.match(/\[(?:File|Image) attached:\s*([^\]]+)\]/)
+                const name = nameMatch?.[1]?.trim() || 'Attachment'
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium ${
+                      dark ? 'bg-white/10 text-slate-200' : 'bg-slate-100/80 text-slate-700'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 shrink-0 opacity-70" />
+                    <span className="truncate">{name}</span>
+                  </div>
+                )
+              }
+              return null
+            })}
+            {shownText && <div className="whitespace-pre-wrap break-words">{shownText}</div>}
+          </div>
+        )}
+        {!editing && long && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className={`mt-1.5 text-[13px] font-semibold ${
+              dark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            {expanded ? 'Show less' : 'Show more'}
+          </button>
+        )}
+        {lightbox && (
+          <ImageLightbox src={lightbox.src} alt={lightbox.alt} onClose={() => setLightbox(null)} />
         )}
       </div>
-      {long && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className={`mt-1.5 text-[13px] font-semibold ${
-            dark ? 'text-indigo-300 hover:text-indigo-200' : 'text-indigo-600 hover:text-indigo-700'
-          }`}
-        >
-          {expanded ? 'Show less' : 'Show more'}
-        </button>
-      )}
-      {lightbox && (
-        <ImageLightbox
-          src={lightbox.src}
-          alt={lightbox.alt}
-          onClose={() => setLightbox(null)}
+      {!editing && (onEdit || onResend) && (
+        <UserMessageActions
+          content={content}
+          dark={dark}
+          disabled={disabled}
+          onEdit={startEdit}
+          onResend={() => onResend?.(textOnly || content)}
         />
       )}
     </div>
   )
 }
 
-/**
- * Memoized so a growing streaming message doesn't force every other message in
- * the thread to re-run formatMarkdown on each delta — only this bubble's own
- * content changing triggers a recompute.
- */
 const AssistantContent = memo(function AssistantContent({
   content,
   isStreamingThis,
@@ -214,10 +291,13 @@ type Props = {
   lastUserPrompt: string
   dark: boolean
   messagesEndRef: RefObject<HTMLDivElement>
-  /** When this changes (open chat / new thread), force scroll to bottom. */
   conversationId?: string | null
   onRegenerate?: () => void
   onSuggestion?: (text: string) => void
+  /** Edit a prior user message and resend from that point */
+  onEditUser?: (messageId: string, newText: string) => void
+  /** Resend a user message as a new turn */
+  onResendUser?: (text: string) => void
   thoughtSeconds?: number | null
   toolStatus?: string | null
   suggestions?: string[]
@@ -232,13 +312,14 @@ export default function MessageList({
   conversationId = null,
   onRegenerate,
   onSuggestion,
+  onEditUser,
+  onResendUser,
   thoughtSeconds,
   toolStatus,
   suggestions = [],
 }: Props) {
   const last = messages[messages.length - 1]
-  const streaming =
-    isLoading && last?.role === 'assistant' && !!last.content
+  const streaming = isLoading && last?.role === 'assistant' && !!last.content
 
   const stickToBottomRef = useRef(true)
   const lastConvRef = useRef<string | null>(null)
@@ -284,16 +365,12 @@ export default function MessageList({
     lastContentLenRef.current = contentLen
 
     const shouldFollow =
-      stickToBottomRef.current &&
-      (isLoading || contentGrew || !!toolStatus || messages.length > 0)
+      stickToBottomRef.current && (isLoading || contentGrew || !!toolStatus || messages.length > 0)
 
     if (!shouldFollow) return
 
     const behavior: ScrollBehavior = isLoading ? 'auto' : 'smooth'
-    scrollChatToBottom(messagesEndRef.current, {
-      force: false,
-      behavior,
-    })
+    scrollChatToBottom(messagesEndRef.current, { force: false, behavior })
   }, [messages, isLoading, toolStatus, last?.content, messagesEndRef])
 
   useEffect(() => {
@@ -341,7 +418,13 @@ export default function MessageList({
               className={msg.role === 'user' ? 'flex justify-end' : ''}
             >
               {msg.role === 'user' ? (
-                <UserBubble content={msg.content} dark={dark} />
+                <UserBubble
+                  content={msg.content}
+                  dark={dark}
+                  disabled={isLoading}
+                  onEdit={onEditUser ? (text) => onEditUser(msg.id, text) : undefined}
+                  onResend={onResendUser}
+                />
               ) : (
                 <div className="max-w-[95%] min-w-0">
                   <div
@@ -389,11 +472,7 @@ export default function MessageList({
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.25 }}
             >
-              <ThinkingStatus
-                prompt={lastUserPrompt}
-                dark={dark}
-                toolLabel={toolStatus}
-              />
+              <ThinkingStatus prompt={lastUserPrompt} dark={dark} toolLabel={toolStatus} />
             </motion.div>
           )}
       </AnimatePresence>
