@@ -1,15 +1,41 @@
+import { useEffect, useState } from 'react'
+
 type Props = {
   size?: number
   className?: string
-  /** When true, use pearl mark (for dark backgrounds). When false, use dark sphere (for light backgrounds). */
+  /**
+   * Explicit theme override.
+   * - true  → pearl mark (for dark backgrounds)
+   * - false → dark sphere (for light backgrounds)
+   * - omit  → auto-follow html.dark / system theme
+   */
   dark?: boolean
   /** Subtle floating animation */
   animated?: boolean
 }
 
+function readIsDark(): boolean {
+  if (typeof document === 'undefined') return false
+  return document.documentElement.classList.contains('dark')
+}
+
 /** Quantumy brand mark — orbital sphere with quantum core */
-export default function Logo({ size = 32, className = '', dark = false, animated = false }: Props) {
-  const src = dark ? '/logo-dark.svg' : '/logo.svg'
+export default function Logo({ size = 32, className = '', dark, animated = false }: Props) {
+  const [autoDark, setAutoDark] = useState(readIsDark)
+
+  useEffect(() => {
+    if (dark !== undefined) return
+    const root = document.documentElement
+    const sync = () => setAutoDark(root.classList.contains('dark'))
+    sync()
+    const mo = new MutationObserver(sync)
+    mo.observe(root, { attributes: true, attributeFilter: ['class'] })
+    return () => mo.disconnect()
+  }, [dark])
+
+  const isDark = dark !== undefined ? dark : autoDark
+  const src = isDark ? '/logo-dark.svg' : '/logo.svg'
+
   return (
     <img
       src={src}
@@ -21,9 +47,9 @@ export default function Logo({ size = 32, className = '', dark = false, animated
       decoding="async"
       fetchPriority={size >= 48 ? 'high' : 'auto'}
       style={{
-        filter: dark
-          ? 'drop-shadow(0 4px 16px rgba(129, 140, 248, 0.35))'
-          : 'drop-shadow(0 4px 14px rgba(79, 70, 229, 0.22))',
+        filter: isDark
+          ? 'drop-shadow(0 2px 12px rgba(255, 255, 255, 0.14))'
+          : 'drop-shadow(0 2px 10px rgba(0, 0, 0, 0.16))',
       }}
     />
   )

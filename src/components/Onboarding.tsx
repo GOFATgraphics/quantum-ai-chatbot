@@ -109,7 +109,8 @@ export default function Onboarding({ onComplete }: Props) {
           {step === 'welcome' && (
             <div className="text-center">
               <div className="flex justify-center mb-5">
-                <Logo size={72} dark />
+                {/* Light card → dark sphere mark */}
+                <Logo size={72} dark={false} />
               </div>
               <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Welcome to Quantumy</h1>
               <p className="mt-2 text-[15px] text-slate-500 leading-relaxed">
@@ -198,7 +199,8 @@ export default function Onboarding({ onComplete }: Props) {
           {step === 'done' && (
             <div className="text-center">
               <div className="flex justify-center mb-4">
-                <Logo size={64} dark />
+                {/* Light card → dark sphere mark */}
+                <Logo size={64} dark={false} />
               </div>
               <h2 className="text-2xl font-semibold text-slate-900 tracking-tight">
                 You’re all set{name.trim() ? `, ${name.trim()}` : ''}
