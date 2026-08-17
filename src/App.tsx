@@ -591,7 +591,7 @@ export default function App() {
   }
 
   return (
-    <div className={'app-root-shell flex overflow-hidden overscroll-none ' + (dark ? 'bg-transparent' : 'bg-transparent')}>
+    <div className={'app-root-shell flex overflow-hidden overscroll-none ' + (dark ? 'bg-[#212121]' : 'bg-[#d1d1d1]')}>
       <div className="hidden lg:flex w-[300px] shrink-0"><Sidebar {...sidebarProps} /></div>
       <AnimatePresence>
         {mobileSidebar && (

@@ -92,6 +92,12 @@ body {
 /* Brutalist / Shadowplay: flat grayscale canvas, no blurred glow orbs, no
    gradients. Light mode uses the palette's lighter pair, dark mode the
    darker pair — same 4-swatch scale, opposite ends. */
+/* Explicit on <html> itself too, not just body — on mobile, a shifted
+   visual viewport (keyboard, browser chrome collapse) can expose whatever
+   is painted behind the fixed app shell, and that's the html background. */
+html {
+  background-color: #d1d1d1;
+}
 html:not(.dark) body {
   background-color: #d1d1d1;
   color: #212121;
