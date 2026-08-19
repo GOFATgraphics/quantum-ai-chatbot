@@ -32,7 +32,7 @@ function extractText(blocks) {
 // most recent messages up to a character budget (~4 chars/token, so this is
 // roughly a 40k-token ceiling on history alone), always keeping at least the
 // current turn even if it alone exceeds the budget.
-const MAX_HISTORY_CHARS = 160_000;
+const MAX_HISTORY_CHARS = 200_000;
 function trimHistory(msgs) {
   if (msgs.length <= 1) return msgs;
   let total = 0;
