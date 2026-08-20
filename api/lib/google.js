@@ -1,5 +1,20 @@
 /** Shared Google OAuth + token helpers for serverless functions */
 
+// Read budgets, matched to driveRead.js so all three readers behave the same.
+// Reads are paginated rather than silently cut: a truncated result always says
+// so and carries the offset to continue from, because a caller that can't tell
+// truncation from "end of data" will confidently report the wrong answer.
+const READ_DEFAULT_MAX = 80000;
+const READ_HARD_MAX = 150000;
+const SHEET_MAX_ROWS = 1000;
+const SHEET_DEFAULT_RANGE = 'A1:BZ2000';
+
+function clampInt(value, min, max, fallback) {
+  const n = Number.parseInt(value, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
 export const PROVIDER_SCOPES = {
   gmail: [
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -266,7 +281,7 @@ export async function searchDrive(accessToken, query, maxResults = 10) {
   }));
 }
 
-export async function readGoogleDoc(accessToken, documentId) {
+export async function readGoogleDoc(accessToken, documentId, opts = {}) {
   const res = await fetch(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -289,7 +304,27 @@ export async function readGoogleDoc(accessToken, documentId) {
     }
   };
   walk(doc.body?.content);
-  return { title: doc.title || '', documentId: doc.documentId, text: chunks.join('').slice(0, 12000) };
+
+  const full = chunks.join('');
+  const start = clampInt(opts.offset, 0, Math.max(0, full.length), 0);
+  const limit = clampInt(opts.max_chars, 1, READ_HARD_MAX, READ_DEFAULT_MAX);
+  const end = Math.min(full.length, start + limit);
+  const truncated = end < full.length;
+
+  return {
+    title: doc.title || '',
+    documentId: doc.documentId,
+    text: full.slice(start, end),
+    total_chars: full.length,
+    offset: start,
+    truncated,
+    ...(truncated
+      ? {
+          next_offset: end,
+          note: `Showing characters ${start}-${end} of ${full.length}. More text follows — read again with offset=${end}. Do not treat this as the end of the document.`,
+        }
+      : {}),
+  };
 }
 
 export async function createGoogleDoc(accessToken, { title, body }) {
@@ -383,12 +418,46 @@ export async function searchSheets(accessToken, query, maxResults = 8) {
   }));
 }
 
-export async function readSheetRange(accessToken, spreadsheetId, range = 'A1:Z30') {
+export async function readSheetRange(accessToken, spreadsheetId, range = SHEET_DEFAULT_RANGE, opts = {}) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!res.ok) throw new Error(`Sheets read failed: ${res.status} ${await res.text()}`);
   const data = await res.json();
-  return { spreadsheetId, range: data.range || range, values: (data.values || []).slice(0, 40) };
+
+  const all = data.values || [];
+  const startRow = clampInt(opts.offset, 0, Math.max(0, all.length), 0);
+  const maxRows = clampInt(opts.max_rows, 1, SHEET_MAX_ROWS, SHEET_MAX_ROWS);
+  const maxChars = clampInt(opts.max_chars, 1, READ_HARD_MAX, READ_DEFAULT_MAX);
+
+  // Bound by rows *and* characters — a sheet can blow the budget with a few
+  // very wide rows just as easily as with many narrow ones.
+  const values = [];
+  let chars = 0;
+  for (let i = startRow; i < all.length && values.length < maxRows; i++) {
+    const len = JSON.stringify(all[i] ?? []).length;
+    if (values.length > 0 && chars + len > maxChars) break;
+    values.push(all[i]);
+    chars += len;
+  }
+
+  const nextRow = startRow + values.length;
+  const truncated = nextRow < all.length;
+
+  return {
+    spreadsheetId,
+    range: data.range || range,
+    values,
+    rows_returned: values.length,
+    rows_available_in_range: all.length,
+    offset: startRow,
+    truncated,
+    ...(truncated
+      ? {
+          next_offset: nextRow,
+          note: `Showing rows ${startRow + 1}-${nextRow} of ${all.length} populated rows in this range. More rows follow — read again with offset=${nextRow}. Do not conclude the sheet ends here.`,
+        }
+      : {}),
+  };
 }
 
 export async function createSpreadsheet(accessToken, { title, headers, rows }) {

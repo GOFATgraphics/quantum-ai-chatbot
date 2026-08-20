@@ -190,10 +190,15 @@ export const DRIVE_TOOL = {
 
 export const DOCS_TOOL = {
   name: 'read_google_doc',
-  description: 'Read a Google Doc by document ID.',
+  description:
+    'Read a Google Doc by document ID. Long documents come back in pages: if the result has truncated=true, read again with offset=next_offset to continue. Never treat a truncated result as the end of the document.',
   input_schema: {
     type: 'object',
-    properties: { document_id: { type: 'string' } },
+    properties: {
+      document_id: { type: 'string' },
+      offset: { type: 'integer', description: 'Character offset to start from. Use next_offset from a truncated result.' },
+      max_chars: { type: 'integer', description: 'Max characters to return (default 80000).' },
+    },
     required: ['document_id'],
   },
 };
@@ -239,12 +244,16 @@ export const SHEETS_LIST_TOOL = {
 
 export const SHEETS_READ_TOOL = {
   name: 'read_sheet',
-  description: 'Read cells from a spreadsheet.',
+  description:
+    'Read cells from a spreadsheet. Defaults to a wide range (A1:BZ2000), so omit range unless you need a specific block. Large sheets come back in pages: if the result has truncated=true, read again with offset=next_offset to continue. Never conclude the sheet ends at the last row shown — check truncated first.',
   input_schema: {
     type: 'object',
     properties: {
       spreadsheet_id: { type: 'string' },
-      range: { type: 'string' },
+      range: { type: 'string', description: 'A1 notation, e.g. "Sheet1!A1:Z500". Defaults to A1:BZ2000.' },
+      offset: { type: 'integer', description: 'Row offset within the range. Use next_offset from a truncated result.' },
+      max_rows: { type: 'integer', description: 'Max rows to return (default/max 1000).' },
+      max_chars: { type: 'integer', description: 'Max characters to return (default 80000).' },
     },
     required: ['spreadsheet_id'],
   },
@@ -728,7 +737,10 @@ export async function runTool(block, user, context = {}) {
           content: 'Google Docs is not connected.',
           is_error: true,
         };
-      const doc = await readGoogleDoc(token, String(input.document_id || ''));
+      const doc = await readGoogleDoc(token, String(input.document_id || ''), {
+        offset: input.offset,
+        max_chars: input.max_chars,
+      });
       return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(doc) };
     }
     if (name === 'create_google_doc' && user) {
@@ -794,7 +806,8 @@ export async function runTool(block, user, context = {}) {
       const data = await readSheetRange(
         token,
         String(input.spreadsheet_id || ''),
-        input.range || 'A1:Z30'
+        input.range || undefined,
+        { offset: input.offset, max_rows: input.max_rows, max_chars: input.max_chars }
       );
       return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(data) };
     }
