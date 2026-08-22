@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { LayoutDashboard, Users, MessageSquare, Plug, Settings, ArrowLeft, Menu, X, Shield } from 'lucide-react'
+import { LayoutDashboard, Users, MessageSquare, Plug, Settings, ArrowLeft, Menu, X, Shield, BarChart3, StickyNote } from 'lucide-react'
 import Logo from '../components/Logo'
 
-export type AdminPage = 'overview' | 'users' | 'conversations' | 'connectors' | 'settings'
+export type AdminPage = 'overview' | 'analytics' | 'users' | 'conversations' | 'notes' | 'connectors' | 'settings'
 
 type Props = {
   dark: boolean
@@ -15,8 +15,10 @@ type Props = {
 
 const NAV: { id: AdminPage; label: string; icon: typeof LayoutDashboard; soon?: boolean }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'users', label: 'Users', icon: Users },
   { id: 'conversations', label: 'Conversations', icon: MessageSquare },
+  { id: 'notes', label: 'Notes', icon: StickyNote },
   { id: 'connectors', label: 'Connectors', icon: Plug },
   { id: 'settings', label: 'Settings', icon: Settings, soon: true },
 ]
