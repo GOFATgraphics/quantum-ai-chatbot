@@ -26,9 +26,9 @@ const NOTE_TYPE_LABEL: Record<NoteType, string> = {
 }
 
 const PRIORITY_DOT: Record<NotePriority, string> = {
-  high: 'bg-rose-500',
-  medium: 'bg-amber-500',
-  low: 'bg-neutral-400',
+  high: 'bg-destructive',
+  medium: 'bg-foreground',
+  low: 'bg-muted-foreground',
 }
 
 function checklistOf(n: Note): ChecklistItem[] {
@@ -44,7 +44,7 @@ function dueLabel(iso: string): { text: string; overdue: boolean } {
   return { text: `due in ${days}d`, overdue: false }
 }
 
-export default function NotesDashboard({ dark, user, projects, currentProjectId, onClose }: Props) {
+export default function NotesDashboard({ user, projects, currentProjectId, onClose }: Props) {
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
@@ -144,13 +144,13 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
     return { open: open.length, overdue: overdue.length, topics: allTopics.size }
   }, [notes])
 
-  const muted = dark ? 'text-neutral-400' : 'text-neutral-500'
-  const hover = dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'
-  const card = dark ? 'bg-white/[0.04] ring-1 ring-white/10' : 'bg-black/[0.02] ring-1 ring-black/5'
-  const chipActive = dark ? 'bg-white/12 text-white ring-1 ring-white/20' : 'bg-black/[0.08] text-black ring-1 ring-black/10'
-  const chip = `px-3 h-8 rounded-full text-[13px] font-medium transition shrink-0 ${dark ? 'text-neutral-300' : 'text-neutral-600'}`
-  const fieldClass = `w-full h-10 rounded-xl px-3 text-[14px] outline-none glass-panel ${dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'}`
-  const primaryBtn = dark ? 'bg-white text-black hover:bg-neutral-200' : 'bg-neutral-900 text-white hover:bg-black'
+  const muted = 'text-muted-foreground'
+  const hover = 'hover:bg-accent'
+  const card = 'bg-card ring-1 ring-border'
+  const chipActive = 'bg-secondary text-foreground ring-1 ring-border'
+  const chip = 'px-3 h-8 rounded-full text-[13px] font-medium transition shrink-0 text-muted-foreground'
+  const fieldClass = 'w-full h-10 rounded-xl px-3 text-[14px] outline-none glass-panel text-foreground placeholder:text-muted-foreground'
+  const primaryBtn = 'bg-primary text-primary-foreground hover:bg-primary/90'
 
   const resetForm = () => {
     setShowForm(false); setText(''); setProjectName(''); setNoteType('action_item')
@@ -226,27 +226,27 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
     const projectObj = n.project_id ? projects.find((p) => p.id === n.project_id) : null
     return (
       <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-        className={`group rounded-2xl mb-1.5 px-3.5 py-3 ${isOverdue ? (dark ? 'bg-rose-500/[0.07]' : 'bg-rose-50/70') : hover}`}>
+        className={`group rounded-2xl mb-1.5 px-3.5 py-3 ${isOverdue ? 'bg-destructive/10' : hover}`}>
         <div className="flex items-start gap-3">
           <button type="button" onClick={() => setStatus(n, n.status === 'open' ? 'done' : 'open')} disabled={busyId === n.id}
             aria-label={n.status === 'open' ? 'Mark done' : 'Mark open'}
             className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition ${
-              n.status === 'done' ? 'bg-emerald-500 text-white'
-                : n.status === 'dismissed' ? (dark ? 'bg-white/10 text-neutral-500' : 'bg-black/[0.06] text-neutral-400')
-                : dark ? 'ring-1 ring-white/25' : 'ring-1 ring-neutral-300'}`}>
+              n.status === 'done' ? 'bg-primary text-primary-foreground'
+                : n.status === 'dismissed' ? 'bg-muted text-muted-foreground'
+                : 'ring-1 ring-border'}`}>
             {n.status === 'done' && <Check className="w-3 h-3" />}
             {n.status === 'dismissed' && <EyeOff className="w-3 h-3" />}
           </button>
           <div className="flex-1 min-w-0">
             <p className={`text-[14px] leading-snug ${n.status !== 'open' ? `line-through ${muted}` : ''}`}>{n.note}</p>
             <div className={`flex flex-wrap items-center gap-1.5 mt-1.5 text-[12px] ${muted}`}>
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary">
                 <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[n.priority]}`} />{NOTE_TYPE_LABEL[n.note_type]}
               </span>
-              {projectObj && <span className={`px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>{projectObj.name}</span>}
-              {n.trade_ref && <span className={`px-1.5 py-0.5 rounded-md font-mono ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>{n.trade_ref}</span>}
+              {projectObj && <span className="px-1.5 py-0.5 rounded-md bg-secondary">{projectObj.name}</span>}
+              {n.trade_ref && <span className="px-1.5 py-0.5 rounded-md font-mono bg-secondary">{n.trade_ref}</span>}
               {due && (
-                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${isOverdue ? 'bg-rose-500/15 text-rose-500' : dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${isOverdue ? 'bg-destructive/15 text-destructive' : 'bg-secondary'}`}>
                   {isOverdue && <AlertTriangle className="w-3 h-3" />}{due.text}
                 </span>
               )}
@@ -254,7 +254,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
                 <span className="flex items-center gap-1 flex-wrap">
                   {n.tags.map((t) => (
                     <button key={t} type="button" onClick={() => setTopicFilter(t)}
-                      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/12 text-neutral-200' : 'bg-black/[0.06] text-neutral-700'}`}>
+                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-secondary text-foreground">
                       <Tag className="w-2.5 h-2.5" />{t}
                     </button>
                   ))}
@@ -262,14 +262,14 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
               )}
               {list.length > 0 && (
                 <button type="button" onClick={() => setExpanded((p) => { const next = new Set(p); if (next.has(n.id)) next.delete(n.id); else next.add(n.id); return next })}
-                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary">
                   <ListChecks className="w-3 h-3" />{checklistDone}/{list.length}
                   {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 </button>
               )}
               {list.length === 0 && (
                 <button type="button" onClick={() => { setAddingItemTo(n.id); setExpanded((p) => new Set(p).add(n.id)) }}
-                  className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-neutral-500 hover:text-neutral-300">
+                  className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-muted-foreground hover:text-foreground">
                   <Plus className="w-3 h-3" /> Checklist
                 </button>
               )}
@@ -279,11 +279,11 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
                 {list.map((item) => (
                   <div key={item.id} className="flex items-center gap-2 group/item">
                     <button type="button" onClick={() => toggleChecklistItem(n, item.id)}
-                      className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${item.done ? 'bg-emerald-500 text-white' : dark ? 'ring-1 ring-white/25' : 'ring-1 ring-neutral-300'}`}>
+                      className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${item.done ? 'bg-primary text-primary-foreground' : 'ring-1 ring-border'}`}>
                       {item.done && <Check className="w-2.5 h-2.5" />}
                     </button>
                     <span className={`text-[13px] flex-1 ${item.done ? `line-through ${muted}` : ''}`}>{item.text}</span>
-                    <button type="button" onClick={() => removeChecklistItem(n, item.id)} className="opacity-0 group-hover/item:opacity-100 text-neutral-400 hover:text-red-500">
+                    <button type="button" onClick={() => removeChecklistItem(n, item.id)} className="opacity-0 group-hover/item:opacity-100 text-muted-foreground hover:text-destructive">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
@@ -292,11 +292,11 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
                   <div className="flex items-center gap-2 pt-1">
                     <input autoFocus value={newItemText} onChange={(e) => setNewItemText(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') addChecklistItem(n); if (e.key === 'Escape') setAddingItemTo(null) }}
-                      placeholder="New step" className={`flex-1 h-8 rounded-lg px-2 text-[13px] outline-none glass-panel ${dark ? 'text-neutral-100' : 'text-neutral-900'}`} />
-                    <button type="button" onClick={() => addChecklistItem(n)} className={`text-[13px] font-medium ${dark ? 'text-neutral-200' : 'text-neutral-700'}`}>Add</button>
+                      placeholder="New step" className="flex-1 h-8 rounded-lg px-2 text-[13px] outline-none glass-panel text-foreground" />
+                    <button type="button" onClick={() => addChecklistItem(n)} className="text-[13px] font-medium text-foreground">Add</button>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setAddingItemTo(n.id)} className={`text-[12px] font-medium flex items-center gap-1 pt-1 ${dark ? 'text-neutral-300' : 'text-neutral-600'}`}>
+                  <button type="button" onClick={() => setAddingItemTo(n.id)} className="text-[12px] font-medium flex items-center gap-1 pt-1 text-muted-foreground">
                     <Plus className="w-3 h-3" /> Add step
                   </button>
                 )}
@@ -306,12 +306,12 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
           <div className="flex flex-col items-end gap-1 shrink-0">
             {n.status !== 'dismissed' && (
               <button type="button" onClick={() => setStatus(n, 'dismissed')} disabled={busyId === n.id}
-                className="opacity-0 sm:group-hover:opacity-100 p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center text-neutral-400 hover:text-neutral-600 disabled:opacity-40" aria-label="Dismiss note">
+                className="opacity-0 sm:group-hover:opacity-100 p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-40" aria-label="Dismiss note">
                 <EyeOff className="w-3.5 h-3.5" />
               </button>
             )}
             <button type="button" onClick={() => remove(n.id)} disabled={busyId === n.id}
-              className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center text-neutral-400 hover:text-red-500 disabled:opacity-40" aria-label="Delete note">
+              className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center text-muted-foreground hover:text-destructive disabled:opacity-40" aria-label="Delete note">
               {busyId === n.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
             </button>
           </div>
@@ -321,9 +321,9 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
   }
 
   return (
-    <div className={`flex flex-col h-full ${dark ? 'text-neutral-100' : 'text-neutral-900'}`}>
+    <div className="flex flex-col h-full text-foreground">
       <div className="flex items-center gap-3 px-5 pt-5 pb-4 shrink-0">
-        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${dark ? 'bg-white text-black' : 'bg-neutral-900 text-white'}`}>
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-primary text-primary-foreground">
           <StickyNote className="w-5 h-5" />
         </div>
         <div className="flex-1 min-w-0">
@@ -331,7 +331,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
           <p className={`text-[13px] ${muted}`}>Everything you asked Quantumy to save, organized by topic</p>
         </div>
         <button type="button" onClick={onClose} className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${hover}`} aria-label="Close notes">
-          <X className={`w-5 h-5 ${dark ? 'text-neutral-300' : 'text-neutral-600'}`} />
+          <X className="w-5 h-5 text-muted-foreground" />
         </button>
       </div>
 
@@ -341,9 +341,9 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
             <p className="text-2xl font-semibold tabular-nums tracking-tight">{stats.open}</p>
             <p className={`text-[12px] ${muted}`}>Open notes</p>
           </div>
-          <div className={`rounded-2xl px-3 py-3 ${stats.overdue > 0 ? (dark ? 'bg-rose-500/10 ring-1 ring-rose-400/25' : 'bg-rose-50 ring-1 ring-rose-200') : card}`}>
-            <p className={`text-2xl font-semibold tabular-nums tracking-tight ${stats.overdue > 0 ? 'text-rose-500' : ''}`}>{stats.overdue}</p>
-            <p className={`text-[12px] ${stats.overdue > 0 ? 'text-rose-500/80' : muted}`}>Overdue</p>
+          <div className={`rounded-2xl px-3 py-3 ${stats.overdue > 0 ? 'bg-destructive/10 ring-1 ring-destructive/25' : card}`}>
+            <p className={`text-2xl font-semibold tabular-nums tracking-tight ${stats.overdue > 0 ? 'text-destructive' : ''}`}>{stats.overdue}</p>
+            <p className={`text-[12px] ${stats.overdue > 0 ? 'text-destructive/80' : muted}`}>Overdue</p>
           </div>
           <div className={`rounded-2xl px-3 py-3 ${card}`}>
             <p className="text-2xl font-semibold tabular-nums tracking-tight">{stats.topics}</p>
@@ -351,10 +351,10 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
           </div>
         </div>
 
-        <div className={`flex items-center gap-2 h-10 rounded-xl px-3 mb-4 ${dark ? 'bg-white/[0.06] ring-1 ring-white/[0.06]' : 'bg-black/[0.04] ring-1 ring-black/[0.04]'}`}>
+        <div className="flex items-center gap-2 h-10 rounded-xl px-3 mb-4 bg-muted ring-1 ring-border">
           <Search className={`w-4 h-4 shrink-0 ${muted}`} />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search notes, tags, projects…"
-            className={`flex-1 min-w-0 bg-transparent border-0 outline-none text-[14px] ${dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'}`} aria-label="Search notes" />
+            className="flex-1 min-w-0 bg-transparent border-0 outline-none text-[14px] text-foreground placeholder:text-muted-foreground" aria-label="Search notes" />
           {search && (
             <button type="button" onClick={() => setSearch('')} className={`p-0.5 rounded ${hover}`} aria-label="Clear search">
               <X className={`w-3.5 h-3.5 ${muted}`} />
@@ -370,12 +370,12 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
           ) : (
             <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={`rounded-2xl p-3.5 space-y-2.5 ${card}`}>
               <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && resetForm()}
-                placeholder="Note" rows={2} className={`w-full resize-none rounded-xl px-3 py-2 text-[14px] outline-none glass-panel ${dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'}`} />
+                placeholder="Note" rows={2} className="w-full resize-none rounded-xl px-3 py-2 text-[14px] outline-none glass-panel text-foreground placeholder:text-muted-foreground" />
               <input value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Project (optional)" className={fieldClass} list="quantumy-projects" />
               <datalist id="quantumy-projects">{projects.map((p) => <option key={p.id} value={p.name} />)}</datalist>
               <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="Topics, comma separated (optional)" className={fieldClass} />
               <textarea value={checklistInput} onChange={(e) => setChecklistInput(e.target.value)} placeholder={'Checklist steps, one per line (optional)'} rows={2}
-                className={`w-full resize-none rounded-xl px-3 py-2 text-[14px] outline-none glass-panel ${dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'}`} />
+                className="w-full resize-none rounded-xl px-3 py-2 text-[14px] outline-none glass-panel text-foreground placeholder:text-muted-foreground" />
               <div className="grid grid-cols-2 gap-2">
                 <select value={noteType} onChange={(e) => setNoteType(e.target.value as NoteType)} className={fieldClass}>
                   {(Object.keys(NOTE_TYPE_LABEL) as NoteType[]).map((t) => (<option key={t} value={t}>{NOTE_TYPE_LABEL[t]}</option>))}
@@ -385,7 +385,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
                 </select>
               </div>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={fieldClass} aria-label="Due date (optional)" />
-              {formError && <p className="text-[12px] text-rose-500">{formError}</p>}
+              {formError && <p className="text-[12px] text-destructive">{formError}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={resetForm} className={`flex-1 h-9 rounded-xl text-[13px] font-medium ${hover} ${muted}`}>Cancel</button>
                 <button type="button" onClick={submit} disabled={!text.trim() || saving} className={`flex-1 h-9 rounded-xl text-[13px] font-medium disabled:opacity-40 flex items-center justify-center gap-1.5 ${primaryBtn}`}>
@@ -404,7 +404,7 @@ export default function NotesDashboard({ dark, user, projects, currentProjectId,
           ))}
           {projects.length > 0 && (
             <>
-              <span className={`w-px h-4 mx-0.5 shrink-0 ${dark ? 'bg-white/10' : 'bg-black/10'}`} />
+              <span className="w-px h-4 mx-0.5 shrink-0 bg-border" />
               <button type="button" onClick={() => setProjectFilter(null)} className={`${chip} ${!projectFilter ? chipActive : hover}`}>All projects</button>
               {projects.map((p) => (
                 <button key={p.id} type="button" onClick={() => setProjectFilter(p.id)} className={`${chip} ${projectFilter === p.id ? chipActive : hover}`}>{p.name}</button>

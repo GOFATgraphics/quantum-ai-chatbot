@@ -55,7 +55,7 @@ type Props = {
 }
 
 /** Single compact status line — no multi-step list eating the screen */
-export default function ThinkingStatus({ prompt = '', dark, toolLabel }: Props) {
+export default function ThinkingStatus({ prompt = '', toolLabel }: Props) {
   const steps = pickSteps(prompt)
   const [activeIdx, setActiveIdx] = useState(0)
   const reduceMotion = useReducedMotion()
@@ -81,7 +81,7 @@ export default function ThinkingStatus({ prompt = '', dark, toolLabel }: Props) 
         {[0, 1, 2].map((d) => (
           <motion.span
             key={d}
-            className={`block w-1.5 h-1.5 rounded-full ${dark ? 'bg-white' : 'bg-neutral-900'}`}
+            className="block w-1.5 h-1.5 rounded-full bg-foreground"
             animate={
               reduceMotion
                 ? { opacity: 0.7 }
@@ -96,9 +96,7 @@ export default function ThinkingStatus({ prompt = '', dark, toolLabel }: Props) 
         ))}
       </div>
       <span
-        className={`text-[13px] font-medium truncate ${
-          dark ? 'text-slate-300' : 'text-slate-600'
-        }`}
+        className="text-[13px] font-medium truncate text-muted-foreground"
       >
         {label}
       </span>

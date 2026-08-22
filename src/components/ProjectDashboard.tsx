@@ -29,9 +29,9 @@ const NOTE_TYPE_LABEL: Record<NoteType, string> = {
 }
 
 const PRIORITY_DOT: Record<NotePriority, string> = {
-  high: 'bg-rose-500',
-  medium: 'bg-amber-500',
-  low: 'bg-neutral-400',
+  high: 'bg-destructive',
+  medium: 'bg-foreground',
+  low: 'bg-muted-foreground',
 }
 
 function timeAgo(iso: string): string {
@@ -121,13 +121,13 @@ export default function ProjectDashboard({
   const overdueNotes = useMemo(() => openNotes.filter((n) => n.due_date && new Date(n.due_date).getTime() < Date.now()), [openNotes])
   const filteredNotes = useMemo(() => (noteFilter === 'all' ? notes : notes.filter((n) => n.status === noteFilter)), [notes, noteFilter])
 
-  const muted = dark ? 'text-neutral-400' : 'text-neutral-500'
-  const hover = dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'
-  const card = dark ? 'bg-white/[0.04] ring-1 ring-white/10' : 'bg-black/[0.02] ring-1 ring-black/5'
-  const chipActive = dark ? 'bg-white/12 text-white ring-1 ring-white/20' : 'bg-black/[0.08] text-black ring-1 ring-black/10'
-  const chip = `px-3 h-8 rounded-full text-[13px] font-medium transition shrink-0 ${dark ? 'text-neutral-300' : 'text-neutral-600'}`
-  const fieldClass = `w-full h-10 rounded-xl px-3 text-[14px] outline-none glass-panel ${dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'}`
-  const primaryBtn = dark ? 'bg-white text-black hover:bg-neutral-200' : 'bg-neutral-900 text-white hover:bg-black'
+  const muted = 'text-muted-foreground'
+  const hover = 'hover:bg-accent'
+  const card = 'bg-card ring-1 ring-border'
+  const chipActive = 'bg-secondary text-foreground ring-1 ring-border'
+  const chip = 'px-3 h-8 rounded-full text-[13px] font-medium transition shrink-0 text-muted-foreground'
+  const fieldClass = 'w-full h-10 rounded-xl px-3 text-[14px] outline-none glass-panel text-foreground placeholder:text-muted-foreground'
+  const primaryBtn = 'bg-primary text-primary-foreground hover:bg-primary/90'
 
   const saveEdit = async () => {
     const n = name.trim()
@@ -180,7 +180,7 @@ export default function ProjectDashboard({
   }
 
   return (
-    <div className={`flex flex-col h-full ${dark ? 'text-neutral-100' : 'text-neutral-900'}`}>
+    <div className="flex flex-col h-full text-foreground">
       <div className="flex items-start gap-3 px-5 pt-5 pb-4 shrink-0">
         <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}26` }}>
           <FolderKanban className="w-5 h-5" style={{ color }} />
@@ -192,7 +192,7 @@ export default function ProjectDashboard({
           ) : (
             <div className="space-y-2">
               <input autoFocus value={name} onChange={(e) => setName(e.target.value)} className={fieldClass} placeholder="Project name" />
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Description (optional)" className={`w-full resize-none rounded-xl px-3 py-2 text-[14px] outline-none glass-panel ${dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'}`} />
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Description (optional)" className="w-full resize-none rounded-xl px-3 py-2 text-[14px] outline-none glass-panel text-foreground placeholder:text-muted-foreground" />
               <div className="flex items-center gap-1.5">
                 {COLORS.map((c) => (
                   <button key={c} type="button" onClick={() => setColor(c)} aria-label={`Use color ${c}`} className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center" style={{ backgroundColor: c, outline: color === c ? `2px solid ${dark ? '#fff' : '#000'}` : 'none', outlineOffset: 2 }}>
@@ -211,11 +211,11 @@ export default function ProjectDashboard({
         </div>
         {!editing && (
           <button type="button" onClick={() => setEditing(true)} className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${hover}`} aria-label="Edit project">
-            <Pencil className={`w-4 h-4 ${dark ? 'text-neutral-300' : 'text-neutral-600'}`} />
+            <Pencil className="w-4 h-4 text-muted-foreground" />
           </button>
         )}
         <button type="button" onClick={onClose} className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${hover}`} aria-label="Close project dashboard">
-          <X className={`w-5 h-5 ${dark ? 'text-neutral-300' : 'text-neutral-600'}`} />
+          <X className="w-5 h-5 text-muted-foreground" />
         </button>
       </div>
 
@@ -229,9 +229,9 @@ export default function ProjectDashboard({
             <p className="text-2xl font-semibold tabular-nums tracking-tight">{openNotes.length}</p>
             <p className={`text-[12px] ${muted}`}>Open notes</p>
           </div>
-          <div className={`rounded-2xl px-3 py-3 ${overdueNotes.length > 0 ? (dark ? 'bg-rose-500/10 ring-1 ring-rose-400/25' : 'bg-rose-50 ring-1 ring-rose-200') : card}`}>
-            <p className={`text-2xl font-semibold tabular-nums tracking-tight ${overdueNotes.length > 0 ? 'text-rose-500' : ''}`}>{overdueNotes.length}</p>
-            <p className={`text-[12px] ${overdueNotes.length > 0 ? 'text-rose-500/80' : muted}`}>Overdue</p>
+          <div className={`rounded-2xl px-3 py-3 ${overdueNotes.length > 0 ? 'bg-destructive/10 ring-1 ring-destructive/25' : card}`}>
+            <p className={`text-2xl font-semibold tabular-nums tracking-tight ${overdueNotes.length > 0 ? 'text-destructive' : ''}`}>{overdueNotes.length}</p>
+            <p className={`text-[12px] ${overdueNotes.length > 0 ? 'text-destructive/80' : muted}`}>Overdue</p>
           </div>
         </div>
 
@@ -243,9 +243,9 @@ export default function ProjectDashboard({
           <div>
             <p className={`text-xs font-medium uppercase tracking-wide mb-2 px-1 ${muted}`}>Recent chats</p>
             {conversations.filter((c) => c.project_id === project.id).length > 4 && (
-              <div className={`flex items-center gap-2 h-9 rounded-xl px-2.5 mb-2 ${dark ? 'bg-white/[0.06]' : 'bg-black/[0.04]'}`}>
+              <div className="flex items-center gap-2 h-9 rounded-xl px-2.5 mb-2 bg-muted">
                 <Search className={`w-3.5 h-3.5 shrink-0 ${muted}`} />
-                <input value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} placeholder="Filter chats" className={`flex-1 min-w-0 bg-transparent border-0 outline-none text-[13px] ${dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'}`} />
+                <input value={chatQuery} onChange={(e) => setChatQuery(e.target.value)} placeholder="Filter chats" className="flex-1 min-w-0 bg-transparent border-0 outline-none text-[13px] text-foreground placeholder:text-muted-foreground" />
               </div>
             )}
             {projectChats.length === 0 ? (
@@ -270,14 +270,14 @@ export default function ProjectDashboard({
           <div>
             <div className="flex items-center justify-between mb-2 px-1">
               <p className={`text-xs font-medium uppercase tracking-wide ${muted}`}>Notes</p>
-              <button type="button" onClick={() => setShowNoteForm((s) => !s)} className={`text-[12px] font-medium flex items-center gap-1 ${dark ? 'text-neutral-200' : 'text-neutral-700'}`}>
+              <button type="button" onClick={() => setShowNoteForm((s) => !s)} className="text-[12px] font-medium flex items-center gap-1 text-foreground">
                 <Plus className="w-3.5 h-3.5" /> Add
               </button>
             </div>
 
             {showNoteForm && (
               <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={`rounded-2xl p-3 space-y-2 mb-2 ${card}`}>
-                <textarea autoFocus value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Note" rows={2} className={`w-full resize-none rounded-xl px-3 py-2 text-[14px] outline-none glass-panel ${dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'}`} />
+                <textarea autoFocus value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Note" rows={2} className="w-full resize-none rounded-xl px-3 py-2 text-[14px] outline-none glass-panel text-foreground placeholder:text-muted-foreground" />
                 <div className="grid grid-cols-2 gap-2">
                   <select value={noteType} onChange={(e) => setNoteType(e.target.value as NoteType)} className={fieldClass}>
                     {(Object.keys(NOTE_TYPE_LABEL) as NoteType[]).map((t) => (<option key={t} value={t}>{NOTE_TYPE_LABEL[t]}</option>))}
@@ -287,7 +287,7 @@ export default function ProjectDashboard({
                   </select>
                 </div>
                 <input type="date" value={noteDue} onChange={(e) => setNoteDue(e.target.value)} className={fieldClass} aria-label="Due date" />
-                {noteError && <p className="text-[12px] text-rose-500">{noteError}</p>}
+                {noteError && <p className="text-[12px] text-destructive">{noteError}</p>}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setShowNoteForm(false)} className={`flex-1 h-9 rounded-xl text-[13px] font-medium ${hover} ${muted}`}>Cancel</button>
                   <button type="button" onClick={submitNote} disabled={!noteText.trim() || savingNote} className={`flex-1 h-9 rounded-xl text-[13px] font-medium disabled:opacity-40 flex items-center justify-center gap-1.5 ${primaryBtn}`}>
@@ -316,26 +316,26 @@ export default function ProjectDashboard({
                   const isOverdue = !!due?.overdue && n.status === 'open'
                   return (
                     <motion.div key={n.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                      className={`group flex items-start gap-2.5 rounded-xl px-3 py-2.5 mb-1 ${isOverdue ? (dark ? 'bg-rose-500/[0.07]' : 'bg-rose-50/70') : hover}`}>
+                      className={`group flex items-start gap-2.5 rounded-xl px-3 py-2.5 mb-1 ${isOverdue ? 'bg-destructive/10' : hover}`}>
                       <button type="button" onClick={() => setNoteStatus(n, n.status === 'open' ? 'done' : 'open')} disabled={busyNoteId === n.id}
-                        className={`mt-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0 transition ${n.status === 'done' ? 'bg-emerald-500 text-white' : dark ? 'ring-1 ring-white/25' : 'ring-1 ring-neutral-300'}`} aria-label="Toggle note status">
+                        className={`mt-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0 transition ${n.status === 'done' ? 'bg-primary text-primary-foreground' : 'ring-1 ring-border'}`} aria-label="Toggle note status">
                         {n.status === 'done' && <Check className="w-2.5 h-2.5" />}
                       </button>
                       <div className="flex-1 min-w-0">
                         <p className={`text-[13px] leading-snug ${n.status !== 'open' ? `line-through ${muted}` : ''}`}>{n.note}</p>
                         <div className={`flex flex-wrap items-center gap-1 mt-1 text-[11px] ${muted}`}>
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary">
                             <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[n.priority]}`} />{NOTE_TYPE_LABEL[n.note_type]}
                           </span>
                           {due && (
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${isOverdue ? 'bg-rose-500/15 text-rose-500' : dark ? 'bg-white/10' : 'bg-black/[0.05]'}`}>
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md ${isOverdue ? 'bg-destructive/15 text-destructive' : 'bg-secondary'}`}>
                               {isOverdue && <AlertTriangle className="w-3 h-3" />}{due.text}
                             </span>
                           )}
                         </div>
                       </div>
                       <button type="button" onClick={() => removeNote(n.id)} disabled={busyNoteId === n.id}
-                        className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center text-neutral-400 hover:text-red-500 disabled:opacity-40 shrink-0" aria-label="Delete note">
+                        className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center text-muted-foreground hover:text-destructive disabled:opacity-40 shrink-0" aria-label="Delete note">
                         {busyNoteId === n.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                       </button>
                     </motion.div>
@@ -346,16 +346,16 @@ export default function ProjectDashboard({
           </div>
         </div>
 
-        <div className={`mt-8 pt-4 border-t ${dark ? 'border-white/10' : 'border-black/10'}`}>
+        <div className="mt-8 pt-4 border-t border-border">
           {!confirmDelete ? (
-            <button type="button" onClick={() => setConfirmDelete(true)} className="text-[13px] font-medium text-red-500/80 hover:text-red-500 flex items-center gap-1.5">
+            <button type="button" onClick={() => setConfirmDelete(true)} className="text-[13px] font-medium text-destructive/80 hover:text-destructive flex items-center gap-1.5">
               <Trash2 className="w-3.5 h-3.5" /> Delete project
             </button>
           ) : (
-            <div className={`rounded-2xl p-3 flex items-center gap-3 ${dark ? 'bg-rose-500/10 ring-1 ring-rose-400/25' : 'bg-rose-50 ring-1 ring-rose-200'}`}>
+            <div className="rounded-2xl p-3 flex items-center gap-3 bg-destructive/10 ring-1 ring-destructive/25">
               <p className="text-[13px] flex-1">Delete &quot;{project.name}&quot;? Its chats stay, but become unassigned.</p>
               <button type="button" onClick={() => setConfirmDelete(false)} className={`h-8 px-3 rounded-lg text-[13px] font-medium ${hover}`}>Cancel</button>
-              <button type="button" onClick={doDelete} disabled={deleting} className="h-8 px-3 rounded-lg text-[13px] font-medium bg-red-600 text-white hover:bg-red-500 disabled:opacity-40 flex items-center gap-1.5">
+              <button type="button" onClick={doDelete} disabled={deleting} className="h-8 px-3 rounded-lg text-[13px] font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40 flex items-center gap-1.5">
                 {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />} Delete
               </button>
             </div>

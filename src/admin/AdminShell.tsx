@@ -31,10 +31,10 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
       <div className="px-4 pt-5 pb-4 flex items-center gap-3">
         <Logo size={32} dark={dark} />
         <div className="min-w-0">
-          <div className={'text-sm font-semibold tracking-tight ' + (dark ? 'text-white' : 'text-slate-900')}>
+          <div className="text-sm font-semibold tracking-tight text-foreground">
             Quantumy Admin
           </div>
-          <div className={'text-[11px] truncate ' + (dark ? 'text-slate-500' : 'text-slate-400')}>
+          <div className="text-[11px] truncate text-muted-foreground">
             {email || 'Admin'}
           </div>
         </div>
@@ -46,11 +46,9 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
           const Icon = item.icon
           let btnClass = 'w-full flex items-center gap-3 px-3 h-10 rounded-xl text-sm transition '
           if (active) {
-            btnClass += dark ? 'bg-white/10 text-white' : 'bg-indigo-50 text-indigo-700'
+            btnClass += 'bg-accent text-accent-foreground'
           } else {
-            btnClass += dark
-              ? 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            btnClass += 'text-muted-foreground hover:bg-accent hover:text-foreground'
           }
           if (item.soon) btnClass += ' opacity-50 cursor-not-allowed'
 
@@ -72,7 +70,7 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
                 <span
                   className={
                     'text-[10px] font-medium px-1.5 py-0.5 rounded-md ' +
-                    (dark ? 'bg-white/10 text-slate-500' : 'bg-slate-100 text-slate-400')
+                    'bg-muted text-muted-foreground'
                   }
                 >
                   Soon
@@ -83,14 +81,11 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
         })}
       </nav>
 
-      <div className={'p-3 border-t ' + (dark ? 'border-white/5' : 'border-slate-100')}>
+      <div className="p-3 border-t border-border">
         <button
           type="button"
           onClick={onBackToApp}
-          className={
-            'w-full flex items-center gap-2.5 px-3 h-10 rounded-xl text-sm transition ' +
-            (dark ? 'text-slate-400 hover:bg-white/5 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-100')
-          }
+          className="w-full flex items-center gap-2.5 px-3 h-10 rounded-xl text-sm transition text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to app
@@ -100,33 +95,20 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
   )
 
   return (
-    <div className={'min-h-dvh flex ' + (dark ? 'bg-[#0c0c10] text-slate-100' : 'bg-slate-50 text-slate-900')}>
-      <aside
-        className={
-          'hidden md:flex w-60 shrink-0 flex-col border-r ' +
-          (dark ? 'bg-[#111114] border-white/5' : 'bg-white border-slate-200')
-        }
-      >
+    <div className="min-h-dvh flex bg-settings-canvas text-foreground">
+      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r bg-settings-surface border-border">
         {navContent}
       </aside>
 
       {mobileOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />
-          <aside
-            className={
-              'fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] flex flex-col md:hidden shadow-2xl ' +
-              (dark ? 'bg-[#111114]' : 'bg-white')
-            }
-          >
+          <aside className="fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] flex flex-col md:hidden shadow-2xl bg-settings-surface">
             <div className="absolute top-3 right-3">
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className={
-                  'w-9 h-9 rounded-full flex items-center justify-center ' +
-                  (dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-100')
-                }
+                className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-accent"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -137,24 +119,16 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header
-          className={
-            'h-14 shrink-0 flex items-center gap-3 px-4 border-b backdrop-blur-sm ' +
-            (dark ? 'border-white/5 bg-[#111114]/80' : 'border-slate-200 bg-white/80')
-          }
-        >
+        <header className="h-14 shrink-0 flex items-center gap-3 px-4 border-b backdrop-blur-sm border-border bg-settings-surface">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className={
-              'md:hidden w-9 h-9 rounded-full flex items-center justify-center ' +
-              (dark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-600 hover:bg-slate-100')
-            }
+            className="md:hidden w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-accent"
           >
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2 min-w-0">
-            <Shield className={'w-4 h-4 shrink-0 ' + (dark ? 'text-indigo-400' : 'text-indigo-600')} />
+            <Shield className="w-4 h-4 shrink-0 text-foreground" />
             <h1 className="text-sm font-semibold truncate capitalize">{activePage}</h1>
           </div>
         </header>

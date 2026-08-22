@@ -184,15 +184,11 @@ export default function CommandPalette({
 
   let flatIndex = -1
 
-  const panel = dark
-    ? 'bg-[#1c1c1e]/border-white/10 text-slate-100'
-    : 'bg-white border-black/10 text-slate-900'
-  const inputCls = dark
-    ? 'text-slate-100 placeholder:text-slate-500'
-    : 'text-slate-900 placeholder:text-slate-400'
-  const rowHover = dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'
-  const rowActive = dark ? 'bg-white/[0.1]' : 'bg-indigo-50 text-indigo-900'
-  const muted = dark ? 'text-slate-500' : 'text-slate-400'
+  const panel = 'bg-card border-border text-foreground'
+  const inputCls = 'text-foreground placeholder:text-muted-foreground'
+  const rowHover = 'hover:bg-accent'
+  const rowActive = 'bg-secondary text-foreground'
+  const muted = 'text-muted-foreground'
 
   return (
     <AnimatePresence>
@@ -215,7 +211,7 @@ export default function CommandPalette({
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             className={`relative w-full max-w-[520px] rounded-2xl border shadow-2xl overflow-hidden ${panel}`}
           >
-            <div className={`flex items-center gap-3 px-4 h-14 border-b ${dark ? 'border-white/[0.08]' : 'border-black/[0.06]'}`}>
+            <div className="flex items-center gap-3 px-4 h-14 border-b border-border">
               <Search className={`w-[18px] h-[18px] shrink-0 ${muted}`} />
               <input
                 ref={inputRef}
@@ -226,7 +222,7 @@ export default function CommandPalette({
                 autoComplete="off"
                 spellCheck={false}
               />
-              <kbd className={`hidden sm:inline text-[11px] font-medium px-1.5 py-0.5 rounded-md ${dark ? 'bg-white/10 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+              <kbd className="hidden sm:inline text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-secondary text-muted-foreground">
                 esc
               </kbd>
             </div>
@@ -269,7 +265,7 @@ export default function CommandPalette({
               )}
             </div>
 
-            <div className={`flex items-center gap-3 px-4 py-2 text-[11px] border-t ${dark ? 'border-white/[0.08]' : 'border-black/[0.06]'} ${muted}`}>
+            <div className={`flex items-center gap-3 px-4 py-2 text-[11px] border-t border-border ${muted}`}>
               <span><kbd className="font-medium">↑↓</kbd> navigate</span>
               <span><kbd className="font-medium">↵</kbd> open</span>
               <span className="ml-auto"><kbd className="font-medium">⌘K</kbd> toggle</span>

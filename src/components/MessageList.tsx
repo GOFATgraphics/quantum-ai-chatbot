@@ -149,9 +149,7 @@ function UserBubble({
   return (
     <div className="flex flex-col items-end max-w-[85%]">
       <div
-        className={`glass-bubble w-full rounded-[22px] px-4 py-2.5 text-[15px] leading-[1.55] ${
-          dark ? 'text-slate-50' : 'text-slate-900'
-        }`}
+        className="glass-bubble w-full rounded-[22px] px-4 py-2.5 text-[15px] leading-[1.55] text-foreground"
       >
         {editing ? (
           <div className="space-y-2">
@@ -159,9 +157,7 @@ function UserBubble({
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={Math.min(8, Math.max(2, draft.split('\n').length + 1))}
-              className={`w-full resize-none bg-transparent border-0 outline-none text-[15px] leading-[1.55] min-h-[48px] ${
-                dark ? 'text-slate-50' : 'text-slate-900'
-              }`}
+              className="w-full resize-none bg-transparent border-0 outline-none text-[15px] leading-[1.55] min-h-[48px] text-foreground"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Escape') setEditing(false)
@@ -175,9 +171,7 @@ function UserBubble({
               <button
                 type="button"
                 onClick={() => setEditing(false)}
-                className={`text-[13px] font-medium px-3 py-1.5 rounded-full transition ${
-                  dark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-600 hover:bg-black/5'
-                }`}
+                className="text-[13px] font-medium px-3 py-1.5 rounded-full transition text-muted-foreground hover:bg-accent"
               >
                 Cancel
               </button>
@@ -185,9 +179,7 @@ function UserBubble({
                 type="button"
                 onClick={saveEdit}
                 disabled={!draft.trim()}
-                className={`text-[13px] font-semibold px-3.5 py-1.5 rounded-full transition disabled:opacity-40 ${
-                  dark ? 'bg-white text-slate-900 hover:bg-slate-100' : 'bg-slate-900 text-white hover:bg-black'
-                }`}
+                className="text-[13px] font-semibold px-3.5 py-1.5 rounded-full transition disabled:opacity-40 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 Save & send
               </button>
@@ -226,9 +218,7 @@ function UserBubble({
                 return (
                   <div
                     key={i}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium ${
-                      dark ? 'bg-white/10 text-slate-200' : 'bg-slate-100/80 text-slate-700'
-                    }`}
+                    className="flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium bg-secondary text-foreground"
                   >
                     <FileText className="w-4 h-4 shrink-0 opacity-70" />
                     <span className="truncate">{name}</span>
@@ -244,9 +234,7 @@ function UserBubble({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className={`mt-1.5 text-[13px] font-semibold ${
-              dark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className="mt-1.5 text-[13px] font-semibold text-muted-foreground hover:text-foreground"
           >
             {expanded ? 'Show less' : 'Show more'}
           </button>
@@ -428,9 +416,7 @@ export default function MessageList({
               ) : (
                 <div className="max-w-[95%] min-w-0">
                   <div
-                    className={`text-[15.5px] leading-[1.65] tracking-[-0.01em] min-w-0 overflow-x-hidden break-words ${
-                      dark ? 'text-slate-100' : 'text-slate-900'
-                    }`}
+                    className="text-[15.5px] leading-[1.65] tracking-[-0.01em] min-w-0 overflow-x-hidden break-words text-foreground"
                   >
                     <AssistantContent content={msg.content} isStreamingThis={isStreamingThis} />
                   </div>
@@ -441,9 +427,7 @@ export default function MessageList({
                           initial={{ opacity: 0, y: 4 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.25 }}
-                          className={`mt-2 text-[12px] font-medium ${
-                            dark ? 'text-slate-500' : 'text-slate-400'
-                          }`}
+                          className="mt-2 text-[12px] font-medium text-muted-foreground"
                         >
                           {`Responded in ${thoughtSeconds}s`}
                         </motion.div>
@@ -484,11 +468,7 @@ export default function MessageList({
               key={s}
               type="button"
               onClick={() => onSuggestion(s)}
-              className={`text-[13px] font-medium px-3 py-1.5 rounded-full transition border ${
-                dark
-                  ? 'bg-white/5 border-white/10 text-slate-200 hover:bg-white/10'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
-              }`}
+              className="text-[13px] font-medium px-3 py-1.5 rounded-full transition border bg-secondary border-border text-foreground hover:bg-accent shadow-sm"
             >
               {s}
             </button>

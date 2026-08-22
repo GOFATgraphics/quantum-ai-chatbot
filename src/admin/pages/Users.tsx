@@ -84,7 +84,7 @@ function displayName(u: Profile) {
   return u.preferred_name || (u.email ? u.email.split('@')[0] : 'User')
 }
 
-export default function Users({ dark, currentUserId }: Props) {
+export default function Users({ currentUserId }: Props) {
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -270,12 +270,12 @@ export default function Users({ dark, currentUserId }: Props) {
     }
   }
 
-  const cardBg = dark ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm'
-  const muted = dark ? 'text-slate-400' : 'text-slate-500'
-  const title = dark ? 'text-white' : 'text-slate-900'
-  const rowHover = dark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'
-  const border = dark ? 'border-white/5' : 'border-slate-100'
-  const chip = dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-600'
+  const cardBg = 'bg-card border-border shadow-sm'
+  const muted = 'text-muted-foreground'
+  const title = 'text-foreground'
+  const rowHover = 'hover:bg-accent'
+  const border = 'border-border'
+  const chip = 'bg-secondary text-secondary-foreground'
 
   // ——— Message thread view ———
   if (selectedUser && selectedConv) {
@@ -288,7 +288,7 @@ export default function Users({ dark, currentUserId }: Props) {
             onClick={backFromConv}
             className={
               'h-9 px-3 rounded-xl text-sm font-medium flex items-center gap-1.5 transition ' +
-              (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+              'bg-secondary text-secondary-foreground hover:bg-accent'
             }
           >
             <ArrowLeft className="w-4 h-4" />
@@ -307,7 +307,7 @@ export default function Users({ dark, currentUserId }: Props) {
           <div
             className={
               'rounded-xl border px-4 py-3 text-sm ' +
-              (dark ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')
+              'border-destructive/30 bg-destructive/10 text-destructive'
             }
           >
             {error}
@@ -331,12 +331,8 @@ export default function Users({ dark, currentUserId }: Props) {
                       className={
                         'max-w-[min(100%,28rem)] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ' +
                         (isUser
-                          ? dark
-                            ? 'bg-indigo-500/25 text-indigo-50'
-                            : 'bg-indigo-50 text-indigo-950'
-                          : dark
-                            ? 'bg-white/[0.06] text-slate-200'
-                            : 'bg-slate-100 text-slate-800')
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-foreground')
                       }
                     >
                       <div className={'text-[10px] font-medium uppercase tracking-wide mb-1 ' + muted}>
@@ -365,7 +361,7 @@ export default function Users({ dark, currentUserId }: Props) {
             onClick={backFromDay}
             className={
               'h-9 px-3 rounded-xl text-sm font-medium flex items-center gap-1.5 transition ' +
-              (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+              'bg-secondary text-secondary-foreground hover:bg-accent'
             }
           >
             <ArrowLeft className="w-4 h-4" />
@@ -383,7 +379,7 @@ export default function Users({ dark, currentUserId }: Props) {
           <div
             className={
               'rounded-xl border px-4 py-3 text-sm ' +
-              (dark ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')
+              'border-destructive/30 bg-destructive/10 text-destructive'
             }
           >
             {error}
@@ -432,14 +428,14 @@ export default function Users({ dark, currentUserId }: Props) {
             onClick={backToUsers}
             className={
               'h-9 px-3 rounded-xl text-sm font-medium flex items-center gap-1.5 transition shrink-0 ' +
-              (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+              'bg-secondary text-secondary-foreground hover:bg-accent'
             }
           >
             <ArrowLeft className="w-4 h-4" />
             Users
           </button>
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-base font-semibold shrink-0">
+            <div className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-base font-semibold shrink-0">
               {initial}
             </div>
             <div className="min-w-0">
@@ -453,7 +449,7 @@ export default function Users({ dark, currentUserId }: Props) {
             disabled={chatsLoading}
             className={
               'h-9 w-9 rounded-xl flex items-center justify-center transition disabled:opacity-50 ' +
-              (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+              'bg-secondary text-secondary-foreground hover:bg-accent'
             }
             aria-label="Refresh chats"
           >
@@ -466,7 +462,7 @@ export default function Users({ dark, currentUserId }: Props) {
             <span
               className={
                 'inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md ' +
-                (dark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-indigo-700')
+                'bg-secondary text-foreground'
               }
             >
               <Shield className="w-3 h-3" />
@@ -485,7 +481,7 @@ export default function Users({ dark, currentUserId }: Props) {
           <div
             className={
               'rounded-xl border px-4 py-3 text-sm ' +
-              (dark ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')
+              'border-destructive/30 bg-destructive/10 text-destructive'
             }
           >
             {error}
@@ -519,7 +515,7 @@ export default function Users({ dark, currentUserId }: Props) {
                   <div
                     className={
                       'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ' +
-                      (dark ? 'bg-white/8 text-slate-300' : 'bg-slate-100 text-slate-600')
+                      'bg-secondary text-secondary-foreground'
                     }
                   >
                     <Calendar className="w-4 h-4" />
@@ -561,7 +557,7 @@ export default function Users({ dark, currentUserId }: Props) {
           disabled={loading}
           className={
             'h-9 px-3 rounded-xl text-sm font-medium flex items-center gap-2 transition disabled:opacity-50 self-start ' +
-            (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+            'bg-secondary text-secondary-foreground hover:bg-accent'
           }
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -572,7 +568,7 @@ export default function Users({ dark, currentUserId }: Props) {
       <div
         className={
           'flex items-center gap-2 h-11 rounded-xl px-3 border ' +
-          (dark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200')
+          'bg-card border-border'
         }
       >
         <Search className={'w-4 h-4 shrink-0 ' + muted} />
@@ -582,7 +578,7 @@ export default function Users({ dark, currentUserId }: Props) {
           placeholder="Search by email, name, or id"
           className={
             'flex-1 min-w-0 bg-transparent border-0 outline-none text-sm ' +
-            (dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400')
+            'text-foreground placeholder:text-muted-foreground'
           }
           aria-label="Search users"
         />
@@ -590,7 +586,7 @@ export default function Users({ dark, currentUserId }: Props) {
           <button
             type="button"
             onClick={() => setQuery('')}
-            className={'p-1 rounded-lg ' + (dark ? 'hover:bg-white/10' : 'hover:bg-slate-100')}
+            className={'p-1 rounded-lg hover:bg-accent'}
             aria-label="Clear search"
           >
             <X className={'w-4 h-4 ' + muted} />
@@ -602,7 +598,7 @@ export default function Users({ dark, currentUserId }: Props) {
         <div
           className={
             'rounded-xl border px-4 py-3 text-sm ' +
-            (dark ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')
+            'border-destructive/30 bg-destructive/10 text-destructive'
           }
         >
           {error}
@@ -648,7 +644,7 @@ export default function Users({ dark, currentUserId }: Props) {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-sm font-semibold shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold shrink-0">
                           {initial}
                         </div>
                         <div className="min-w-0">
@@ -667,7 +663,7 @@ export default function Users({ dark, currentUserId }: Props) {
                         <span
                           className={
                             'inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md ' +
-                            (dark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-indigo-700')
+                            'bg-secondary text-foreground'
                           }
                         >
                           <Shield className="w-3 h-3" />
@@ -685,12 +681,8 @@ export default function Users({ dark, currentUserId }: Props) {
                         className={
                           'text-xs font-medium px-2.5 py-1.5 rounded-lg transition disabled:opacity-40 ' +
                           (u.is_admin
-                            ? dark
-                              ? 'bg-white/10 text-slate-300 hover:bg-white/15'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            : dark
-                              ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30'
-                              : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100')
+                            ? 'bg-secondary text-secondary-foreground hover:bg-accent'
+                            : 'bg-primary text-primary-foreground hover:opacity-90')
                         }
                       >
                         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : u.is_admin ? 'Revoke' : 'Make admin'}
@@ -704,7 +696,7 @@ export default function Users({ dark, currentUserId }: Props) {
         </div>
       </div>
 
-      <p className={'text-xs ' + (dark ? 'text-slate-600' : 'text-slate-400')}>
+      <p className={'text-xs text-muted-foreground'}>
         Tap a row to open that user&apos;s conversations grouped by date.
       </p>
     </div>

@@ -31,7 +31,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   excel: 'Excel Online',
 }
 
-export default function ConnectorsPage({ dark }: Props) {
+export default function ConnectorsPage(_props: Props) {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -98,20 +98,20 @@ export default function ConnectorsPage({ dark }: Props) {
 
   const connectedCount = rows.filter((r) => r.status === 'connected').length
 
-  const cardBg = dark ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm'
-  const muted = dark ? 'text-slate-400' : 'text-slate-500'
-  const title = dark ? 'text-white' : 'text-slate-900'
-  const rowHover = dark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'
-  const border = dark ? 'border-white/5' : 'border-slate-100'
+  const cardBg = 'bg-card border-border shadow-sm'
+  const muted = 'text-muted-foreground'
+  const title = 'text-foreground'
+  const rowHover = 'hover:bg-accent'
+  const border = 'border-border'
 
   const statusClass = (status: string) => {
     if (status === 'connected') {
-      return dark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700'
+      return 'bg-secondary text-foreground'
     }
     if (status === 'error') {
-      return dark ? 'bg-red-500/15 text-red-300' : 'bg-red-50 text-red-700'
+      return 'bg-destructive/10 text-destructive'
     }
-    return dark ? 'bg-white/10 text-slate-400' : 'bg-slate-100 text-slate-500'
+    return 'bg-muted text-muted-foreground'
   }
 
   return (
@@ -131,7 +131,7 @@ export default function ConnectorsPage({ dark }: Props) {
           disabled={loading}
           className={
             'h-9 px-3 rounded-xl text-sm font-medium flex items-center gap-2 transition disabled:opacity-50 self-start ' +
-            (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+            'bg-secondary text-secondary-foreground hover:bg-accent'
           }
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -142,7 +142,7 @@ export default function ConnectorsPage({ dark }: Props) {
       <div
         className={
           'flex items-center gap-2 h-11 rounded-xl px-3 border ' +
-          (dark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200')
+          'bg-card border-border'
         }
       >
         <Search className={'w-4 h-4 shrink-0 ' + muted} />
@@ -152,12 +152,12 @@ export default function ConnectorsPage({ dark }: Props) {
           placeholder="Search provider, account, owner, status"
           className={
             'flex-1 min-w-0 bg-transparent border-0 outline-none text-sm ' +
-            (dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400')
+            'text-foreground placeholder:text-muted-foreground'
           }
           aria-label="Search connectors"
         />
         {query && (
-          <button type="button" onClick={() => setQuery('')} className={'p-1 rounded-lg ' + (dark ? 'hover:bg-white/10' : 'hover:bg-slate-100')} aria-label="Clear">
+          <button type="button" onClick={() => setQuery('')} className="p-1 rounded-lg hover:bg-accent" aria-label="Clear">
             <X className={'w-4 h-4 ' + muted} />
           </button>
         )}
@@ -167,7 +167,7 @@ export default function ConnectorsPage({ dark }: Props) {
         <div
           className={
             'rounded-xl border px-4 py-3 text-sm ' +
-            (dark ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')
+            'border-destructive/30 bg-destructive/10 text-destructive'
           }
         >
           {error}

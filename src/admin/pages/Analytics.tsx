@@ -40,7 +40,7 @@ type Analytics = {
 }
 
 /** Minimal inline bar chart — no chart library, scales to the tallest bar. */
-function Bars({ data, dark, label }: { data: DayPoint[]; dark: boolean; label: string }) {
+function Bars({ data, label }: { data: DayPoint[]; label: string }) {
   const max = Math.max(1, ...data.map((d) => d.count))
   return (
     <div>
@@ -48,14 +48,14 @@ function Bars({ data, dark, label }: { data: DayPoint[]; dark: boolean; label: s
         {data.map((d) => (
           <div key={d.date} className="flex-1 flex flex-col justify-end group relative">
             <div
-              className={'rounded-sm transition-all ' + (dark ? 'bg-indigo-400/70' : 'bg-indigo-500/70')}
+              className="rounded-sm transition-all bg-foreground/70"
               style={{ height: `${Math.max(2, (d.count / max) * 100)}%` }}
             />
             <div
               className={
                 'pointer-events-none absolute bottom-full mb-1 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap ' +
                 'opacity-0 group-hover:opacity-100 transition text-[10px] px-1.5 py-0.5 rounded ' +
-                (dark ? 'bg-black text-slate-100' : 'bg-slate-900 text-white')
+                'bg-popover text-popover-foreground'
               }
             >
               {d.date.slice(5)}: {d.count} {label}
@@ -63,7 +63,7 @@ function Bars({ data, dark, label }: { data: DayPoint[]; dark: boolean; label: s
           </div>
         ))}
       </div>
-      <div className={'flex justify-between mt-1.5 text-[10px] ' + (dark ? 'text-slate-600' : 'text-slate-400')}>
+      <div className="flex justify-between mt-1.5 text-[10px] text-muted-foreground">
         <span>{data[0]?.date.slice(5)}</span>
         <span>{data[data.length - 1]?.date.slice(5)}</span>
       </div>
@@ -71,7 +71,7 @@ function Bars({ data, dark, label }: { data: DayPoint[]; dark: boolean; label: s
   )
 }
 
-export default function Analytics({ dark }: Props) {
+export default function Analytics(_props: Props) {
   const [data, setData] = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -90,10 +90,10 @@ export default function Analytics({ dark }: Props) {
 
   useEffect(() => { void load() }, [load])
 
-  const cardBg = dark ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm'
-  const muted = dark ? 'text-slate-400' : 'text-slate-500'
-  const faint = dark ? 'text-slate-600' : 'text-slate-400'
-  const title = dark ? 'text-white' : 'text-slate-900'
+  const cardBg = 'bg-card border-border shadow-sm'
+  const muted = 'text-muted-foreground'
+  const faint = 'text-muted-foreground'
+  const title = 'text-foreground'
   const fmt = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString())
 
   if (loading && !data) {
@@ -132,7 +132,7 @@ export default function Analytics({ dark }: Props) {
           disabled={loading}
           className={
             'h-9 px-3 rounded-xl text-sm font-medium flex items-center gap-2 transition disabled:opacity-50 ' +
-            (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+            'bg-secondary text-secondary-foreground hover:bg-accent'
           }
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -144,7 +144,7 @@ export default function Analytics({ dark }: Props) {
         <div
           className={
             'rounded-xl border px-4 py-3 text-sm flex items-start gap-2 ' +
-            (dark ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-red-200 bg-red-50 text-red-800')
+            'border-destructive/30 bg-destructive/10 text-destructive'
           }
         >
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -158,7 +158,7 @@ export default function Analytics({ dark }: Props) {
             <div
               className={
                 'rounded-xl border px-4 py-3 text-sm ' +
-                (dark ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800')
+                'border-border bg-muted text-muted-foreground'
               }
             >
               Message volume hit the per-request row cap, so {data.window_days}-day figures are a floor, not exact.
@@ -184,18 +184,18 @@ export default function Analytics({ dark }: Props) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div className={'rounded-2xl border p-5 ' + cardBg}>
               <h3 className={'text-sm font-semibold mb-3 ' + title}>Messages per day</h3>
-              <Bars data={data.activity.messages_per_day} dark={dark} label="msgs" />
+              <Bars data={data.activity.messages_per_day} label="msgs" />
               <p className={'mt-3 text-xs ' + faint}>
                 {fmt(data.activity.user_messages_30d)} from users · {fmt(data.activity.assistant_messages_30d)} from Quantumy
               </p>
             </div>
             <div className={'rounded-2xl border p-5 ' + cardBg}>
               <h3 className={'text-sm font-semibold mb-3 ' + title}>New chats per day</h3>
-              <Bars data={data.activity.conversations_per_day} dark={dark} label="chats" />
+              <Bars data={data.activity.conversations_per_day} label="chats" />
             </div>
             <div className={'rounded-2xl border p-5 ' + cardBg}>
               <h3 className={'text-sm font-semibold mb-3 ' + title}>Signups per day</h3>
-              <Bars data={data.growth.signups_per_day} dark={dark} label="signups" />
+              <Bars data={data.growth.signups_per_day} label="signups" />
               <p className={'mt-3 text-xs ' + faint}>
                 {fmt(data.growth.new_users_30d)} new in {data.window_days} days
               </p>
@@ -204,7 +204,6 @@ export default function Analytics({ dark }: Props) {
               <h3 className={'text-sm font-semibold mb-3 ' + title}>Activity by hour (UTC)</h3>
               <Bars
                 data={data.activity.by_hour_utc.map((h) => ({ date: String(h.hour).padStart(2, '0') + '-00', count: h.count }))}
-                dark={dark}
                 label="msgs"
               />
             </div>
@@ -221,12 +220,12 @@ export default function Analytics({ dark }: Props) {
                     .sort((a, b) => b[1] - a[1])
                     .map(([provider, count]) => (
                       <div key={provider} className="flex items-center gap-3">
-                        <span className={'text-sm flex-1 ' + (dark ? 'text-slate-300' : 'text-slate-700')}>
+                        <span className="text-sm flex-1 text-foreground">
                           {provider.replace(/_/g, ' ')}
                         </span>
-                        <div className={'h-1.5 w-28 rounded-full overflow-hidden ' + (dark ? 'bg-white/10' : 'bg-slate-100')}>
+                        <div className="h-1.5 w-28 rounded-full overflow-hidden bg-muted">
                           <div
-                            className={dark ? 'h-full bg-indigo-400' : 'h-full bg-indigo-500'}
+                            className="h-full bg-foreground/70"
                             style={{ width: `${(count / Math.max(1, data.totals.users || 1)) * 100}%` }}
                           />
                         </div>
@@ -253,7 +252,7 @@ export default function Analytics({ dark }: Props) {
                     </div>
                     {Object.entries(obj as Record<string, number>).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
                       <div key={k} className="flex items-center justify-between gap-2 text-sm">
-                        <span className={dark ? 'text-slate-300' : 'text-slate-700'}>{k.replace(/_/g, ' ')}</span>
+                        <span className="text-foreground">{k.replace(/_/g, ' ')}</span>
                         <span className={'tabular-nums ' + muted}>{v}</span>
                       </div>
                     ))}
@@ -261,7 +260,7 @@ export default function Analytics({ dark }: Props) {
                 ))}
               </div>
               {data.notes.overdue > 0 && (
-                <p className={'mt-3 text-xs ' + (dark ? 'text-red-300' : 'text-red-600')}>
+                <p className="mt-3 text-xs text-destructive">
                   {data.notes.overdue} open note{data.notes.overdue === 1 ? '' : 's'} past due
                 </p>
               )}
@@ -269,7 +268,7 @@ export default function Analytics({ dark }: Props) {
           </div>
 
           <div className={'rounded-2xl border overflow-hidden ' + cardBg}>
-            <div className={'px-5 py-4 border-b ' + (dark ? 'border-white/5' : 'border-slate-100')}>
+            <div className="px-5 py-4 border-b border-border">
               <h3 className={'text-sm font-semibold ' + title}>Per-user activity</h3>
               <p className={'mt-0.5 text-xs ' + faint}>Ranked by messages in the last {data.window_days} days</p>
             </div>
@@ -286,21 +285,21 @@ export default function Analytics({ dark }: Props) {
                 </thead>
                 <tbody>
                   {data.users.map((u) => (
-                    <tr key={u.id} className={dark ? 'border-t border-white/5' : 'border-t border-slate-100'}>
+                    <tr key={u.id} className="border-t border-border">
                       <td className="px-4 py-2.5 min-w-[180px]">
-                        <div className={'font-medium truncate ' + (dark ? 'text-slate-200' : 'text-slate-800')}>
+                        <div className="font-medium truncate text-foreground">
                           {u.name || u.email || u.id.slice(0, 8)}
                           {u.is_admin && (
-                            <span className={'ml-2 text-[10px] px-1.5 py-0.5 rounded ' + (dark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-indigo-600')}>
+                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-foreground">
                               admin
                             </span>
                           )}
                         </div>
                         {u.name && u.email && <div className={'text-[11px] truncate ' + faint}>{u.email}</div>}
                       </td>
-                      <td className={'px-4 py-2.5 tabular-nums ' + (dark ? 'text-slate-300' : 'text-slate-700')}>{u.messages_30d}</td>
-                      <td className={'px-4 py-2.5 tabular-nums ' + (dark ? 'text-slate-300' : 'text-slate-700')}>{u.conversations}</td>
-                      <td className={'px-4 py-2.5 tabular-nums ' + (dark ? 'text-slate-300' : 'text-slate-700')}>
+                      <td className="px-4 py-2.5 tabular-nums text-foreground">{u.messages_30d}</td>
+                      <td className="px-4 py-2.5 tabular-nums text-foreground">{u.conversations}</td>
+                      <td className="px-4 py-2.5 tabular-nums text-foreground">
                         {u.notes}{u.notes_open > 0 && <span className={faint}> ({u.notes_open} open)</span>}
                       </td>
                       <td className={'px-4 py-2.5 ' + muted}>

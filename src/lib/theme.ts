@@ -10,20 +10,16 @@ function readStoredMode(): ThemeMode {
   return 'system'
 }
 
+// Background/foreground come from the --background/--foreground design
+// tokens (src/index.css) — never hardcode a hex here, or this drifts from
+// the token values again.
 function applyThemeDom(dark: boolean, themeMode: ThemeMode) {
   const root = document.documentElement
   root.classList.toggle('dark', dark)
   // Instant switch — no CSS transition on theme tokens
   root.style.setProperty('color-scheme', dark ? 'dark' : 'light')
-  const appRoot = document.getElementById('root')
-  if (appRoot) {
-    appRoot.style.background = dark ? '#111114' : 'transparent'
-    appRoot.style.color = dark ? '#ececf1' : ''
-  }
-  document.body.style.backgroundColor = dark ? '#111114' : ''
-  document.body.style.color = dark ? '#f1f5f9' : ''
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', dark ? '#111114' : '#eef2ff')
+  if (meta) meta.setAttribute('content', dark ? 'hsl(0 0% 19%)' : 'hsl(0 0% 100%)')
   try {
     localStorage.setItem('quantumy-theme', themeMode)
   } catch { /* ignore */ }

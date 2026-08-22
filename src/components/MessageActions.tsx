@@ -125,7 +125,7 @@ function playBuffer(buf: ArrayBuffer, audioRef: React.MutableRefObject<HTMLAudio
   })
 }
 
-export default function MessageActions({ content, dark, onRegenerate }: Props) {
+export default function MessageActions({ content, onRegenerate }: Props) {
   const [copied, setCopied] = useState(false)
   const [liked, setLiked] = useState<'up' | 'down' | null>(null)
   const [speaking, setSpeaking] = useState(false)
@@ -134,12 +134,8 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
   const abortRef = useRef<AbortController | null>(null)
   const stopFlagRef = useRef(false)
 
-  const muted = dark
-    ? 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.08]'
-    : 'text-slate-400 hover:text-slate-700 hover:bg-black/[0.04]'
-  const active = dark
-    ? 'text-white bg-white/15'
-    : 'text-neutral-900 bg-neutral-100'
+  const muted = 'text-muted-foreground hover:text-foreground hover:bg-accent'
+  const active = 'text-foreground bg-secondary'
 
   const copy = async () => {
     try {
@@ -284,9 +280,7 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
-      className={`msg-actions-bar inline-flex items-center gap-0.5 mt-2.5 px-1.5 py-0.5 rounded-full ${
-        dark ? 'bg-white/[0.04] ring-1 ring-white/[0.04]' : 'bg-black/[0.025] ring-1 ring-black/[0.03]'
-      }`}
+      className="msg-actions-bar inline-flex items-center gap-0.5 mt-2.5 px-1.5 py-0.5 rounded-full bg-muted ring-1 ring-border"
     >
       <button type="button" onClick={copy} className={`p-1.5 rounded-full transition ${muted}`} title="Copy">
         <AnimatePresence mode="wait" initial={false}>
@@ -299,7 +293,7 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
               transition={{ type: 'spring', stiffness: 500, damping: 22 }}
               className="block"
             >
-              <Check className="w-3.5 h-3.5 text-emerald-500" />
+              <Check className="w-3.5 h-3.5 text-foreground" />
             </motion.span>
           ) : (
             <motion.span
@@ -345,7 +339,7 @@ export default function MessageActions({ content, dark, onRegenerate }: Props) {
           <Volume2 className="w-3.5 h-3.5" />
         )}
       </button>
-      <span className={`w-px h-3 mx-0.5 ${dark ? 'bg-white/10' : 'bg-black/8'}`} />
+      <span className="w-px h-3 mx-0.5 bg-border" />
       <motion.button
         type="button"
         whileTap={{ scale: 0.88 }}

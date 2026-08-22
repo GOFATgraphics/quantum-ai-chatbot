@@ -60,11 +60,11 @@ export default function Auth({ onSuccess }: Props) {
   }
 
   return (
-    <div className="min-h-dvh w-full flex flex-col items-center justify-center relative overflow-hidden bg-[#05050a] px-5 py-10">
+    <div className="min-h-dvh w-full flex flex-col items-center justify-center relative overflow-hidden bg-background px-5 py-10">
       {/* Soft ambient glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[480px] h-[320px] rounded-full bg-indigo-600/20 blur-[100px]" />
-        <div className="absolute bottom-0 right-0 w-[280px] h-[280px] rounded-full bg-violet-600/10 blur-[80px]" />
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[480px] h-[320px] rounded-full bg-foreground/10 blur-[100px]" />
+        <div className="absolute bottom-0 right-0 w-[280px] h-[280px] rounded-full bg-foreground/5 blur-[80px]" />
       </div>
 
       <motion.div
@@ -76,24 +76,24 @@ export default function Auth({ onSuccess }: Props) {
         {/* Brand */}
         <div className="flex flex-col items-center text-center mb-8">
           <div className="relative mb-5">
-            <div className="absolute inset-0 rounded-full bg-indigo-500/30 blur-xl scale-125" />
+            <div className="absolute inset-0 rounded-full bg-foreground/15 blur-xl scale-125" />
             <Logo size={72} className="relative drop-shadow-2xl" dark />
           </div>
-          <h1 className="text-2xl font-semibold text-white tracking-tight">Quantumy</h1>
-          <p className="mt-1.5 text-sm text-slate-400 max-w-[280px]">
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">Quantumy</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground max-w-[280px]">
             Your AI that remembers you, drafts email, and works across your tools.
           </p>
         </div>
 
         {/* Card */}
         <div className="relative">
-          <div className="absolute -inset-px rounded-[24px] bg-gradient-to-b from-white/15 via-white/5 to-transparent opacity-70" />
-          <div className="relative rounded-[24px] bg-white/[0.04] backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl shadow-black/40">
+          <div className="absolute -inset-px rounded-[24px] bg-gradient-to-b from-foreground/15 via-foreground/5 to-transparent opacity-70" />
+          <div className="relative rounded-[24px] bg-card/95 backdrop-blur-xl border border-border p-6 sm:p-7 shadow-2xl shadow-black/40">
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-white tracking-tight">
+              <h2 className="text-lg font-semibold text-foreground tracking-tight">
                 {mode === 'login' ? 'Welcome back' : 'Create your account'}
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {mode === 'login' ? 'Sign in to continue' : 'Start in under a minute'}
               </p>
             </div>
@@ -102,7 +102,7 @@ export default function Auth({ onSuccess }: Props) {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={googleLoading || loading}
-              className="w-full h-12 rounded-2xl bg-white text-slate-800 text-[15px] font-medium flex items-center justify-center gap-2.5 hover:bg-slate-100 transition disabled:opacity-60"
+              className="w-full h-12 rounded-2xl bg-secondary text-foreground text-[15px] font-medium flex items-center justify-center gap-2.5 hover:bg-accent transition disabled:opacity-60"
             >
               {googleLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -115,14 +115,14 @@ export default function Auth({ onSuccess }: Props) {
             </button>
 
             <div className="flex items-center gap-3 my-5">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">or</span>
-              <div className="h-px flex-1 bg-white/10" />
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">or</span>
+              <div className="h-px flex-1 bg-border" />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3.5">
               <div>
-                <label className="block text-[11px] font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
                   Email
                 </label>
                 <input
@@ -131,13 +131,13 @@ export default function Auth({ onSuccess }: Props) {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-12 px-4 rounded-2xl bg-white/[0.05] border border-white/10 text-white text-[16px] placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition"
+                  className="w-full h-12 px-4 rounded-2xl bg-input border border-input text-foreground text-[16px] placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition"
                   placeholder="you@email.com"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
                   Password
                 </label>
                 <input
@@ -147,7 +147,7 @@ export default function Auth({ onSuccess }: Props) {
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-12 px-4 rounded-2xl bg-white/[0.05] border border-white/10 text-white text-[16px] placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition"
+                  className="w-full h-12 px-4 rounded-2xl bg-input border border-input text-foreground text-[16px] placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition"
                   placeholder="••••••••"
                 />
               </div>
@@ -158,7 +158,7 @@ export default function Auth({ onSuccess }: Props) {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-3.5 py-2.5"
+                    className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-3.5 py-2.5"
                   >
                     {error}
                   </motion.div>
@@ -168,7 +168,7 @@ export default function Auth({ onSuccess }: Props) {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="text-sm text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3.5 py-2.5"
+                    className="text-sm text-foreground bg-secondary border border-border rounded-xl px-3.5 py-2.5"
                   >
                     {message}
                   </motion.div>
@@ -178,10 +178,10 @@ export default function Auth({ onSuccess }: Props) {
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative w-full h-12 rounded-2xl font-medium text-[15px] text-white overflow-hidden disabled:opacity-60 mt-1"
+                className="group relative w-full h-12 rounded-2xl font-medium text-[15px] text-primary-foreground overflow-hidden disabled:opacity-60 mt-1"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600" />
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition bg-white/10" />
+                <div className="absolute inset-0 bg-primary" />
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition bg-primary-foreground/10" />
                 <span className="relative flex items-center justify-center gap-2">
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -195,7 +195,7 @@ export default function Auth({ onSuccess }: Props) {
               </button>
             </form>
 
-            <p className="mt-6 text-center text-sm text-slate-500">
+            <p className="mt-6 text-center text-sm text-muted-foreground">
               {mode === 'login' ? (
                 <>
                   No account?{' '}
@@ -206,7 +206,7 @@ export default function Auth({ onSuccess }: Props) {
                       setError(null)
                       setMessage(null)
                     }}
-                    className="text-indigo-300 font-medium hover:text-indigo-200 transition"
+                    className="text-foreground font-medium hover:text-muted-foreground transition"
                   >
                     Sign up
                   </button>
@@ -221,7 +221,7 @@ export default function Auth({ onSuccess }: Props) {
                       setError(null)
                       setMessage(null)
                     }}
-                    className="text-indigo-300 font-medium hover:text-indigo-200 transition"
+                    className="text-foreground font-medium hover:text-muted-foreground transition"
                   >
                     Sign in
                   </button>
@@ -231,12 +231,12 @@ export default function Auth({ onSuccess }: Props) {
           </div>
         </div>
 
-        <p className="mt-8 text-center text-[11px] text-slate-600">
-          <a href="/home.html" className="hover:text-slate-400 transition">About</a>
+        <p className="mt-8 text-center text-[11px] text-muted-foreground">
+          <a href="/home.html" className="hover:text-foreground transition">About</a>
           {' · '}
-          <a href="/privacy.html" className="hover:text-slate-400 transition">Privacy</a>
+          <a href="/privacy.html" className="hover:text-foreground transition">Privacy</a>
           {' · '}
-          <a href="/terms.html" className="hover:text-slate-400 transition">Terms</a>
+          <a href="/terms.html" className="hover:text-foreground transition">Terms</a>
         </p>
       </motion.div>
     </div>

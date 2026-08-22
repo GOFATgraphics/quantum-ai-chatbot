@@ -22,7 +22,7 @@ const BRAND: Record<string, React.ReactNode> = {
   excel: <ExcelIcon size={22} />,
 }
 
-export default function Connectors({ dark, accessToken, onClose }: Props) {
+export default function Connectors({ accessToken, onClose }: Props) {
   const [connectors, setConnectors] = useState<Connector[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
@@ -30,12 +30,12 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
   const [selected, setSelected] = useState<string | null>(null)
   const [justConnected, setJustConnected] = useState<string | null>(null)
 
-  const bg = dark ? 'bg-[#0a0a0c]' : 'bg-[#f2f2f7]'
-  const textMain = dark ? 'text-white' : 'text-slate-900'
-  const textMuted = dark ? 'text-white/40' : 'text-slate-500'
-  const card = dark ? 'bg-[#1c1c1e]' : 'bg-white shadow-sm'
-  const rowBorder = dark ? 'border-white/[0.06]' : 'border-black/[0.06]'
-  const iconBg = dark ? 'bg-white/[0.08]' : 'bg-[#f0f0f5]'
+  const bg = 'bg-settings-canvas'
+  const textMain = 'text-foreground'
+  const textMuted = 'text-muted-foreground'
+  const card = 'bg-settings-surface shadow-sm'
+  const rowBorder = 'border-border'
+  const iconBg = 'bg-secondary'
 
   const load = async () => {
     setLoading(true)
@@ -145,9 +145,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
         <button
           type="button"
           onClick={() => (selected ? setSelected(null) : onClose?.())}
-          className={`absolute left-4 w-9 h-9 rounded-full flex items-center justify-center ${
-            dark ? 'bg-white/10 text-white' : 'bg-white text-slate-800 shadow-sm'
-          }`}
+          className="absolute left-4 w-9 h-9 rounded-full flex items-center justify-center bg-secondary text-foreground shadow-sm"
           aria-label="Back"
         >
           <ChevronLeft className="w-5 h-5" strokeWidth={2.25} />
@@ -164,9 +162,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
               initial={{ opacity: 0, y: -8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6 }}
-              className={`rounded-2xl px-4 py-3 text-[14px] flex items-center gap-2 ${
-                dark ? 'bg-emerald-500/15 text-emerald-200' : 'bg-emerald-50 text-emerald-800'
-              }`}
+              className="rounded-2xl px-4 py-3 text-[14px] flex items-center gap-2 bg-secondary text-foreground"
             >
               <motion.span
                 initial={{ scale: 0 }}
@@ -184,9 +180,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`rounded-2xl px-4 py-3 text-[14px] ${
-              dark ? 'bg-amber-500/10 text-amber-200' : 'bg-amber-50 text-amber-800'
-            }`}
+            className="rounded-2xl px-4 py-3 text-[14px] bg-destructive/10 text-destructive"
           >
             {error}
           </motion.div>
@@ -224,7 +218,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
               type="button"
               onClick={() => disconnect(selectedItem.provider)}
               disabled={busy === selectedItem.provider}
-              className="w-full h-12 rounded-2xl text-[16px] font-medium text-red-500 bg-red-500/10 active:bg-red-500/15 disabled:opacity-50"
+              className="w-full h-12 rounded-2xl text-[16px] font-medium text-destructive bg-destructive/10 active:bg-destructive/15 disabled:opacity-50"
             >
               {busy === selectedItem.provider ? (
                 <Loader2 className="w-4 h-4 animate-spin inline" />
@@ -259,7 +253,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                       </div>
                       <p className={`flex-1 text-[16px] font-medium ${textMain}`}>{item.name}</p>
                       <ChevronRight
-                        className={`w-[18px] h-[18px] shrink-0 ${dark ? 'text-white/25' : 'text-slate-300'}`}
+                        className="w-[18px] h-[18px] shrink-0 text-muted-foreground"
                       />
                     </motion.button>
                   ))}
@@ -294,11 +288,7 @@ export default function Connectors({ dark, accessToken, onClose }: Props) {
                           whileTap={{ scale: 0.94 }}
                           onClick={() => connect(item.provider)}
                           disabled={isBusy}
-                          className={`shrink-0 h-[30px] px-3.5 rounded-full text-[13px] font-medium transition disabled:opacity-50 ${
-                            dark
-                              ? 'bg-white/10 text-white active:bg-white/15'
-                              : 'bg-[#e8e8ed] text-slate-800 active:bg-[#dddde3]'
-                          }`}
+                          className="shrink-0 h-[30px] px-3.5 rounded-full text-[13px] font-medium transition disabled:opacity-50 bg-secondary text-foreground active:bg-accent"
                         >
                           {isBusy ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />

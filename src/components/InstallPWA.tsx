@@ -8,7 +8,7 @@ type BeforeInstallPromptEvent = Event & {
 
 type Props = { dark: boolean }
 
-export default function InstallPWA({ dark }: Props) {
+export default function InstallPWA({}: Props) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null)
   const [visible, setVisible] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
@@ -55,9 +55,7 @@ export default function InstallPWA({ dark }: Props) {
 
   if (!visible) return null
 
-  const card = dark
-    ? 'bg-[#12121a]/95 border-white/10 text-slate-100'
-    : 'bg-white/95 border-slate-200 text-slate-900'
+  const card = 'bg-card/95 border-border text-foreground'
 
   return (
     <div className="fixed bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] left-3 right-3 sm:left-auto sm:right-6 sm:w-[340px] z-40">
@@ -66,7 +64,7 @@ export default function InstallPWA({ dark }: Props) {
           <img src="/logo.svg" alt="" width={36} height={36} className="shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold">Install Quantumy</p>
-            <p className={`text-xs mt-0.5 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className="text-xs mt-0.5 text-muted-foreground">
               {isIOS
                 ? 'Tap Share, then “Add to Home Screen” for the full app.'
                 : 'Add to your home screen — faster launch on phone and desktop.'}
@@ -75,20 +73,20 @@ export default function InstallPWA({ dark }: Props) {
               {!isIOS && deferred && (
                 <button
                   onClick={install}
-                  className="h-8 px-3 rounded-full text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 flex items-center gap-1.5"
+                  className="h-8 px-3 rounded-full text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 flex items-center gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5" /> Install
                 </button>
               )}
               <button
                 onClick={dismiss}
-                className={`h-8 px-3 rounded-full text-xs font-medium ${dark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}
+                className="h-8 px-3 rounded-full text-xs font-medium text-muted-foreground hover:bg-accent"
               >
                 Not now
               </button>
             </div>
           </div>
-          <button onClick={dismiss} className={`p-1 rounded-full ${dark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}>
+          <button onClick={dismiss} className="p-1 rounded-full hover:bg-accent">
             <X className="w-4 h-4 opacity-50" />
           </button>
         </div>

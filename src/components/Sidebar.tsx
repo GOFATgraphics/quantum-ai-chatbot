@@ -56,18 +56,12 @@ export default function Sidebar({
     return list.filter((c) => (c.title || '').toLowerCase().includes(q))
   }, [conversations, query, currentProjectId])
 
-  const text = dark ? 'text-slate-100' : 'text-slate-900'
-  const muted = dark ? 'text-slate-400' : 'text-slate-500'
-  const hover = dark ? 'hover:bg-white/[0.08]' : 'hover:bg-black/[0.04]'
-  const active = dark
-    ? 'bg-white/10 text-white'
-    : 'bg-black/[0.06] text-black'
-  const newChat = dark
-    ? 'glass-btn bg-white/[0.08] hover:bg-white/[0.14]'
-    : 'glass-btn bg-white/60 hover:bg-white/80'
-  const row = `w-full flex items-center gap-3 h-11 rounded-xl px-3.5 text-[15px] transition ${hover} ${
-    dark ? 'text-slate-200' : 'text-slate-700'
-  }`
+  const text = 'text-sidebar-foreground'
+  const muted = 'text-muted-foreground'
+  const hover = 'hover:bg-sidebar-accent'
+  const active = 'bg-sidebar-selected text-sidebar-accent-foreground'
+  const newChat = 'glass-btn bg-sidebar-accent hover:bg-sidebar-selected'
+  const row = `w-full flex items-center gap-3 h-11 rounded-xl px-3.5 text-[15px] transition ${hover} text-sidebar-foreground`
 
   return (
     <div className={`glass-sidebar flex flex-col h-full min-h-0 w-full ${text}`}>
@@ -82,7 +76,7 @@ export default function Sidebar({
             className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center ${hover}`}
             aria-label="Close"
           >
-            <X className={`w-5 h-5 ${dark ? 'text-slate-300' : 'text-slate-600'}`} />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         )}
       </div>
@@ -102,9 +96,7 @@ export default function Sidebar({
           <Search className="w-[18px] h-[18px]" />
           <span className="flex-1 text-left">Search</span>
           <kbd
-            className={`hidden sm:inline text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
-              dark ? 'bg-white/10 text-slate-400' : 'bg-black/[0.06] text-slate-500'
-            }`}
+            className="hidden sm:inline text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-sidebar-accent text-muted-foreground"
           >
             ⌘K
           </kbd>
@@ -130,9 +122,7 @@ export default function Sidebar({
       {activeProject && (
         <div className="px-3 mt-3 shrink-0">
           <div
-            className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] ${
-              dark ? 'bg-white/10 text-white' : 'bg-black/[0.06] text-black'
-            }`}
+            className="flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] bg-sidebar-selected text-sidebar-accent-foreground"
           >
             <FolderKanban className="w-3.5 h-3.5 shrink-0 opacity-80" />
             <span className="flex-1 truncate font-medium">{activeProject.name}</span>
@@ -150,18 +140,14 @@ export default function Sidebar({
 
       <div className="px-3 mt-3 shrink-0">
         <div
-          className={`flex items-center gap-2 h-10 rounded-xl px-3 ${
-            dark ? 'bg-white/[0.06] ring-1 ring-white/[0.06]' : 'bg-black/[0.04] ring-1 ring-black/[0.04]'
-          }`}
+          className="flex items-center gap-2 h-10 rounded-xl px-3 bg-sidebar-accent ring-1 ring-sidebar-border"
         >
           <Search className={`w-4 h-4 shrink-0 ${muted}`} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
-            className={`flex-1 min-w-0 bg-transparent border-0 outline-none text-[14px] ${
-              dark ? 'text-slate-100 placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
-            }`}
+            className="flex-1 min-w-0 bg-transparent border-0 outline-none text-[14px] text-sidebar-foreground placeholder:text-muted-foreground"
             aria-label="Filter chats"
           />
           {query && (
@@ -204,7 +190,7 @@ export default function Sidebar({
                   type="button"
                   onClick={() => onDeleteChat(c.id)}
                   disabled={deletingId === c.id}
-                  className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-red-500 active:text-red-500 disabled:opacity-40"
+                  className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-destructive active:text-destructive disabled:opacity-40"
                   aria-label={`Delete chat ${c.title || 'New chat'}`}
                 >
                   {deletingId === c.id ? (
@@ -228,14 +214,14 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className={`shrink-0 p-3 ${dark ? 'border-t border-white/[0.06]' : 'border-t border-black/[0.05]'}`}>
+      <div className="shrink-0 p-3 border-t border-sidebar-border">
         <motion.button
           type="button"
           whileTap={{ scale: 0.98 }}
           onClick={onOpenSettings}
           className={`glass-panel w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 transition ${hover}`}
         >
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${dark ? 'bg-white text-black' : 'bg-black text-white'}`}>
+          <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 bg-primary text-primary-foreground">
             {initial}
           </div>
           <div className="flex-1 min-w-0 text-left">

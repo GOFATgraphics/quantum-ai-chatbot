@@ -59,14 +59,9 @@ export default function AdminApp() {
 
   if (loading) {
     return (
-      <div
-        className={
-          'min-h-dvh flex flex-col items-center justify-center gap-4 ' +
-          (dark ? 'bg-[#0c0c10]' : 'bg-slate-50')
-        }
-      >
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-settings-canvas">
         <Logo size={48} dark={dark} />
-        <Loader2 className={'w-5 h-5 animate-spin ' + (dark ? 'text-slate-500' : 'text-slate-400')} />
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -78,34 +73,19 @@ export default function AdminApp() {
 
   if (!profile?.is_admin) {
     return (
-      <div
-        className={
-          'min-h-dvh flex flex-col items-center justify-center px-6 ' +
-          (dark ? 'bg-[#0c0c10] text-slate-100' : 'bg-slate-50 text-slate-900')
-        }
-      >
-        <div
-          className={
-            'w-full max-w-sm rounded-2xl border p-6 text-center ' +
-            (dark ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm')
-          }
-        >
-          <div
-            className={
-              'mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 ' +
-              (dark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600')
-            }
-          >
+      <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-settings-canvas text-foreground">
+        <div className="w-full max-w-sm rounded-2xl border p-6 text-center bg-card border-border shadow-sm">
+          <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-destructive/10 text-destructive">
             <ShieldOff className="w-6 h-6" />
           </div>
           <h1 className="text-lg font-semibold">Access denied</h1>
-          <p className={'mt-2 text-sm ' + (dark ? 'text-slate-400' : 'text-slate-500')}>
+          <p className="mt-2 text-sm text-muted-foreground">
             Your account does not have admin privileges.
           </p>
           <button
             type="button"
             onClick={goToApp}
-            className="mt-5 w-full h-11 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition"
+            className="mt-5 w-full h-11 rounded-xl text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 transition"
           >
             Back to Quantumy
           </button>
@@ -129,7 +109,7 @@ export default function AdminApp() {
       {page === 'notes' && <AdminNotes dark={dark} />}
       {page === 'connectors' && <ConnectorsPage dark={dark} />}
       {page === 'settings' && (
-        <div className={'text-sm ' + (dark ? 'text-slate-400' : 'text-slate-500')}>
+        <div className="text-sm text-muted-foreground">
           Settings is coming in a later batch.
         </div>
       )}

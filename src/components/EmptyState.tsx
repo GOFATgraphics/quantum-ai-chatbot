@@ -7,7 +7,7 @@ type Props = {
   composing?: boolean
 }
 
-export default function EmptyState({ greeting, dark, composing = false }: Props) {
+export default function EmptyState({ greeting, composing = false }: Props) {
   const reduceMotion = useReducedMotion()
 
   return (
@@ -28,9 +28,7 @@ export default function EmptyState({ greeting, dark, composing = false }: Props)
         className="relative z-10 flex flex-col items-center text-center w-full max-w-lg"
       >
         <h1
-          className={`empty-greeting text-[1.75rem] sm:text-[2.05rem] font-semibold tracking-[-0.03em] leading-[1.22] max-w-md ${
-            dark ? 'text-white' : 'text-slate-900'
-          }`}
+          className="empty-greeting text-[1.75rem] sm:text-[2.05rem] font-semibold tracking-[-0.03em] leading-[1.22] max-w-md text-foreground"
         >
           {greeting}
         </h1>

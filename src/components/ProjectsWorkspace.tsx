@@ -103,18 +103,12 @@ export default function ProjectsWorkspace({
     )
   }, [projects, query])
 
-  const muted = dark ? 'text-neutral-400' : 'text-neutral-500'
-  const hover = dark ? 'hover:bg-white/[0.06]' : 'hover:bg-black/[0.04]'
-  const active = dark
-    ? 'bg-white/10 text-white ring-1 ring-white/15'
-    : 'bg-black/[0.06] text-black ring-1 ring-black/10'
-  const card = dark ? 'bg-white/[0.04] ring-1 ring-white/10' : 'bg-black/[0.02] ring-1 ring-black/5'
-  const fieldClass = `w-full rounded-xl px-3 text-[14px] outline-none glass-panel ${
-    dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'
-  }`
-  const primaryBtn = dark
-    ? 'bg-white text-black hover:bg-neutral-200'
-    : 'bg-neutral-900 text-white hover:bg-black'
+  const muted = 'text-muted-foreground'
+  const hover = 'hover:bg-accent'
+  const active = 'bg-secondary text-foreground ring-1 ring-border'
+  const card = 'bg-card ring-1 ring-border'
+  const fieldClass = 'w-full rounded-xl px-3 text-[14px] outline-none glass-panel text-foreground placeholder:text-muted-foreground'
+  const primaryBtn = 'bg-primary text-primary-foreground hover:bg-primary/90'
 
   const resetForm = () => {
     setShowForm(false)
@@ -165,12 +159,10 @@ export default function ProjectsWorkspace({
   }
 
   return (
-    <div className={`flex flex-col h-full ${dark ? 'text-neutral-100' : 'text-neutral-900'}`}>
+    <div className="flex flex-col h-full text-foreground">
       <div className="flex items-center gap-3 px-5 pt-5 pb-3 shrink-0">
         <div
-          className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
-            dark ? 'bg-white text-black' : 'bg-neutral-900 text-white'
-          }`}
+          className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-primary text-primary-foreground"
         >
           <FolderKanban className="w-5 h-5" />
         </div>
@@ -186,25 +178,21 @@ export default function ProjectsWorkspace({
           className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center ${hover}`}
           aria-label="Close projects"
         >
-          <X className={`w-5 h-5 ${dark ? 'text-neutral-300' : 'text-neutral-600'}`} />
+          <X className="w-5 h-5 text-muted-foreground" />
         </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6">
         {projects.length > 3 && (
           <div
-            className={`flex items-center gap-2 h-10 rounded-xl px-3 mb-3 ${
-              dark ? 'bg-white/[0.06] ring-1 ring-white/[0.06]' : 'bg-black/[0.04] ring-1 ring-black/[0.04]'
-            }`}
+            className="flex items-center gap-2 h-10 rounded-xl px-3 mb-3 bg-muted ring-1 ring-border"
           >
             <Search className={`w-4 h-4 shrink-0 ${muted}`} />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search projects"
-              className={`flex-1 min-w-0 bg-transparent border-0 outline-none text-[14px] ${
-                dark ? 'text-neutral-100 placeholder:text-neutral-500' : 'text-neutral-900 placeholder:text-neutral-400'
-              }`}
+              className="flex-1 min-w-0 bg-transparent border-0 outline-none text-[14px] text-foreground placeholder:text-muted-foreground"
               aria-label="Search projects"
             />
             {query && (
@@ -301,9 +289,7 @@ export default function ProjectsWorkspace({
           }`}
         >
           <div
-            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-              dark ? 'bg-white/10' : 'bg-neutral-100'
-            }`}
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-secondary"
           >
             <FolderKanban className="w-4 h-4 opacity-80" />
           </div>
@@ -348,9 +334,7 @@ export default function ProjectsWorkspace({
                 exit={{ opacity: 0, height: 0 }}
                 className={`group rounded-2xl mb-1.5 overflow-hidden ${
                   confirming
-                    ? dark
-                      ? 'bg-rose-500/10 ring-1 ring-rose-400/25'
-                      : 'bg-rose-50 ring-1 ring-rose-200'
+                    ? 'bg-destructive/10 ring-1 ring-destructive/25'
                     : isActive
                       ? active
                       : hover
@@ -358,7 +342,7 @@ export default function ProjectsWorkspace({
               >
                 {confirming ? (
                   <div className="flex items-center gap-2 px-3.5 py-3">
-                    <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+                    <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
                     <p className="text-[13px] flex-1 min-w-0">Delete “{p.name}”?</p>
                     <button
                       type="button"
@@ -371,7 +355,7 @@ export default function ProjectsWorkspace({
                       type="button"
                       onClick={() => remove(p.id)}
                       disabled={deletingId === p.id}
-                      className="h-8 px-2.5 rounded-lg text-[12px] font-medium bg-red-600 text-white hover:bg-red-500 disabled:opacity-40 flex items-center gap-1"
+                      className="h-8 px-2.5 rounded-lg text-[12px] font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40 flex items-center gap-1"
                     >
                       {deletingId === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                       Delete
@@ -409,7 +393,7 @@ export default function ProjectsWorkspace({
                     <button
                       type="button"
                       onClick={() => onOpenDashboard(p.id)}
-                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-neutral-400 hover:text-neutral-100 shrink-0"
+                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
                       aria-label={`Open dashboard for ${p.name}`}
                       title="Dashboard"
                     >
@@ -418,7 +402,7 @@ export default function ProjectsWorkspace({
                     <button
                       type="button"
                       onClick={() => onOpenNotesForProject(p.id)}
-                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-neutral-400 hover:text-amber-500 shrink-0"
+                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
                       aria-label={`View notes for ${p.name}`}
                       title="Notes"
                     >
@@ -427,7 +411,7 @@ export default function ProjectsWorkspace({
                     <button
                       type="button"
                       onClick={() => startEdit(p)}
-                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-neutral-400 hover:text-neutral-200 shrink-0"
+                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
                       aria-label={`Edit ${p.name}`}
                       title="Edit"
                     >
@@ -436,7 +420,7 @@ export default function ProjectsWorkspace({
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteId(p.id)}
-                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-neutral-400 hover:text-red-500 shrink-0"
+                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0"
                       aria-label={`Delete project ${p.name}`}
                       title="Delete"
                     >
@@ -456,11 +440,7 @@ export default function ProjectsWorkspace({
               onNewChat()
               onClose()
             }}
-            className={`mt-6 w-full h-11 rounded-2xl text-[14px] font-medium transition ${
-              dark
-                ? 'bg-white/[0.08] text-neutral-100 hover:bg-white/[0.12]'
-                : 'bg-black/[0.05] text-neutral-800 hover:bg-black/[0.08]'
-            }`}
+            className="mt-6 w-full h-11 rounded-2xl text-[14px] font-medium transition bg-secondary text-foreground hover:bg-accent"
           >
             New chat in this project
           </button>

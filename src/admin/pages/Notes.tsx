@@ -37,7 +37,7 @@ const PRIORITIES = ['all', 'high', 'medium', 'low']
 
 const PAGE = 50
 
-export default function AdminNotes({ dark }: Props) {
+export default function AdminNotes(_props: Props) {
   const [data, setData] = useState<Resp | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -78,21 +78,19 @@ export default function AdminNotes({ dark }: Props) {
 
   useEffect(() => { void load() }, [load])
 
-  const cardBg = dark ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm'
-  const muted = dark ? 'text-slate-400' : 'text-slate-500'
-  const title = dark ? 'text-white' : 'text-slate-900'
+  const cardBg = 'bg-card border-border shadow-sm'
+  const muted = 'text-muted-foreground'
+  const title = 'text-foreground'
   const inputCls =
     'h-9 px-3 rounded-xl text-sm border outline-none transition ' +
-    (dark
-      ? 'bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500'
-      : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400')
+    'bg-input border-input text-foreground placeholder:text-muted-foreground'
 
   const badge = (text: string, tone: 'default' | 'warn' | 'danger' | 'ok' = 'default') => {
     const tones = {
-      default: dark ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-600',
-      ok: dark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700',
-      warn: dark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700',
-      danger: dark ? 'bg-red-500/15 text-red-300' : 'bg-red-50 text-red-700',
+      default: 'bg-secondary text-secondary-foreground',
+      ok: 'bg-secondary text-foreground',
+      warn: 'bg-muted text-muted-foreground',
+      danger: 'bg-destructive/10 text-destructive',
     }
     return (
       <span className={'text-[11px] font-medium px-2 py-0.5 rounded-md whitespace-nowrap ' + tones[tone]}>
@@ -119,7 +117,7 @@ export default function AdminNotes({ dark }: Props) {
           disabled={loading}
           className={
             'h-9 px-3 rounded-xl text-sm font-medium flex items-center gap-2 transition disabled:opacity-50 ' +
-            (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+            'bg-secondary text-secondary-foreground hover:bg-accent'
           }
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -152,7 +150,7 @@ export default function AdminNotes({ dark }: Props) {
         <div
           className={
             'rounded-xl border px-4 py-3 text-sm flex items-start gap-2 ' +
-            (dark ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-red-200 bg-red-50 text-red-800')
+            'border-destructive/30 bg-destructive/10 text-destructive'
           }
         >
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -183,7 +181,7 @@ export default function AdminNotes({ dark }: Props) {
                       <span className={'text-[11px] ' + muted}>{n.owner.email}</span>
                     )}
                   </div>
-                  <p className={'text-sm leading-relaxed whitespace-pre-wrap break-words ' + (dark ? 'text-slate-200' : 'text-slate-800')}>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
                     {n.note}
                   </p>
                 </div>
@@ -206,7 +204,7 @@ export default function AdminNotes({ dark }: Props) {
                   <span
                     className={
                       'text-[11px] flex items-center gap-1 ' +
-                      (isOverdue(n) ? (dark ? 'text-red-300' : 'text-red-600') : muted)
+                      (isOverdue(n) ? 'text-destructive' : muted)
                     }
                   >
                     <CalendarClock className="w-3 h-3" />
@@ -235,7 +233,7 @@ export default function AdminNotes({ dark }: Props) {
               onClick={() => setOffset((o) => Math.max(0, o - PAGE))}
               className={
                 'h-9 w-9 rounded-xl flex items-center justify-center transition disabled:opacity-40 ' +
-                (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+                'bg-secondary text-secondary-foreground hover:bg-accent'
               }
             >
               <ChevronLeft className="w-4 h-4" />
@@ -246,7 +244,7 @@ export default function AdminNotes({ dark }: Props) {
               onClick={() => setOffset((o) => o + PAGE)}
               className={
                 'h-9 w-9 rounded-xl flex items-center justify-center transition disabled:opacity-40 ' +
-                (dark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')
+                'bg-secondary text-secondary-foreground hover:bg-accent'
               }
             >
               <ChevronRight className="w-4 h-4" />

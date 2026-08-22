@@ -60,57 +60,35 @@ html.dark .glass-btn:hover {
 }
 
 .glass-menu {
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  color: #0a0a0a;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--popover-foreground));
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
 html.dark .glass-menu {
-  background: rgba(18, 18, 18, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fafafa;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 .glass-sheet {
-  background: #ffffff;
-  color: #0a0a0a;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
-html.dark .glass-sheet {
-  background: #0a0a0a;
-  color: #fafafa;
-}
-html.glass-on:not(.dark) .glass-sheet {
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-html.glass-on.dark .glass-sheet {
-  background: rgba(10, 10, 10, 0.94);
+html.glass-on .glass-sheet {
+  background: hsl(var(--background) / 0.94);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 
-/* Sidebar — pure light gray / pure near-black */
+/* Sidebar */
 .glass-sidebar {
-  background: #f7f7f7;
-  border-right: 1px solid rgba(0, 0, 0, 0.06);
-  color: #0a0a0a;
+  background: hsl(var(--sidebar));
+  border-right: 1px solid hsl(var(--sidebar-border));
+  color: hsl(var(--sidebar-foreground));
 }
-html.dark .glass-sidebar {
-  background: #0a0a0a;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  color: #fafafa;
-}
-html.glass-on:not(.dark) .glass-sidebar {
-  background: rgba(247, 247, 247, 0.94);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-html.glass-on.dark .glass-sidebar {
-  background: rgba(10, 10, 10, 0.96);
+html.glass-on .glass-sidebar {
+  background: hsl(var(--sidebar) / 0.94);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -147,26 +125,26 @@ html.dark .glass-chip {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Theme tokens — Grok monochrome */
+/* Theme tokens — sourced from the --background/--card/etc. design tokens in index.css */
 :root {
-  --q-surface: #ffffff;
-  --q-surface-2: #f7f7f7;
-  --q-border: rgba(0, 0, 0, 0.08);
-  --q-text: #0a0a0a;
-  --q-muted: #737373;
-  --q-sidebar: #f7f7f7;
-  --q-accent: #0a0a0a;
-  --q-accent-fg: #ffffff;
+  --q-surface: hsl(var(--card));
+  --q-surface-2: hsl(var(--muted));
+  --q-border: hsl(var(--border));
+  --q-text: hsl(var(--foreground));
+  --q-muted: hsl(var(--muted-foreground));
+  --q-sidebar: hsl(var(--sidebar));
+  --q-accent: hsl(var(--primary));
+  --q-accent-fg: hsl(var(--primary-foreground));
 }
 html.dark {
-  --q-surface: #0a0a0a;
-  --q-surface-2: #141414;
-  --q-border: rgba(255, 255, 255, 0.1);
-  --q-text: #fafafa;
-  --q-muted: #a3a3a3;
-  --q-sidebar: #0a0a0a;
-  --q-accent: #fafafa;
-  --q-accent-fg: #0a0a0a;
+  --q-surface: hsl(var(--card));
+  --q-surface-2: hsl(var(--muted));
+  --q-border: hsl(var(--border));
+  --q-text: hsl(var(--foreground));
+  --q-muted: hsl(var(--muted-foreground));
+  --q-sidebar: hsl(var(--sidebar));
+  --q-accent: hsl(var(--primary));
+  --q-accent-fg: hsl(var(--primary-foreground));
 }
 
 /* Scrollbar */
@@ -287,13 +265,10 @@ html.dark .glass-bubble {
   bottom: 20%;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: #0a0a0a;
-}
-html.dark .sidebar-chat-active::before {
-  background: #fafafa;
+  background: hsl(var(--primary));
 }
 
-/* Scrollbar — thinner + theme-aware */
+/* Scrollbar — thinner + theme-aware, uses the shared scrollbar tokens */
 main::-webkit-scrollbar {
   width: 5px;
 }
@@ -301,45 +276,37 @@ main::-webkit-scrollbar-track {
   background: transparent;
 }
 main::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--scrollbar-thumb);
   border-radius: 999px;
 }
 main::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.28);
-}
-html.dark main::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-}
-html.dark main::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--scrollbar-thumb-hover);
 }
 
 .composer-surface textarea:focus {
   outline: none;
 }
 
-/* Listening pulse — rose kept for mic state */
+/* Listening pulse — uses the destructive token (nanobot's semantic "alert" red) */
 @keyframes mic-pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.45); }
-  70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+  0% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0.45); }
+  70% { box-shadow: 0 0 0 10px hsl(var(--destructive) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0); }
 }
 .mic-listening {
   animation: mic-pulse-ring 1.4s ease-out infinite;
 }
 
-/* Send button — pure black / pure white like Grok */
+/* Send button */
 .send-ready {
-  background: #0a0a0a !important;
-  color: #ffffff !important;
+  background: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
   box-shadow: 0 4px 14px -3px rgba(0, 0, 0, 0.35) !important;
 }
 .send-ready:hover {
   filter: brightness(1.15);
 }
 html.dark .send-ready {
-  background: #fafafa !important;
-  color: #0a0a0a !important;
   box-shadow: 0 4px 16px -3px rgba(255, 255, 255, 0.2) !important;
 }
 
