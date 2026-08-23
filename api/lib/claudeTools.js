@@ -559,7 +559,9 @@ export async function runTool(block, user, context = {}) {
     if (name === 'get_gmail_message' && user) {
       const token = await getValidToken(user.id, 'gmail');
       if (!token) return gmailNotConnected(id);
-      const msg = await getGmailMessage(token, String(input.message_id || ''));
+      const msg = await getGmailMessage(token, String(input.message_id || ''), {
+        maxBodyChars: 40_000,
+      });
       return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(msg) };
     }
     if (name === 'send_email' && user) {

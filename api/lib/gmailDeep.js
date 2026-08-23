@@ -56,7 +56,11 @@ function encodeRawMime({ to, subject, body, cc, bcc, from, inReplyTo, references
   return Buffer.from(raw).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export async function getGmailMessage(accessToken, messageId) {
+/**
+ * Fetch one message. Body is returned in full by default because reply/forward
+ * quoting depends on it; pass maxBodyChars to bound what reaches the model.
+ */
+export async function getGmailMessage(accessToken, messageId, opts = {}) {
   if (!messageId) throw new Error('messageId is required');
   const res = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full`,
@@ -77,7 +81,19 @@ export async function getGmailMessage(accessToken, messageId) {
     date: getHeader(headers, 'Date'),
     messageIdHeader: getHeader(headers, 'Message-ID') || getHeader(headers, 'Message-Id'),
     references: getHeader(headers, 'References'),
-    body: extractBody(msg.payload),
+    ...bodyFields(extractBody(msg.payload), opts.maxBodyChars),
+  };
+}
+
+function bodyFields(raw, maxBodyChars) {
+  const text = String(raw || '');
+  const cap = Number.isFinite(maxBodyChars) && maxBodyChars > 0 ? maxBodyChars : 0;
+  if (!cap || text.length <= cap) return { body: text };
+  return {
+    body: text.slice(0, cap),
+    body_truncated: true,
+    body_full_length: text.length,
+    note: `Body truncated at ${cap} of ${text.length} characters.`,
   };
 }
 

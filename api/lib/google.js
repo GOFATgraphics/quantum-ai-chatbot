@@ -113,6 +113,23 @@ export async function getGoogleEmail(accessToken) {
   return data.email || null;
 }
 
+// A search result is a shortlist, not a document dump. Returning every matched
+// message's full body inlines an unbounded amount of text into the model
+// prompt — long forwarded chains quote their entire history, so a handful of
+// hits can run to megabytes. Callers that need the whole message body ask for
+// it explicitly with get_gmail_message.
+const GMAIL_SEARCH_BODY_CHARS = 1200;
+
+function previewBody(text) {
+  const s = String(text || '');
+  if (s.length <= GMAIL_SEARCH_BODY_CHARS) return { body: s, truncated: false };
+  return {
+    body: s.slice(0, GMAIL_SEARCH_BODY_CHARS),
+    truncated: true,
+    full_length: s.length,
+  };
+}
+
 export async function searchGmail(accessToken, query, maxResults = 10) {
   const q = encodeURIComponent(query || 'in:inbox');
   const listRes = await fetch(
@@ -135,6 +152,7 @@ export async function searchGmail(accessToken, query, maxResults = 10) {
     const msg = await detail.json();
     const headers = msg.payload?.headers || [];
     const getH = (n) => headers.find((h) => h.name.toLowerCase() === n.toLowerCase())?.value || '';
+    const preview = previewBody(extractBody(msg.payload));
     out.push({
       id: msg.id,
       threadId: msg.threadId,
@@ -143,7 +161,14 @@ export async function searchGmail(accessToken, query, maxResults = 10) {
       from: getH('From'),
       date: getH('Date'),
       labelIds: msg.labelIds || [],
-      body: extractBody(msg.payload),
+      body: preview.body,
+      ...(preview.truncated
+        ? {
+            body_truncated: true,
+            body_full_length: preview.full_length,
+            note: 'Preview only. Call get_gmail_message with this id for the full body.',
+          }
+        : {}),
     });
   }
   return out;

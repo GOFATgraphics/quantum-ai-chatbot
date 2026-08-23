@@ -347,6 +347,34 @@ export default async function handler(req, res) {
       try { sseWrite(res, { status: 'started' }); } catch (_) {}
     }
 
+    // Per-result and cumulative ceilings on tool output. Once the running total
+    // is spent, later results are trimmed hard rather than dropped, so the model
+    // still sees that a tool ran and can answer from what it already has.
+    const MAX_TOOL_RESULT_CHARS = 20_000;
+    const MAX_TOOL_RESULT_CHARS_TIGHT = 2_000;
+    const TOTAL_TOOL_BUDGET_CHARS = 300_000;
+    let toolCharsUsed = 0;
+
+    const capToolResults = (results) =>
+      results.map((r) => {
+        if (typeof r?.content !== 'string') return r;
+        const overBudget = toolCharsUsed >= TOTAL_TOOL_BUDGET_CHARS;
+        const cap = overBudget ? MAX_TOOL_RESULT_CHARS_TIGHT : MAX_TOOL_RESULT_CHARS;
+        if (r.content.length <= cap) {
+          toolCharsUsed += r.content.length;
+          return r;
+        }
+        toolCharsUsed += cap;
+        const dropped = r.content.length - cap;
+        return {
+          ...r,
+          content:
+            `${r.content.slice(0, cap)}\n\n[Truncated: ${dropped} more characters not shown` +
+            `${overBudget ? ', tool-output budget for this turn is spent' : ''}. ` +
+            'Narrow the query or request a specific item rather than re-running the same search.]',
+        };
+      });
+
     const maxRounds = 24;
     // Kept moderate on purpose: the auto-continuation loop below is what actually
     // guards against truncation now, so a very high single-shot ceiling here would
@@ -476,7 +504,11 @@ export default async function handler(req, res) {
         }
         return res.status(200).json({ content: fallback });
       }
-      anthropicMessages.push({ role: 'user', content: toolResults });
+      // Tool output is the one part of the prompt with no natural ceiling: up
+      // to maxRounds of results accumulate here, and every earlier round stays
+      // in the request. Uncapped, a few large Gmail/Drive hits can push the
+      // whole call past the model's context limit and fail the turn outright.
+      anthropicMessages.push({ role: 'user', content: capToolResults(toolResults) });
     }
     const limitMsg = 'I reached the tool-step ceiling. Ask me to continue from where I left off.';
     if (wantStream) {
