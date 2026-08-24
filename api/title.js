@@ -1,5 +1,6 @@
 import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
 import { allowRequest } from './lib/rateLimit.js';
+import { recordUsage } from './lib/tokenUsage.js';
 
 const MODEL = 'claude-sonnet-5';
 const RATE_LIMIT = 20;
@@ -39,6 +40,7 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: `AI provider error (${response.status})`, details: errorText.slice(0, 180) });
     }
     const data = await response.json();
+    await recordUsage({ userId: user.id, endpoint: 'title', model: MODEL, usage: data.usage });
     const title = (data.content || [])
       .filter((b) => b.type === 'text')
       .map((b) => b.text)

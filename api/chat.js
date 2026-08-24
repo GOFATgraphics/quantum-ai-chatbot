@@ -1,6 +1,7 @@
 import { getUserFromAuthHeader, getAdminClient } from './lib/supabaseAdmin.js';
 import { loadConnectorsAndTools, runTool } from './lib/claudeTools.js';
 import { allowRequest } from './lib/rateLimit.js';
+import { createUsageMeter } from './lib/tokenUsage.js';
 
 export const config = { maxDuration: 300 };
 
@@ -229,7 +230,7 @@ async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) 
   return response.json();
 }
 
-async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTokens = 4096 }) {
+export async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTokens = 4096 }) {
   const body = {
     model: MODEL,
     max_tokens: maxTokens,
@@ -255,6 +256,10 @@ async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTo
   let buffer = '', stopReason = null, textAcc = '';
   const contentBlocks = [];
   let currentTool = null;
+  // Streaming splits usage across two events: message_start carries the input
+  // side (which is final the moment the request is accepted), message_delta
+  // carries a running output count whose last value is the total.
+  const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -272,7 +277,15 @@ async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTo
       } catch {
         continue;
       }
-      if (evt.type === 'content_block_start') {
+      if (evt.type === 'message_start') {
+        const u = evt.message?.usage;
+        if (u) {
+          usage.input_tokens = Number(u.input_tokens) || 0;
+          usage.cache_read_input_tokens = Number(u.cache_read_input_tokens) || 0;
+          usage.cache_creation_input_tokens = Number(u.cache_creation_input_tokens) || 0;
+          usage.output_tokens = Number(u.output_tokens) || 0;
+        }
+      } else if (evt.type === 'content_block_start') {
         const b = evt.content_block;
         if (b?.type === 'text') contentBlocks.push({ type: 'text', text: '' });
         else if (b?.type === 'tool_use') {
@@ -301,6 +314,7 @@ async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTo
         }
       } else if (evt.type === 'message_delta') {
         if (evt.delta?.stop_reason) stopReason = evt.delta.stop_reason;
+        if (evt.usage?.output_tokens != null) usage.output_tokens = Number(evt.usage.output_tokens) || 0;
       }
     }
   }
@@ -308,7 +322,7 @@ async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTo
     if (b.type === 'tool_use') return { type: 'tool_use', id: b.id, name: b.name, input: b.input || {} };
     return b;
   });
-  return { stop_reason: stopReason || 'end_turn', content: normalized, text: textAcc };
+  return { stop_reason: stopReason || 'end_turn', content: normalized, text: textAcc, usage };
 }
 
 function sendSseError(res, message) {
@@ -369,6 +383,18 @@ export default async function handler(req, res) {
       }))
     );
 
+    // Measured once, before the loop starts adding to the prompt: this is the
+    // conversation the user actually sent, separate from what the tool loop
+    // appends to it.
+    const historyChars = JSON.stringify(anthropicMessages).length;
+    const meter = createUsageMeter({
+      userId: user.id,
+      conversationId: body?.conversationId || null,
+      endpoint: 'chat',
+      model: MODEL,
+    });
+    let assistantChars = 0;
+
     if (wantStream) {
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -416,140 +442,161 @@ export default async function handler(req, res) {
     let continuations = 0;
     let accumulatedText = '';
 
-    for (let round = 0; round < maxRounds; round++) {
-      let data;
-      if (wantStream) {
-        data = await runClaudeStream({
-          apiKey,
-          system: systemPrompt,
-          messages: anthropicMessages,
-          tools: tools.length ? tools : undefined,
-          maxTokens,
-          onDelta: (delta) => {
-            try {
-              // Raw, unstripped: stripEmDashes needs to see whole words/phrases, and
-              // Anthropic's delta chunks split mid-token, so per-chunk stripping can
-              // miss patterns straddling a chunk boundary. The final { content } event
-              // below carries the fully-stripped text and overwrites this on the client.
-              sseWrite(res, { delta });
-            } catch (_) {}
-          },
-        });
-      } else {
-        data = await runClaude({
-          apiKey,
-          system: systemPrompt,
-          messages: anthropicMessages,
-          tools: tools.length ? tools : undefined,
-          maxTokens,
-        });
-      }
-      const content = data.content || [];
-      const clientToolBlocks = content.filter((b) => b.type === 'tool_use' && b.name);
-      if (clientToolBlocks.length === 0) {
-        const textOut = (wantStream ? data.text : extractText(content)) || extractText(content) || '';
-        accumulatedText += textOut;
-        if (data.stop_reason === 'max_tokens' && continuations < MAX_CONTINUATIONS) {
-          continuations += 1;
-          anthropicMessages = [
-            ...anthropicMessages,
-            { role: 'assistant', content },
-            {
-              role: 'user',
-              content:
-                'Continue exactly where you left off, mid-sentence or mid-code-block if needed. Do not repeat anything already written, do not add any preamble or acknowledgement.',
+    // Usage is written no matter how the turn ends — normal finish, tool-step
+    // ceiling, or a thrown provider error mid-loop — so cost reporting cannot
+    // silently under-count the turns that went wrong. The client already has
+    // its bytes by then, so the insert costs it nothing.
+    try {
+      for (let round = 0; round < maxRounds; round++) {
+        let data;
+        if (wantStream) {
+          data = await runClaudeStream({
+            apiKey,
+            system: systemPrompt,
+            messages: anthropicMessages,
+            tools: tools.length ? tools : undefined,
+            maxTokens,
+            onDelta: (delta) => {
+              try {
+                // Raw, unstripped: stripEmDashes needs to see whole words/phrases, and
+                // Anthropic's delta chunks split mid-token, so per-chunk stripping can
+                // miss patterns straddling a chunk boundary. The final { content } event
+                // below carries the fully-stripped text and overwrites this on the client.
+                sseWrite(res, { delta });
+              } catch (_) {}
             },
-          ];
-          continue;
-        }
-        const finalText = accumulatedText || 'Sorry, I could not generate a response.';
-        if (wantStream) {
-          sseWrite(res, { content: stripEmDashes(finalText) });
-          sseWrite(res, { done: true });
-          res.write('data: [DONE]\n\n');
-          return res.end();
-        }
-        return res.status(200).json({ content: stripEmDashes(finalText) });
-      }
-      if (wantStream) {
-        try {
-          const names = clientToolBlocks.map((b) => b.name).filter(Boolean);
-          sseWrite(res, {
-            status: 'tool_use',
-            tool: names[0] || 'tool',
-            tools: names,
-            round: round + 1,
-            message: 'Running: ' + names.join(', '),
           });
-        } catch (_) {}
-      }
-      anthropicMessages = [...anthropicMessages, { role: 'assistant', content }];
-      const toolResults = (
-        await Promise.all(
-          clientToolBlocks.map(async (block) => {
-            const started = Date.now();
-            try {
-              const result = await runTool(block, user, {
-                projectId: project?.id || null,
-                projectName: project?.name || null,
-              });
-              if (wantStream) {
-                try {
-                  sseWrite(res, {
-                    status: 'tool_done',
-                    tool: block.name,
-                    ms: Date.now() - started,
-                    ok: !(result && result.is_error),
-                  });
-                } catch (_) {}
-              }
-              return result;
-            } catch (e) {
-              if (wantStream) {
-                try {
-                  sseWrite(res, {
-                    status: 'tool_done',
-                    tool: block.name,
-                    ms: Date.now() - started,
-                    ok: false,
-                    detail: e?.message || String(e),
-                  });
-                } catch (_) {}
-              }
-              return {
-                type: 'tool_result',
-                tool_use_id: block.id,
-                is_error: true,
-                content: `Tool error: ${e?.message || String(e)}`,
-              };
-            }
-          })
-        )
-      ).filter(Boolean);
-      if (toolResults.length === 0) {
-        const fallback = 'Tool step produced no results. Please try a more specific request.';
-        if (wantStream) {
-          sseWrite(res, { content: fallback });
-          sseWrite(res, { done: true });
-          res.write('data: [DONE]\n\n');
-          return res.end();
+        } else {
+          data = await runClaude({
+            apiKey,
+            system: systemPrompt,
+            messages: anthropicMessages,
+            tools: tools.length ? tools : undefined,
+            maxTokens,
+          });
         }
-        return res.status(200).json({ content: fallback });
+        const content = data.content || [];
+        meter.addRound();
+        meter.addUsage(data.usage);
+        meter.setStopReason(data.stop_reason);
+        assistantChars += JSON.stringify(content).length;
+        const clientToolBlocks = content.filter((b) => b.type === 'tool_use' && b.name);
+        meter.addToolCalls(clientToolBlocks.length);
+        if (clientToolBlocks.length === 0) {
+          const textOut = (wantStream ? data.text : extractText(content)) || extractText(content) || '';
+          accumulatedText += textOut;
+          if (data.stop_reason === 'max_tokens' && continuations < MAX_CONTINUATIONS) {
+            continuations += 1;
+            anthropicMessages = [
+              ...anthropicMessages,
+              { role: 'assistant', content },
+              {
+                role: 'user',
+                content:
+                  'Continue exactly where you left off, mid-sentence or mid-code-block if needed. Do not repeat anything already written, do not add any preamble or acknowledgement.',
+              },
+            ];
+            continue;
+          }
+          const finalText = accumulatedText || 'Sorry, I could not generate a response.';
+          if (wantStream) {
+            sseWrite(res, { content: stripEmDashes(finalText) });
+            sseWrite(res, { done: true });
+            res.write('data: [DONE]\n\n');
+            return res.end();
+          }
+          return res.status(200).json({ content: stripEmDashes(finalText) });
+        }
+        if (wantStream) {
+          try {
+            const names = clientToolBlocks.map((b) => b.name).filter(Boolean);
+            sseWrite(res, {
+              status: 'tool_use',
+              tool: names[0] || 'tool',
+              tools: names,
+              round: round + 1,
+              message: 'Running: ' + names.join(', '),
+            });
+          } catch (_) {}
+        }
+        anthropicMessages = [...anthropicMessages, { role: 'assistant', content }];
+        const toolResults = (
+          await Promise.all(
+            clientToolBlocks.map(async (block) => {
+              const started = Date.now();
+              try {
+                const result = await runTool(block, user, {
+                  projectId: project?.id || null,
+                  projectName: project?.name || null,
+                });
+                if (wantStream) {
+                  try {
+                    sseWrite(res, {
+                      status: 'tool_done',
+                      tool: block.name,
+                      ms: Date.now() - started,
+                      ok: !(result && result.is_error),
+                    });
+                  } catch (_) {}
+                }
+                return result;
+              } catch (e) {
+                if (wantStream) {
+                  try {
+                    sseWrite(res, {
+                      status: 'tool_done',
+                      tool: block.name,
+                      ms: Date.now() - started,
+                      ok: false,
+                      detail: e?.message || String(e),
+                    });
+                  } catch (_) {}
+                }
+                return {
+                  type: 'tool_result',
+                  tool_use_id: block.id,
+                  is_error: true,
+                  content: `Tool error: ${e?.message || String(e)}`,
+                };
+              }
+            })
+          )
+        ).filter(Boolean);
+        if (toolResults.length === 0) {
+          const fallback = 'Tool step produced no results. Please try a more specific request.';
+          if (wantStream) {
+            sseWrite(res, { content: fallback });
+            sseWrite(res, { done: true });
+            res.write('data: [DONE]\n\n');
+            return res.end();
+          }
+          return res.status(200).json({ content: fallback });
+        }
+        // Tool output is the one part of the prompt with no natural ceiling: up
+        // to maxRounds of results accumulate here, and every earlier round stays
+        // in the request. Uncapped, a few large Gmail/Drive hits can push the
+        // whole call past the model's context limit and fail the turn outright.
+        anthropicMessages.push({ role: 'user', content: capToolResults(toolResults) });
       }
-      // Tool output is the one part of the prompt with no natural ceiling: up
-      // to maxRounds of results accumulate here, and every earlier round stays
-      // in the request. Uncapped, a few large Gmail/Drive hits can push the
-      // whole call past the model's context limit and fail the turn outright.
-      anthropicMessages.push({ role: 'user', content: capToolResults(toolResults) });
+      const limitMsg = 'I reached the tool-step ceiling. Ask me to continue from where I left off.';
+      if (wantStream) {
+        sseWrite(res, { content: limitMsg });
+        sseWrite(res, { done: true });
+        res.write('data: [DONE]\n\n');
+        return res.end();
+      }
+      return res.status(200).json({ content: limitMsg });
+    } finally {
+      meter.setComposition({
+        system_prompt: systemPrompt.staticPrompt.length,
+        user_context: (systemPrompt.dynamicContext || '').length,
+        tools: tools.length ? JSON.stringify(tools).length : 0,
+        history: historyChars,
+        tool_results: toolCharsUsed,
+        assistant: assistantChars,
+      });
+      await meter.flush();
     }
-    const limitMsg = 'I reached the tool-step ceiling. Ask me to continue from where I left off.';
-    if (wantStream) {
-      sseWrite(res, { content: limitMsg });
-      sseWrite(res, { done: true });
-      res.write('data: [DONE]\n\n');
-      return res.end();
-    }
-    return res.status(200).json({ content: limitMsg });
   } catch (err) {
     console.error('Handler error:', err);
     const msg =

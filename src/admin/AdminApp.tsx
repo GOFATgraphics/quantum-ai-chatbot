@@ -6,6 +6,7 @@ import Logo from '../components/Logo'
 import AdminShell, { type AdminPage } from './AdminShell'
 import Overview from './pages/Overview'
 import Analytics from './pages/Analytics'
+import Usage from './pages/Usage'
 import Users from './pages/Users'
 import Conversations from './pages/Conversations'
 import AdminNotes from './pages/Notes'
@@ -104,6 +105,7 @@ export default function AdminApp() {
     >
       {page === 'overview' && <Overview dark={dark} />}
       {page === 'analytics' && <Analytics dark={dark} />}
+      {page === 'usage' && <Usage dark={dark} />}
       {page === 'users' && <Users dark={dark} currentUserId={profile.id} />}
       {page === 'conversations' && <Conversations dark={dark} />}
       {page === 'notes' && <AdminNotes dark={dark} />}
