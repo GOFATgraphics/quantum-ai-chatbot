@@ -268,10 +268,22 @@ export default function ChatInput({
             const note = result.truncated
               ? '\n\n[Only the first hour of this recording was transcribed. Do not treat this as the whole recording.]'
               : ''
+            // Speech recognition reports no confidence, and its errors land on
+            // exactly the fields that carry the meaning: company names, ports,
+            // prices, quantities, dates. Quoting a transcript back verbatim
+            // presents a machine's best guess as a record of what was said, and
+            // a misheard digit in a price is indistinguishable from a correct
+            // one. The model is told what it is holding.
+            const caveat =
+              '\n\n[This is an automatic transcription, not a recording of what was certainly said. ' +
+              'Names, figures, dates and place names are the least reliable parts of any transcript and ' +
+              'are frequently wrong in ways that read as plausible. Do not quote it back as verbatim. ' +
+              'When repeating any name, number, currency amount, quantity or date from it, mark it as ' +
+              'needing confirmation against the audio or a written source.]'
             next.push({
               name: file.name,
               type: file.type || 'audio/mpeg',
-              text: `${header}\n\`\`\`\n${result.text}\n\`\`\`${note}`,
+              text: `${header}\n\`\`\`\n${result.text}\n\`\`\`${note}${caveat}`,
             })
           }
         } catch (err: any) {
