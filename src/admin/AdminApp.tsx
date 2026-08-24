@@ -59,7 +59,7 @@ export default function AdminApp() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-settings-canvas">
+      <div className="h-full flex flex-col items-center justify-center gap-4 bg-settings-canvas">
         <Logo size={48} dark={dark} />
         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       </div>
@@ -73,7 +73,7 @@ export default function AdminApp() {
 
   if (!profile?.is_admin) {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center px-6 bg-settings-canvas text-foreground">
+      <div className="h-full flex flex-col items-center justify-center px-6 overflow-y-auto bg-settings-canvas text-foreground">
         <div className="w-full max-w-sm rounded-2xl border p-6 text-center bg-card border-border shadow-sm">
           <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-destructive/10 text-destructive">
             <ShieldOff className="w-6 h-6" />

@@ -40,7 +40,7 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
         </div>
       </div>
 
-      <nav className="flex-1 px-2 space-y-0.5">
+      <nav className="flex-1 min-h-0 overflow-y-auto px-2 space-y-0.5">
         {NAV.map((item) => {
           const active = activePage === item.id
           const Icon = item.icon
@@ -95,7 +95,10 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
   )
 
   return (
-    <div className="min-h-dvh flex bg-settings-canvas text-foreground">
+    // #root is height-locked with overflow:hidden for the chat shell, so this
+    // must be bounded (h-full, not min-h-dvh) or its content spills past the
+    // clip and becomes unreachable.
+    <div className="h-full min-h-0 overflow-hidden flex bg-settings-canvas text-foreground">
       <aside className="hidden md:flex w-60 shrink-0 flex-col border-r bg-settings-surface border-border">
         {navContent}
       </aside>
@@ -118,7 +121,7 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
         </>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <header className="h-14 shrink-0 flex items-center gap-3 px-4 border-b backdrop-blur-sm border-border bg-settings-surface">
           <button
             type="button"
@@ -133,7 +136,12 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+        <main
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))]"
+          data-scrollable="true"
+        >
+          {children}
+        </main>
       </div>
     </div>
   )
