@@ -4,6 +4,7 @@ import { Send, Plus, Square, Mic, MicOff, X, FileText, Image as ImageIcon } from
 import { supabase } from '../lib/supabase'
 import VoiceWaveform from './VoiceWaveform'
 import { officeKind, isLegacyOffice, parseOfficeFile } from '../lib/officeParse'
+import { isAudioFile, transcribeAudioFile, formatDuration } from '../lib/audioTranscribe'
 
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession()
@@ -97,6 +98,9 @@ export default function ChatInput({
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [fileError, setFileError] = useState<string | null>(null)
+  // Transcription is the one attachment path slow enough to need its own
+  // progress: an hour-long recording is dozens of sequential requests.
+  const [fileBusy, setFileBusy] = useState<string | null>(null)
   const [listening, setListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -201,7 +205,8 @@ export default function ChatInput({
     }
   }
 
-  const hasText = !!value.trim() || pendingFiles.length > 0
+  // Sending mid-transcription would attach a half-finished transcript.
+  const hasText = (!!value.trim() || pendingFiles.length > 0) && !fileBusy
   const onPickFiles = () => fileInputRef.current?.click()
 
   const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -217,7 +222,9 @@ export default function ChatInput({
     const quality = imageCount >= 3 ? 0.72 : 0.82
     const rejected: string[] = []
     for (const file of picked) {
-      if (file.size > 10_000_000) { rejected.push(`${file.name} is over 10MB`); continue }
+      // Audio is split and streamed in pieces rather than sent whole, so the
+      // blanket limit does not apply to it.
+      if (file.size > 10_000_000 && !isAudioFile(file)) { rejected.push(`${file.name} is over 10MB`); continue }
       const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
       if (isPdf) {
         // The whole message is one request body, and Vercel rejects bodies over
@@ -233,6 +240,49 @@ export default function ChatInput({
           next.push({ name: file.name, type: 'application/pdf', dataUrl })
         } catch {
           rejected.push(`${file.name} could not be read`)
+        }
+      } else if (isAudioFile(file)) {
+        if (file.size > 200_000_000) {
+          rejected.push(`${file.name} is too large to transcribe (${(file.size / 1_000_000).toFixed(0)}MB)`)
+          continue
+        }
+        try {
+          setFileBusy(`Transcribing ${file.name}...`)
+          const result = await transcribeAudioFile(file, ({ done, total }) => {
+            setFileBusy(
+              total > 1
+                ? `Transcribing ${file.name} - part ${Math.min(done + 1, total)} of ${total}...`
+                : `Transcribing ${file.name}...`,
+            )
+          })
+          if (!result.text.trim()) {
+            next.push({
+              name: file.name,
+              type: file.type || 'audio/mpeg',
+              text: `[Audio attached: ${file.name} - transcribed, but no speech was found in it. Tell the user rather than guessing at its contents.]`,
+            })
+            rejected.push(`${file.name} had no speech in it`)
+          } else {
+            const parts = [formatDuration(result.durationSec), result.diarized ? 'speakers labelled' : ''].filter(Boolean)
+            const header = `\u{1F3A4} **${file.name}**${parts.length ? ` (${parts.join(' \u00B7 ')})` : ''} - transcript`
+            const note = result.truncated
+              ? '\n\n[Only the first hour of this recording was transcribed. Do not treat this as the whole recording.]'
+              : ''
+            next.push({
+              name: file.name,
+              type: file.type || 'audio/mpeg',
+              text: `${header}\n\`\`\`\n${result.text}\n\`\`\`${note}`,
+            })
+          }
+        } catch (err: any) {
+          next.push({
+            name: file.name,
+            type: file.type || 'audio/mpeg',
+            text: `[Audio attached: ${file.name} - could not be transcribed, so its contents are NOT available. Tell the user it could not be read instead of guessing.]`,
+          })
+          rejected.push(`${file.name}: ${err?.message || 'could not be transcribed'}`)
+        } finally {
+          setFileBusy(null)
         }
       } else if (file.type.startsWith('image/')) {
         try {
@@ -323,6 +373,18 @@ export default function ChatInput({
               role="status"
             >
               {errorHint}
+            </motion.p>
+          )}
+          {fileBusy && (
+            <motion.p
+              key="file-busy"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="glass-chip text-xs text-center mb-2 px-3 py-1.5 rounded-full mx-auto w-fit text-muted-foreground"
+              role="status"
+            >
+              {fileBusy}
             </motion.p>
           )}
           {fileError && (
@@ -426,7 +488,7 @@ export default function ChatInput({
               />
 
               <div className="flex items-center gap-1.5 pt-1">
-                <input ref={fileInputRef} type="file" multiple accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.pptx,image/jpeg,image/png,image/gif,image/webp,image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*" className="hidden" onChange={onFileSelected} />
+                <input ref={fileInputRef} type="file" multiple accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.pptx,audio/*,.mp3,.m4a,.wav,.ogg,.opus,.aac,.flac,.amr,image/jpeg,image/png,image/gif,image/webp,image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*" className="hidden" onChange={onFileSelected} />
                 <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={onPickFiles} disabled={isLoading} title="Attach files" className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${toolBtn}`} aria-label="Add attachment">
                   <Plus className="w-[18px] h-[18px]" />
                 </motion.button>

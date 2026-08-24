@@ -16,6 +16,35 @@ export const config = {
   },
 };
 
+/**
+ * Map a caller's language hint to what Scribe expects (ISO-639-3), or to null
+ * for auto-detect. Unknown codes are passed through rather than forced to
+ * English: guessing wrong silently produces a confident, wrong transcript.
+ */
+const LANGUAGE_ALIASES = {
+  en: 'eng', eng: 'eng', english: 'eng',
+  ha: 'hau', hau: 'hau', hausa: 'hau',
+  ar: 'ara', ara: 'ara', arabic: 'ara',
+  fr: 'fra', fra: 'fra', fre: 'fra', french: 'fra',
+  es: 'spa', spa: 'spa', spanish: 'spa',
+  hi: 'hin', hin: 'hin', hindi: 'hin',
+  ur: 'urd', urd: 'urd', urdu: 'urd',
+  zh: 'zho', zho: 'zho', chi: 'zho', chinese: 'zho',
+  tr: 'tur', tur: 'tur', turkish: 'tur',
+  ru: 'rus', rus: 'rus', russian: 'rus',
+  pt: 'por', por: 'por', portuguese: 'por',
+  de: 'deu', deu: 'deu', ger: 'deu', german: 'deu',
+};
+
+export function resolveLanguage(language) {
+  const key = String(language || '').trim().toLowerCase();
+  if (!key || key === 'auto' || key === 'detect') return null;
+  if (LANGUAGE_ALIASES[key]) return LANGUAGE_ALIASES[key];
+  // Already a three-letter code we don't have an alias for — let Scribe judge it.
+  if (/^[a-z]{3}$/.test(key)) return key;
+  return null;
+}
+
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -50,6 +79,9 @@ export default async function handler(req, res) {
     const contentType = req.headers['content-type'] || '';
     let fileBlob;
     let language = 'en';
+    // Speaker labels are worth having on an uploaded call and pointless on a
+    // few seconds of dictation, so the caller decides.
+    let diarize = false;
 
     if (contentType.includes('application/json')) {
       const raw = await readRawBody(req);
@@ -62,6 +94,7 @@ export default async function handler(req, res) {
       if (buf.length > 25 * 1024 * 1024) return res.status(400).json({ error: 'Audio too large (max 25MB)' });
       fileBlob = new Blob([buf], { type: mime });
       language = (body?.language || 'en').toLowerCase();
+      diarize = !!body?.diarize;
     } else if (contentType.includes('multipart/form-data')) {
       // Vercel/Node may still parse; fall back to raw + manual boundary is heavy.
       // Prefer JSON base64 from the client for reliability on serverless.
@@ -77,13 +110,16 @@ export default async function handler(req, res) {
       language = (req.headers['x-language'] || 'en').toLowerCase();
     }
 
-    const isHausa = language === 'ha' || language === 'hau' || language === 'hausa';
-    const languageCode = isHausa ? 'hau' : 'eng';
+    const languageCode = resolveLanguage(language);
 
     const form = new FormData();
     form.append('file', fileBlob, 'recording.webm');
     form.append('model_id', 'scribe_v2');
-    form.append('language_code', languageCode);
+    // Omitted entirely when the caller asked for auto: Scribe then detects the
+    // language itself, which matters for uploaded recordings where we have no
+    // idea what was spoken. The mic button still pins a language as before.
+    if (languageCode) form.append('language_code', languageCode);
+    if (diarize) form.append('diarize', 'true');
 
     const elRes = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
       method: 'POST',
