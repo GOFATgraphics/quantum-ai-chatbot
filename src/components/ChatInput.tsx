@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Plus, Square, Mic, MicOff, X, FileText, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import VoiceWaveform from './VoiceWaveform'
+import { officeKind, isLegacyOffice, parseOfficeFile } from '../lib/officeParse'
 
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession()
@@ -240,6 +241,43 @@ export default function ChatInput({
         } catch {
           next.push({ name: file.name, type: file.type, text: `[Image attached: ${file.name}]` })
         }
+      } else if (officeKind(file)) {
+        const kind = officeKind(file)!
+        try {
+          const parsed = await parseOfficeFile(file, kind)
+          if (!parsed.text.trim()) {
+            next.push({
+              name: file.name,
+              type: file.type || 'application/octet-stream',
+              text: `[File attached: ${file.name} — opened, but no readable text was found in it. Tell the user rather than guessing at its contents.]`,
+            })
+            rejected.push(`${file.name} had no readable text`)
+          } else {
+            const header = `📎 **${file.name}**`
+            const note = parsed.truncated
+              ? `\n\n[Truncated: showing the first ${parsed.text.length.toLocaleString()} of ${parsed.totalChars.toLocaleString()} characters. Do not treat this as the whole document.]`
+              : ''
+            next.push({
+              name: file.name,
+              type: file.type || 'application/octet-stream',
+              text: `${header}\n\`\`\`\n${parsed.text}\n\`\`\`${note}`,
+            })
+          }
+        } catch {
+          next.push({
+            name: file.name,
+            type: file.type || 'application/octet-stream',
+            text: `[File attached: ${file.name} — could not be read, so its contents are NOT available. Tell the user it could not be read instead of guessing.]`,
+          })
+          rejected.push(`${file.name} could not be parsed`)
+        }
+      } else if (isLegacyOffice(file)) {
+        next.push({
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          text: `[File attached: ${file.name} — this is a legacy Office format and cannot be read. Its contents are NOT available.]`,
+        })
+        rejected.push(`${file.name} is a legacy format — re-save it as .docx, .xlsx or .pptx`)
       } else if (file.type.startsWith('text/') || /\.(txt|md|csv|json|ts|tsx|js|jsx|py|html|css)$/i.test(file.name)) {
         const body = await file.text()
         next.push({ name: file.name, type: file.type || 'text/plain', text: body.slice(0, 40_000) })
@@ -388,7 +426,7 @@ export default function ChatInput({
               />
 
               <div className="flex items-center gap-1.5 pt-1">
-                <input ref={fileInputRef} type="file" multiple accept="application/pdf,.pdf,image/jpeg,image/png,image/gif,image/webp,image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*" className="hidden" onChange={onFileSelected} />
+                <input ref={fileInputRef} type="file" multiple accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.pptx,image/jpeg,image/png,image/gif,image/webp,image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*" className="hidden" onChange={onFileSelected} />
                 <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={onPickFiles} disabled={isLoading} title="Attach files" className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${toolBtn}`} aria-label="Add attachment">
                   <Plus className="w-[18px] h-[18px]" />
                 </motion.button>
