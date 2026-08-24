@@ -303,6 +303,10 @@ type Props = {
   thoughtSeconds?: number | null
   toolStatus?: string | null
   suggestions?: string[]
+  /** True when the chat has turns older than the ones loaded. */
+  hasEarlier?: boolean
+  loadingEarlier?: boolean
+  onLoadEarlier?: () => void
 }
 
 export default function MessageList({
@@ -319,6 +323,9 @@ export default function MessageList({
   thoughtSeconds,
   toolStatus,
   suggestions = [],
+  hasEarlier = false,
+  loadingEarlier = false,
+  onLoadEarlier,
 }: Props) {
   const last = messages[messages.length - 1]
   const streaming = isLoading && last?.role === 'assistant' && !!last.content
@@ -399,6 +406,21 @@ export default function MessageList({
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-5 py-4 pb-6 space-y-6 overflow-x-hidden w-full max-w-full">
+      {hasEarlier && onLoadEarlier && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={onLoadEarlier}
+            disabled={loadingEarlier}
+            className={
+              'text-xs font-medium px-3 h-8 rounded-full transition disabled:opacity-50 ' +
+              'bg-secondary text-secondary-foreground hover:bg-accent'
+            }
+          >
+            {loadingEarlier ? 'Loading...' : 'Load earlier messages'}
+          </button>
+        </div>
+      )}
       <AnimatePresence initial={false} mode="popLayout">
         {messages.map((msg, idx) => {
           const isLast = idx === messages.length - 1
