@@ -392,3 +392,105 @@ html.dark .md-code {
 .ai-content .md-codeblock {
   max-width: 100%;
 }
+
+/* Assistant output typography.
+   Tailwind's preflight zeroes the margins on p/ul/ol/headings, strips list
+   markers, and resets heading font-size to inherit. Nothing here replaced any
+   of it, so a formatted answer rendered as one unbroken block: no gap between
+   paragraphs, bullets that were not bullets, and headings the same size and
+   weight as body text. */
+.ai-content {
+  line-height: 1.7;
+}
+
+.md-p {
+  margin: 0 0 0.85em;
+}
+
+.md-h2 {
+  font-size: 1.13em;
+  font-weight: 650;
+  line-height: 1.35;
+  /* Weighted towards the top so a heading groups with the text beneath it
+     rather than floating between two blocks. */
+  margin: 1.6em 0 0.5em;
+}
+.md-h3 {
+  font-size: 1.02em;
+  font-weight: 650;
+  line-height: 1.4;
+  margin: 1.35em 0 0.4em;
+}
+
+.md-ul,
+.md-ol {
+  margin: 0 0 0.9em;
+  padding-left: 1.4em;
+}
+.md-ul { list-style: disc; }
+.md-ol { list-style: decimal; }
+.md-ul li,
+.md-ol li {
+  margin: 0 0 0.42em;
+  padding-left: 0.15em;
+}
+.md-ul li::marker,
+.md-ol li::marker {
+  color: hsl(var(--muted-foreground));
+}
+.md-ul li:last-child,
+.md-ol li:last-child {
+  margin-bottom: 0;
+}
+/* Nested lists belong to the item above them, so they sit tighter. */
+.md-ul .md-ul,
+.md-ul .md-ol,
+.md-ol .md-ul,
+.md-ol .md-ol {
+  margin: 0.4em 0 0;
+}
+
+.md-hr {
+  margin: 1.6em 0;
+  border: 0;
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* Blank lines already produce this spacer; real margins now do the spacing,
+   and leaving both would double every gap. */
+.md-gap { display: none; }
+
+.md-table-wrap {
+  margin: 0 0 1em;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.md-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.93em;
+}
+.md-table th,
+.md-table td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.45em 0.7em;
+  text-align: left;
+  vertical-align: top;
+}
+.md-table th {
+  background: hsl(var(--muted-foreground) / 0.06);
+  font-weight: 600;
+}
+
+.md-codeblock { margin: 0 0 1em; }
+
+.md-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+/* No leading gap above the first block or trailing gap below the last, so the
+   bubble's own padding stays even. */
+.md-root > :first-child { margin-top: 0; }
+.md-root > :last-child { margin-bottom: 0; }

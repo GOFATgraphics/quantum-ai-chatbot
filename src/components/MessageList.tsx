@@ -281,7 +281,7 @@ const AssistantContent = memo(function AssistantContent({
   if (!content) return null
   return (
     <div className="ai-content overflow-x-hidden break-words max-w-full">
-      <span dangerouslySetInnerHTML={{ __html: html }} />
+      <span className="md-root" dangerouslySetInnerHTML={{ __html: html }} />
       {isStreamingThis && <span className="stream-caret" aria-hidden />}
     </div>
   )

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   SquarePen, Search, Link2, Settings, X, Trash2, Loader2,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import type { Conversation, Project } from '../lib/supabase'
 import Logo from './Logo'
+import { searchChatContents, splitSnippet, type ChatSearchHit } from '../lib/chatSearch'
 import type { User } from '@supabase/supabase-js'
 
 type Props = {
@@ -55,6 +56,51 @@ export default function Sidebar({
     if (!q) return list
     return list.filter((c) => (c.title || '').toLowerCase().includes(q))
   }, [conversations, query, currentProjectId])
+
+  // Title matches are local and instant. Message bodies need a round trip, so
+  // they load underneath rather than holding up what the user can already see.
+  const [contentHits, setContentHits] = useState<ChatSearchHit[]>([])
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const searchSeq = useRef(0)
+
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) {
+      setContentHits([])
+      setSearching(false)
+      setSearchError(null)
+      return
+    }
+    const seq = ++searchSeq.current
+    setSearching(true)
+    const timer = setTimeout(async () => {
+      try {
+        const hits = await searchChatContents(q)
+        // A slower earlier query must not overwrite a newer one's results.
+        if (searchSeq.current !== seq) return
+        setContentHits(hits)
+        setSearchError(null)
+      } catch (e: any) {
+        if (searchSeq.current !== seq) return
+        setContentHits([])
+        setSearchError(e?.message || 'Search failed')
+      } finally {
+        if (searchSeq.current === seq) setSearching(false)
+      }
+    }, 220)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  // Anything already shown as a title match does not need repeating below.
+  const titleMatchIds = useMemo(() => new Set(filtered.map((c) => c.id)), [filtered])
+  const inProject = useMemo(() => new Set(conversations
+    .filter((c) => !currentProjectId || c.project_id === currentProjectId)
+    .map((c) => c.id)), [conversations, currentProjectId])
+  const bodyHits = useMemo(
+    () => contentHits.filter((h) => !titleMatchIds.has(h.conversation_id) && inProject.has(h.conversation_id)),
+    [contentHits, titleMatchIds, inProject],
+  )
 
   const text = 'text-sidebar-foreground'
   const muted = 'text-muted-foreground'
@@ -202,7 +248,7 @@ export default function Sidebar({
               </motion.div>
             ))}
           </AnimatePresence>
-          {filtered.length === 0 && (
+          {filtered.length === 0 && bodyHits.length === 0 && !searching && (
             <p className={`px-3 py-4 text-sm ${muted}`}>
               {query.trim()
                 ? 'No matching chats'
@@ -212,6 +258,48 @@ export default function Sidebar({
             </p>
           )}
         </div>
+
+        {query.trim().length >= 2 && (bodyHits.length > 0 || searching || searchError) && (
+          <div className="mt-4">
+            <p className={`px-3 mb-1 text-xs font-medium uppercase tracking-wide ${muted}`}>
+              In chat contents
+            </p>
+            {searching && bodyHits.length === 0 && (
+              <p className={`px-3 py-2 text-sm flex items-center gap-2 ${muted}`}>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Searching…
+              </p>
+            )}
+            {searchError && (
+              <p className="px-3 py-2 text-xs text-destructive">{searchError}</p>
+            )}
+            <div className="space-y-0.5">
+              {bodyHits.map((h) => (
+                <button
+                  key={h.conversation_id}
+                  type="button"
+                  onClick={() => onSelectChat(h.conversation_id)}
+                  className={`w-full text-left px-3 py-2 rounded-xl ${
+                    currentConversationId === h.conversation_id ? active : hover
+                  }`}
+                >
+                  <span className="block text-[13.5px] truncate">{h.title || 'New chat'}</span>
+                  <span className={`block text-[12px] leading-snug mt-0.5 line-clamp-2 ${muted}`}>
+                    {splitSnippet(h.snippet).map((part, i) =>
+                      part.hit ? (
+                        <mark key={i} className="bg-transparent text-foreground font-medium">
+                          {part.text}
+                        </mark>
+                      ) : (
+                        <span key={i}>{part.text}</span>
+                      ),
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="shrink-0 p-3 border-t border-sidebar-border">
