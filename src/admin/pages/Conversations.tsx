@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, RefreshCw, Search, X } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { adminFetch } from '../adminApi'
 
 type Props = { dark: boolean }
 
@@ -38,33 +38,17 @@ export default function Conversations(_props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: err } = await supabase
-        .from('conversations')
-        .select('id, title, user_id, project_id, created_at, updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(300)
-
-      if (err) throw err
-      const list = (data || []) as Row[]
-
-      const userIds = [...new Set(list.map((r) => r.user_id).filter(Boolean))]
-      const profileMap: Record<string, { email: string | null; preferred_name: string | null }> = {}
-
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, email, preferred_name')
-          .in('id', userIds)
-        for (const p of profiles || []) {
-          profileMap[p.id] = { email: p.email, preferred_name: p.preferred_name }
-        }
-      }
+      // Owners are resolved server-side; RLS would hide every row but the
+      // admin's own if this ran in the browser.
+      const { conversations } = await adminFetch<{
+        conversations: (Row & { owner: { email: string | null; name: string | null } | null })[]
+      }>('/api/admin/conversations')
 
       setRows(
-        list.map((r) => ({
+        (conversations || []).map((r) => ({
           ...r,
-          owner_email: profileMap[r.user_id]?.email ?? null,
-          owner_name: profileMap[r.user_id]?.preferred_name ?? null,
+          owner_email: r.owner?.email ?? null,
+          owner_name: r.owner?.name ?? null,
         })),
       )
     } catch (e: any) {

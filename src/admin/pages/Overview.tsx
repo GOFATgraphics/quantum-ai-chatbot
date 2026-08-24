@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Loader2, RefreshCw, Users, MessageSquare, MessagesSquare, Plug } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { adminFetch } from '../adminApi'
 
 type Props = {
   dark: boolean
@@ -11,41 +11,6 @@ type Stats = {
   conversations: number | null
   messagesToday: number | null
   connectors: number | null
-}
-
-async function countTable(table: string, filter?: { column: string; value: string }): Promise<number | null> {
-  try {
-    let q = supabase.from(table).select('*', { count: 'exact', head: true })
-    if (filter) q = q.eq(filter.column, filter.value)
-    const { count, error } = await q
-    if (error) {
-      console.warn('count', table, error.message)
-      return null
-    }
-    return count ?? 0
-  } catch (e) {
-    console.warn('count exception', table, e)
-    return null
-  }
-}
-
-async function countMessagesToday(): Promise<number | null> {
-  try {
-    const start = new Date()
-    start.setHours(0, 0, 0, 0)
-    const { count, error } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', start.toISOString())
-    if (error) {
-      console.warn('count messages today', error.message)
-      return null
-    }
-    return count ?? 0
-  } catch (e) {
-    console.warn('count messages today exception', e)
-    return null
-  }
 }
 
 export default function Overview(_props: Props) {
@@ -63,17 +28,19 @@ export default function Overview(_props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const [users, conversations, messagesToday, connectors] = await Promise.all([
-        countTable('profiles'),
-        countTable('conversations'),
-        countMessagesToday(),
-        countTable('connectors', { column: 'status', value: 'connected' }),
-      ])
-      setStats({ users, conversations, messagesToday, connectors })
+      // Counted server-side. In the browser these are RLS-scoped to the
+      // caller, which returns a small plausible number rather than an error.
+      const data = await adminFetch<{
+        users: number | null; conversations: number | null
+        messagesToday: number | null; connectors: number | null
+      }>('/api/admin/overview')
+      setStats({
+        users: data.users,
+        conversations: data.conversations,
+        messagesToday: data.messagesToday,
+        connectors: data.connectors,
+      })
       setUpdatedAt(new Date())
-      if (users === null && conversations === null && messagesToday === null && connectors === null) {
-        setError('Could not load stats. Check RLS policies allow admin reads.')
-      }
     } catch (e: any) {
       setError(e?.message || 'Failed to load stats')
     } finally {
@@ -188,17 +155,12 @@ export default function Overview(_props: Props) {
       <div className={'rounded-2xl border p-5 ' + cardBg}>
         <h3 className={'text-sm font-semibold ' + title}>About these numbers</h3>
         <p className={'mt-1.5 text-sm leading-relaxed ' + muted}>
-          Counts use the logged-in admin session. If RLS only allows each user to see their own
-          rows, totals will under-count. For full product-wide metrics, add policies that let{' '}
-          <code
-            className={
-              'text-xs px-1.5 py-0.5 rounded bg-muted'
-            }
-          >
-            is_admin = true
-          </code>{' '}
-          read all rows on profiles, conversations, messages, and connectors — or move aggregates
-          to a server function.
+          Product-wide totals, counted on the server with the service role and gated by an{' '}
+          <code className={'text-xs px-1.5 py-0.5 rounded bg-muted'}>is_admin</code> check on every
+          request. They are deliberately not read from the browser: RLS scopes every table to its
+          owner, so a client-side count would quietly return your own rows and look like the whole
+          product. Widening RLS instead would expose those rows to anyone holding an admin session
+          token, so the service-role key stays server-side.
         </p>
         {updatedAt && (
           <p className="mt-3 text-xs text-muted-foreground">

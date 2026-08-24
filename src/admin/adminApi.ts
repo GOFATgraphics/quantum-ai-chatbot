@@ -23,6 +23,29 @@ export async function adminFetch<T>(path: string, params?: Record<string, string
   return body as T
 }
 
+/**
+ * Write through an admin API route. Same guarantee as adminFetch: the server
+ * re-verifies is_admin, and the service-role key never leaves it.
+ */
+export async function adminMutate<T>(
+  path: string,
+  body: unknown,
+  method: 'PATCH' | 'POST' | 'DELETE' = 'PATCH',
+): Promise<T> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error('Not signed in')
+
+  const res = await fetch(new URL(path, window.location.origin).toString(), {
+    method,
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const payload = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(payload?.error || `Request failed (${res.status})`)
+  return payload as T
+}
+
 export function formatDateTime(iso: string | null | undefined) {
   if (!iso) return '—'
   try {

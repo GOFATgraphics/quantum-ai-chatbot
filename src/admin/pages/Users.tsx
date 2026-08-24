@@ -10,7 +10,8 @@ import {
   MessageSquare,
   Calendar,
 } from 'lucide-react'
-import { supabase, type Profile, type Conversation, type DbMessage } from '../../lib/supabase'
+import { type Profile, type Conversation, type DbMessage } from '../../lib/supabase'
+import { adminFetch, adminMutate } from '../adminApi'
 
 type Props = {
   dark: boolean
@@ -104,14 +105,10 @@ export default function Users({ currentUserId }: Props) {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: err } = await supabase
-        .from('profiles')
-        .select('id, email, preferred_name, is_admin, created_at, updated_at')
-        .order('created_at', { ascending: false })
-        .limit(500)
-
-      if (err) throw err
-      setUsers((data || []) as Profile[])
+      // Server-side with the service role: RLS scopes profiles to the caller's
+      // own row, so a direct query here would show one user and look correct.
+      const { users: rows } = await adminFetch<{ users: Profile[] }>('/api/admin/users')
+      setUsers(rows || [])
     } catch (e: any) {
       console.warn('Users load error', e)
       setError(e?.message || 'Failed to load users')
@@ -129,15 +126,11 @@ export default function Users({ currentUserId }: Props) {
     setChatsLoading(true)
     setError(null)
     try {
-      const { data, error: err } = await supabase
-        .from('conversations')
-        .select('id, user_id, title, project_id, created_at, updated_at')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false })
-        .limit(200)
-
-      if (err) throw err
-      setUserChats((data || []) as Conversation[])
+      const { conversations } = await adminFetch<{ conversations: Conversation[] }>(
+        '/api/admin/conversations',
+        { user_id: userId },
+      )
+      setUserChats(conversations || [])
     } catch (e: any) {
       console.warn('user chats', e)
       setError(e?.message || 'Failed to load conversations')
@@ -151,15 +144,11 @@ export default function Users({ currentUserId }: Props) {
     setMessagesLoading(true)
     setError(null)
     try {
-      const { data, error: err } = await supabase
-        .from('messages')
-        .select('id, conversation_id, role, content, created_at')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true })
-        .limit(500)
-
-      if (err) throw err
-      setMessages((data || []) as DbMessage[])
+      const { messages: rows } = await adminFetch<{ messages: DbMessage[] }>(
+        '/api/admin/conversations',
+        { conversation_id: conversationId },
+      )
+      setMessages(rows || [])
     } catch (e: any) {
       console.warn('messages', e)
       setError(e?.message || 'Failed to load messages')
@@ -254,17 +243,14 @@ export default function Users({ currentUserId }: Props) {
     setTogglingId(u.id)
     setError(null)
     try {
-      const { error: err } = await supabase
-        .from('profiles')
-        .update({ is_admin: next, updated_at: new Date().toISOString() })
-        .eq('id', u.id)
-
-      if (err) throw err
+      // The server refuses to demote the last admin, which would lock the
+      // dashboard away from everyone.
+      await adminMutate('/api/admin/users', { user_id: u.id, is_admin: next })
       setUsers((prev) => prev.map((p) => (p.id === u.id ? { ...p, is_admin: next } : p)))
       if (selectedUser?.id === u.id) setSelectedUser({ ...u, is_admin: next })
     } catch (err: any) {
       console.warn('toggle admin', err)
-      setError(err?.message || 'Failed to update admin. Check RLS allows admin UPDATE on profiles.')
+      setError(err?.message || 'Failed to update admin.')
     } finally {
       setTogglingId(null)
     }

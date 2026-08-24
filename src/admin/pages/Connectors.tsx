@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, RefreshCw, Search, X } from 'lucide-react'
-import { supabase, type Connector } from '../../lib/supabase'
+import { type Connector } from '../../lib/supabase'
+import { adminFetch } from '../adminApi'
 
 type Props = { dark: boolean }
 
@@ -41,33 +42,18 @@ export default function ConnectorsPage(_props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const { data, error: err } = await supabase
-        .from('connectors')
-        .select('id, user_id, provider, account_email, status, scopes, created_at, updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(300)
-
-      if (err) throw err
-      const list = (data || []) as Connector[]
-
-      const userIds = [...new Set(list.map((r) => r.user_id).filter(Boolean))]
-      const profileMap: Record<string, { email: string | null; preferred_name: string | null }> = {}
-
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, email, preferred_name')
-          .in('id', userIds)
-        for (const p of profiles || []) {
-          profileMap[p.id] = { email: p.email, preferred_name: p.preferred_name }
-        }
-      }
+      // The route selects a fixed column list that excludes access_token and
+      // refresh_token, so credentials never reach the browser.
+      const { connectors, owners } = await adminFetch<{
+        connectors: Connector[]
+        owners: Record<string, { email: string | null; preferred_name: string | null }>
+      }>('/api/admin/connectors')
 
       setRows(
-        list.map((r) => ({
+        (connectors || []).map((r) => ({
           ...r,
-          owner_email: profileMap[r.user_id]?.email ?? null,
-          owner_name: profileMap[r.user_id]?.preferred_name ?? null,
+          owner_email: owners?.[r.user_id]?.email ?? null,
+          owner_name: owners?.[r.user_id]?.preferred_name ?? null,
         })),
       )
     } catch (e: any) {
