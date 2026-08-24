@@ -708,4 +708,212 @@ export async function createCalendarEvent(accessToken, {
   };
 }
 
+export async function getCalendarEvent(accessToken, eventId) {
+  if (!eventId) throw new Error('event_id is required');
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (res.status === 404) throw new Error(`No event found with id ${eventId}. List events first to get a valid id.`);
+  if (!res.ok) throw new Error(`Calendar get failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+const emailOf = (a) => String((typeof a === 'string' ? a : a?.email) || '').trim();
+
+/** Merge an attendee edit into the event's existing list, matching case-insensitively on address. */
+function resolveAttendees(existing, { attendees, addAttendees, removeAttendees }) {
+  const current = Array.isArray(existing) ? existing : [];
+  if (Array.isArray(attendees)) {
+    return attendees.map((a) => ({ email: emailOf(a) })).filter((a) => a.email);
+  }
+  if (!Array.isArray(addAttendees) && !Array.isArray(removeAttendees)) return undefined;
+
+  const drop = new Set((removeAttendees || []).map((a) => emailOf(a).toLowerCase()).filter(Boolean));
+  // Existing entries are kept whole, not rebuilt from the address: they carry
+  // each attendee's RSVP status, and replacing them would reset every reply.
+  const out = current.filter((a) => !drop.has(emailOf(a).toLowerCase()));
+  const have = new Set(out.map((a) => emailOf(a).toLowerCase()));
+  for (const a of addAttendees || []) {
+    const email = emailOf(a);
+    if (!email || have.has(email.toLowerCase())) continue;
+    out.push({ email });
+    have.add(email.toLowerCase());
+  }
+  return out;
+}
+
+const dayMs = 86_400_000;
+const asDate = (v) => String(v || '').slice(0, 10);
+const shiftDays = (isoDate, days) =>
+  new Date(new Date(`${isoDate}T00:00:00Z`).getTime() + days * dayMs).toISOString().slice(0, 10);
+
+/**
+ * Move or amend an existing event.
+ *
+ * PATCH, never PUT: the caller supplies only what changed, and a full replace
+ * would silently blank every field it left out. Anything not named here is
+ * untouched.
+ *
+ * Times are the subtle part. Shifting only the start of an event would leave
+ * the old end behind it, which Google rejects outright, so a start-only move
+ * carries the original duration with it — the behaviour someone means by "push
+ * the loading window back two days".
+ */
+export async function updateCalendarEvent(accessToken, eventId, {
+  summary,
+  description,
+  location,
+  start,
+  end,
+  allDay,
+  timeZone,
+  attendees,
+  addAttendees,
+  removeAttendees,
+  notify,
+} = {}) {
+  const existing = await getCalendarEvent(accessToken, eventId);
+  if (existing.status === 'cancelled') {
+    throw new Error('That event is already cancelled and cannot be edited.');
+  }
+
+  const wasAllDay = !!existing.start?.date && !existing.start?.dateTime;
+  const isAllDay = allDay === undefined ? wasAllDay : !!allDay;
+  const body = {};
+  const changed = [];
+
+  if (summary !== undefined) { body.summary = String(summary); changed.push('summary'); }
+  if (description !== undefined) { body.description = String(description); changed.push('description'); }
+  if (location !== undefined) { body.location = String(location); changed.push('location'); }
+
+  const oldStartRaw = existing.start?.dateTime || existing.start?.date || '';
+  const oldEndRaw = existing.end?.dateTime || existing.end?.date || '';
+
+  if (start !== undefined || end !== undefined || allDay !== undefined) {
+    if (isAllDay) {
+      const oldStartDate = asDate(oldStartRaw);
+      const oldEndDate = asDate(oldEndRaw) || oldStartDate;
+      const newStartDate = start !== undefined ? asDate(start) : oldStartDate;
+      let newEndDate;
+      if (end !== undefined) {
+        newEndDate = asDate(end);
+      } else if (start !== undefined && wasAllDay && oldStartDate && oldEndDate) {
+        // Carry the span across, so a 3-day window stays 3 days long.
+        const span = Math.round(
+          (new Date(`${oldEndDate}T00:00:00Z`) - new Date(`${oldStartDate}T00:00:00Z`)) / dayMs,
+        );
+        newEndDate = shiftDays(newStartDate, Math.max(1, span || 1));
+      } else {
+        newEndDate = shiftDays(newStartDate, 1);
+      }
+      // Google treats an all-day end as exclusive, so it must be at least the
+      // next day or the event has no length and the API rejects it.
+      if (new Date(`${newEndDate}T00:00:00Z`) <= new Date(`${newStartDate}T00:00:00Z`)) {
+        newEndDate = shiftDays(newStartDate, 1);
+      }
+      body.start = { date: newStartDate };
+      body.end = { date: newEndDate };
+    } else {
+      const tz = timeZone || existing.start?.timeZone || 'UTC';
+      const oldStart = oldStartRaw ? new Date(wasAllDay ? `${asDate(oldStartRaw)}T00:00:00Z` : oldStartRaw) : null;
+      const oldEnd = oldEndRaw ? new Date(wasAllDay ? `${asDate(oldEndRaw)}T00:00:00Z` : oldEndRaw) : null;
+      const durationMs =
+        oldStart && oldEnd && oldEnd > oldStart ? oldEnd.getTime() - oldStart.getTime() : 60 * 60 * 1000;
+
+      const newStart = start !== undefined ? new Date(start) : oldStart;
+      if (!newStart || Number.isNaN(newStart.getTime())) {
+        throw new Error(`Could not read "${start}" as a date/time. Use ISO 8601, e.g. 2026-09-01T14:00:00Z.`);
+      }
+      let newEnd;
+      if (end !== undefined) {
+        newEnd = new Date(end);
+        if (Number.isNaN(newEnd.getTime())) {
+          throw new Error(`Could not read "${end}" as a date/time. Use ISO 8601, e.g. 2026-09-01T15:00:00Z.`);
+        }
+      } else {
+        newEnd = new Date(newStart.getTime() + durationMs);
+      }
+      if (newEnd <= newStart) {
+        throw new Error(
+          `The end (${newEnd.toISOString()}) is not after the start (${newStart.toISOString()}). ` +
+            'Give both times when moving an event across a boundary.',
+        );
+      }
+      body.start = { dateTime: newStart.toISOString(), timeZone: tz };
+      body.end = { dateTime: newEnd.toISOString(), timeZone: tz };
+    }
+    changed.push('time');
+  }
+
+  const resolved = resolveAttendees(existing.attendees, { attendees, addAttendees, removeAttendees });
+  if (resolved !== undefined) {
+    body.attendees = resolved;
+    changed.push('attendees');
+  }
+
+  if (changed.length === 0) throw new Error('Nothing to update — no fields were provided.');
+
+  // Anyone on the invite is told by default: a moved deadline that reaches
+  // nobody is worse than a redundant notification.
+  const guestCount = (resolved ?? existing.attendees ?? []).length;
+  const sendUpdates = notify === undefined ? (guestCount > 0 ? 'all' : 'none') : notify ? 'all' : 'none';
+
+  const params = new URLSearchParams({ sendUpdates });
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}?${params}`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error(`Calendar update failed: ${res.status} ${await res.text()}`);
+  const ev = await res.json();
+  return {
+    id: ev.id,
+    summary: ev.summary,
+    start: ev.start?.dateTime || ev.start?.date,
+    end: ev.end?.dateTime || ev.end?.date,
+    location: ev.location || '',
+    htmlLink: ev.htmlLink,
+    status: ev.status,
+    changed,
+    previous: { start: oldStartRaw, end: oldEndRaw, summary: existing.summary || '' },
+    attendees: (ev.attendees || []).map((a) => a.email).filter(Boolean),
+    guests_notified: sendUpdates === 'all' && guestCount > 0,
+    recurring_instance: !!ev.recurringEventId,
+  };
+}
+
+/** Cancel an event. Returns cleanly if it was already gone, so a repeat call is not an error. */
+export async function deleteCalendarEvent(accessToken, eventId, { notify } = {}) {
+  if (!eventId) throw new Error('event_id is required');
+  let existing = null;
+  try {
+    existing = await getCalendarEvent(accessToken, eventId);
+  } catch (_) {
+    // Fall through: the delete below reports the real outcome.
+  }
+  const guestCount = (existing?.attendees || []).length;
+  const sendUpdates = notify === undefined ? (guestCount > 0 ? 'all' : 'none') : notify ? 'all' : 'none';
+  const params = new URLSearchParams({ sendUpdates });
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}?${params}`,
+    { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  // 410 means it was already deleted — the caller's intent is satisfied either way.
+  if (!res.ok && res.status !== 410) {
+    throw new Error(`Calendar delete failed: ${res.status} ${await res.text()}`);
+  }
+  return {
+    deleted: true,
+    id: eventId,
+    summary: existing?.summary || '',
+    start: existing?.start?.dateTime || existing?.start?.date || '',
+    already_gone: res.status === 410,
+    guests_notified: sendUpdates === 'all' && guestCount > 0,
+  };
+}
+
 export { readDriveFile } from './driveRead.js';

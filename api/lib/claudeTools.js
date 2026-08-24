@@ -21,6 +21,8 @@ import {
   trashGmailMessage,
   listCalendarEvents,
   createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
 } from './google.js';
 import {
   replyGmail,
@@ -298,12 +300,15 @@ export const UPDATE_SHEET_TOOL = {
 
 export const CALENDAR_TOOL = {
   name: 'list_calendar_events',
-  description: 'List upcoming Google Calendar events.',
+  description:
+    'List Google Calendar events. Returns each event id, which is required to update or cancel it. ' +
+    'Use days_back to include events that have already started (a window that is running now, or one that just closed).',
   input_schema: {
     type: 'object',
     properties: {
-      query: { type: 'string' },
-      days_ahead: { type: 'number' },
+      query: { type: 'string', description: 'Free-text match on title, description, location or attendee.' },
+      days_ahead: { type: 'number', description: 'How far forward to look. Default 7, max 30.' },
+      days_back: { type: 'number', description: 'How far back to look. Default 0, max 30.' },
       max_results: { type: 'number' },
     },
     required: [],
@@ -326,6 +331,55 @@ export const CREATE_EVENT_TOOL = {
       attendees: { type: 'array', items: { type: 'string' } },
     },
     required: ['summary', 'start'],
+  },
+};
+
+export const UPDATE_EVENT_TOOL = {
+  name: 'update_calendar_event',
+  description:
+    'Change an existing Google Calendar event: move it, rename it, or amend its guest list. ' +
+    'Get event_id from list_calendar_events first. Only the fields you pass are changed; everything else is left alone. ' +
+    'Moving an event by passing only "start" keeps its original duration, so use that to shift a deadline or a loading window. ' +
+    'Guests are emailed about the change automatically when the event has any. ' +
+    'For a repeating event, the id from list_calendar_events points at one occurrence, so only that occurrence moves. ' +
+    'Confirm with the user before changing an event that has attendees.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      event_id: { type: 'string', description: 'Event id from list_calendar_events.' },
+      summary: { type: 'string', description: 'New title.' },
+      description: { type: 'string' },
+      location: { type: 'string' },
+      start: { type: 'string', description: 'New start, ISO 8601. Alone, it moves the event and keeps its length.' },
+      end: { type: 'string', description: 'New end, ISO 8601. For all-day events this is exclusive: the day after the last day.' },
+      all_day: { type: 'boolean', description: 'Convert between timed and all-day. Omit to keep it as it is.' },
+      time_zone: { type: 'string', description: 'IANA zone, e.g. Asia/Dubai. Defaults to the event\'s existing zone.' },
+      attendees: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Replaces the whole guest list. Prefer add_attendees/remove_attendees, which leave existing RSVPs intact.',
+      },
+      add_attendees: { type: 'array', items: { type: 'string' }, description: 'Email addresses to invite, keeping current guests.' },
+      remove_attendees: { type: 'array', items: { type: 'string' }, description: 'Email addresses to uninvite.' },
+      notify: { type: 'boolean', description: 'Force guest emails on or off. Defaults to on when the event has guests.' },
+    },
+    required: ['event_id'],
+  },
+};
+
+export const DELETE_EVENT_TOOL = {
+  name: 'delete_calendar_event',
+  description:
+    'Cancel and remove a Google Calendar event. Get event_id from list_calendar_events first. ' +
+    'This cannot be undone, and guests are emailed the cancellation. ' +
+    'Always confirm with the user, naming the event and its date, before calling this.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      event_id: { type: 'string', description: 'Event id from list_calendar_events.' },
+      notify: { type: 'boolean', description: 'Force cancellation emails on or off. Defaults to on when the event has guests.' },
+    },
+    required: ['event_id'],
   },
 };
 
@@ -942,9 +996,12 @@ export async function runTool(block, user, context = {}) {
           is_error: true,
         };
       const days = Math.min(30, Math.max(1, Number(input.days_ahead) || 7));
+      // Editing an in-flight window means finding an event that already
+      // started, so the search can reach backwards as well as forwards.
+      const back = Math.min(30, Math.max(0, Number(input.days_back) || 0));
       const max = Math.min(25, Math.max(1, Number(input.max_results) || 15));
       const events = await listCalendarEvents(token, {
-        timeMin: new Date().toISOString(),
+        timeMin: new Date(Date.now() - back * 86400000).toISOString(),
         timeMax: new Date(Date.now() + days * 86400000).toISOString(),
         maxResults: max,
         query: input.query || undefined,
@@ -952,7 +1009,7 @@ export async function runTool(block, user, context = {}) {
       return {
         type: 'tool_result',
         tool_use_id: id,
-        content: JSON.stringify({ count: events.length, days_ahead: days, events }),
+        content: JSON.stringify({ count: events.length, days_ahead: days, days_back: back, events }),
       };
     }
     if (name === 'create_calendar_event' && user) {
@@ -973,6 +1030,48 @@ export async function runTool(block, user, context = {}) {
         allDay: !!input.all_day,
         timeZone: input.time_zone ? String(input.time_zone) : undefined,
         attendees: Array.isArray(input.attendees) ? input.attendees : undefined,
+      });
+      return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+    }
+    if (name === 'update_calendar_event' && user) {
+      const token = await getValidToken(user.id, 'google_calendar');
+      if (!token)
+        return {
+          type: 'tool_result',
+          tool_use_id: id,
+          content: 'Google Calendar is not connected. Reconnect with write access.',
+          is_error: true,
+        };
+      // Undefined and empty string mean different things here: undefined leaves
+      // a field alone, '' clears it. Only pass through what was actually sent.
+      const opt = (v) => (v === undefined ? undefined : String(v));
+      const list = (v) => (Array.isArray(v) ? v : undefined);
+      const result = await updateCalendarEvent(token, String(input.event_id || ''), {
+        summary: opt(input.summary),
+        description: opt(input.description),
+        location: opt(input.location),
+        start: opt(input.start),
+        end: opt(input.end),
+        allDay: input.all_day === undefined ? undefined : !!input.all_day,
+        timeZone: opt(input.time_zone),
+        attendees: list(input.attendees),
+        addAttendees: list(input.add_attendees),
+        removeAttendees: list(input.remove_attendees),
+        notify: input.notify === undefined ? undefined : !!input.notify,
+      });
+      return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+    }
+    if (name === 'delete_calendar_event' && user) {
+      const token = await getValidToken(user.id, 'google_calendar');
+      if (!token)
+        return {
+          type: 'tool_result',
+          tool_use_id: id,
+          content: 'Google Calendar is not connected. Reconnect with write access.',
+          is_error: true,
+        };
+      const result = await deleteCalendarEvent(token, String(input.event_id || ''), {
+        notify: input.notify === undefined ? undefined : !!input.notify,
       });
       return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
     }
@@ -1247,7 +1346,7 @@ export async function loadConnectorsAndTools(user) {
   }
   if (calTok) {
     connected.calendar = true;
-    tools.push(CALENDAR_TOOL, CREATE_EVENT_TOOL);
+    tools.push(CALENDAR_TOOL, CREATE_EVENT_TOOL, UPDATE_EVENT_TOOL, DELETE_EVENT_TOOL);
   }
   if (outlookTok) {
     connected.outlook = true;
