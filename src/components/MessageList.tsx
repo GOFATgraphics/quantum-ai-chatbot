@@ -33,6 +33,17 @@ const messageVariants = {
 
 function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] {
   const parts: { type: 'text' | 'image' | 'file'; value: string; alt?: string }[] = []
+  // Attached PDFs carry their whole base64 payload inline. Collapse them to a
+  // named chip before anything else, or the bubble renders megabytes of it.
+  const pdfNames: string[] = []
+  content = content.replace(
+    /\[\u{1F4C4}?\s*([^\]]*)\]\(data:application\/pdf;base64,[A-Za-z0-9+/=\s]+\)/gu,
+    (_full, name: string) => {
+      const clean = String(name || 'document.pdf').trim() || 'document.pdf'
+      pdfNames.push(clean)
+      return ''
+    },
+  )
   const imgRe = /!\[([^\]]*)\]\((data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=\s]+|https?:\/\/[^)\s]+)\)/g
   let last = 0
   let m: RegExpExecArray | null
@@ -52,6 +63,9 @@ function parseUserContent(content: string): { type: 'text' | 'image' | 'file'; v
     } else {
       parts.push({ type: 'text', value: rest })
     }
+  }
+  for (const name of pdfNames) {
+    parts.push({ type: 'file', value: `📎 **${name}**` })
   }
   if (parts.length === 0 && content.trim()) {
     parts.push({ type: 'text', value: content })

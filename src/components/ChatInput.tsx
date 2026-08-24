@@ -95,6 +95,7 @@ export default function ChatInput({
   pendingFiles = [], onFilesChange, onFocusChange, language = 'en',
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
   const [listening, setListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -213,9 +214,26 @@ export default function ChatInput({
     const imageCount = picked.filter((f) => f.type.startsWith('image/')).length + next.filter((f) => f.dataUrl).length
     const maxSide = imageCount >= 3 ? 1024 : 1280
     const quality = imageCount >= 3 ? 0.72 : 0.82
+    const rejected: string[] = []
     for (const file of picked) {
-      if (file.size > 10_000_000) continue
-      if (file.type.startsWith('image/')) {
+      if (file.size > 10_000_000) { rejected.push(`${file.name} is over 10MB`); continue }
+      const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+      if (isPdf) {
+        // The whole message is one request body, and Vercel rejects bodies over
+        // ~4.5MB before the function runs. Base64 inflates a file by a third,
+        // so anything past ~3MB raw cannot be sent — say so rather than
+        // attaching something that will fail on send.
+        if (file.size > 3_000_000) {
+          rejected.push(`${file.name} is too large to send (${(file.size / 1_000_000).toFixed(1)}MB, limit 3MB)`)
+          continue
+        }
+        try {
+          const dataUrl = await readAsDataURL(file)
+          next.push({ name: file.name, type: 'application/pdf', dataUrl })
+        } catch {
+          rejected.push(`${file.name} could not be read`)
+        }
+      } else if (file.type.startsWith('image/')) {
         try {
           const { dataUrl, type } = await compressImageDataUrl(file, maxSide, quality)
           next.push({ name: file.name, type, dataUrl })
@@ -226,10 +244,18 @@ export default function ChatInput({
         const body = await file.text()
         next.push({ name: file.name, type: file.type || 'text/plain', text: body.slice(0, 40_000) })
       } else {
-        next.push({ name: file.name, type: file.type || 'application/octet-stream', text: `[File attached: ${file.name}]` })
+        // Not a format we can actually read. Say so in the attachment itself,
+        // so the model never answers as though it had seen the contents.
+        next.push({
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          text: `[File attached: ${file.name} — this format cannot be read, so its contents are NOT available. Tell the user it could not be read instead of guessing.]`,
+        })
+        rejected.push(`${file.name} can't be read yet — try PDF, an image, or a text file`)
       }
     }
     onFilesChange(next.slice(0, MAX_ATTACHMENTS))
+    setFileError(rejected.length ? rejected.join(' · ') : null)
     e.target.value = ''
   }
 
@@ -259,6 +285,19 @@ export default function ChatInput({
               role="status"
             >
               {errorHint}
+            </motion.p>
+          )}
+          {fileError && (
+            <motion.p
+              key="file-error"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="glass-chip text-xs text-center mb-2 px-3 py-1.5 rounded-full mx-auto w-fit text-destructive"
+              role="status"
+              onClick={() => setFileError(null)}
+            >
+              {fileError}
             </motion.p>
           )}
         </AnimatePresence>
@@ -349,7 +388,7 @@ export default function ChatInput({
               />
 
               <div className="flex items-center gap-1.5 pt-1">
-                <input ref={fileInputRef} type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*" className="hidden" onChange={onFileSelected} />
+                <input ref={fileInputRef} type="file" multiple accept="application/pdf,.pdf,image/jpeg,image/png,image/gif,image/webp,image/*,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.html,.css,text/*" className="hidden" onChange={onFileSelected} />
                 <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={onPickFiles} disabled={isLoading} title="Attach files" className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-40 ${toolBtn}`} aria-label="Add attachment">
                   <Plus className="w-[18px] h-[18px]" />
                 </motion.button>

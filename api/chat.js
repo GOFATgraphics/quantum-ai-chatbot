@@ -46,8 +46,33 @@ function trimHistory(msgs) {
   return kept;
 }
 
+// Attached PDFs ride in the message text as [📄 name](data:application/pdf;base64,…).
+// Claude reads PDFs natively — including scanned ones, which it renders as
+// images — so there is no parsing step here, just a document block.
+const PDF_RE = /\[([^\]]*)\]\(data:application\/pdf;base64,([A-Za-z0-9+/=\s]+)\)/g;
+const MAX_PDFS = 3;
+
+function extractPdfs(str) {
+  const docs = [];
+  const text = str.replace(PDF_RE, (_full, label, data) => {
+    const clean = String(data || '').replace(/\s+/g, '');
+    const name = String(label || 'document').replace(/^📄\s*/, '').trim() || 'document';
+    if (clean.length < 128) return `[Attached PDF "${name}" was empty and could not be read]`;
+    if (docs.length >= MAX_PDFS) {
+      return `[Attached PDF "${name}" was not read — at most ${MAX_PDFS} PDFs per message]`;
+    }
+    docs.push({
+      type: 'document',
+      source: { type: 'base64', media_type: 'application/pdf', data: clean },
+    });
+    return `[Attached PDF: ${name}]`;
+  });
+  return { text, docs };
+}
+
 function toAnthropicContent(content) {
-  const str = String(content || '');
+  const { text: withoutPdfs, docs } = extractPdfs(String(content || ''));
+  const str = withoutPdfs;
   const imgRe = /!\[([^\]]*)\]\((data:image\/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=\s]+))\)/g;
   const parts = [];
   let last = 0, m, imageCount = 0;
@@ -75,11 +100,18 @@ function toAnthropicContent(content) {
   }
   const rest = str.slice(last).trim();
   if (rest) parts.push({ type: 'text', text: rest });
-  if (parts.length === 0) return str || '';
-  if (parts.length === 1 && parts[0].type === 'text') return parts[0].text;
-  if (parts.every((p) => p.type === 'image')) {
+  if (parts.length === 0 && docs.length === 0) return str || '';
+  if (parts.every((p) => p.type === 'image') && parts.length > 0) {
     parts.unshift({ type: 'text', text: `Please analyze the ${parts.length} attached image${parts.length > 1 ? 's' : ''}.` });
   }
+  // Documents lead, so the model has them in hand before the request text.
+  if (docs.length > 0) {
+    if (parts.length === 0) {
+      parts.push({ type: 'text', text: `Please review the attached PDF${docs.length > 1 ? 's' : ''}.` });
+    }
+    return [...docs, ...parts];
+  }
+  if (parts.length === 1 && parts[0].type === 'text') return parts[0].text;
   return parts;
 }
 
