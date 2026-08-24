@@ -9,6 +9,8 @@ import {
   readGoogleDoc,
   createGoogleDoc,
   appendGoogleDocText,
+  findDriveFolders,
+  moveFileToFolder,
   searchSheets,
   readSheetRange,
   createSpreadsheet,
@@ -205,12 +207,18 @@ export const DOCS_TOOL = {
 
 export const CREATE_DOC_TOOL = {
   name: 'create_google_doc',
-  description: 'Create a new Google Doc with optional body text.',
+  description:
+    'Create a new Google Doc with optional body text. By default it lands loose in My Drive; pass folder_id, or folder_name to file it into an existing Drive folder (e.g. "Trade Contracts"). Filing into a folder needs the Google Drive connector — with only Docs connected the doc is still created, and the result says it could not be filed.',
   input_schema: {
     type: 'object',
     properties: {
       title: { type: 'string' },
       body: { type: 'string' },
+      folder_id: { type: 'string', description: 'Drive folder id, if already known.' },
+      folder_name: {
+        type: 'string',
+        description: 'Folder name to look up instead of an id. If several match, the doc is left in My Drive and the matches are returned so the user can pick.',
+      },
     },
     required: ['title'],
   },
@@ -758,6 +766,84 @@ export async function runTool(block, user, context = {}) {
         title: String(input.title || 'Untitled'),
         body: input.body ? String(input.body) : undefined,
       });
+
+      const wantsFolder = input.folder_id || input.folder_name;
+      if (wantsFolder && result?.documentId) {
+        // Folder lookup and the move both need the full `drive` scope; a
+        // google_docs token only has drive.file and cannot see folders it
+        // didn't create. Never fail the whole call over filing — the doc
+        // already exists, so report where it ended up instead.
+        const driveToken = await getValidToken(user.id, 'google_drive');
+        try {
+          if (!driveToken) {
+            return {
+              type: 'tool_result',
+              tool_use_id: id,
+              content: JSON.stringify({
+                ...result,
+                filed: false,
+                reason: 'Google Drive is not connected, so the doc was left in My Drive. Connect Drive to file documents into folders.',
+              }),
+            };
+          }
+
+          let folderId = input.folder_id ? String(input.folder_id) : null;
+          let folderName = input.folder_name ? String(input.folder_name) : null;
+
+          if (!folderId && folderName) {
+            const matches = await findDriveFolders(driveToken, folderName);
+            if (matches.length === 0) {
+              return {
+                type: 'tool_result',
+                tool_use_id: id,
+                content: JSON.stringify({
+                  ...result,
+                  filed: false,
+                  reason: `No Drive folder matching "${folderName}". The doc is in My Drive. Ask the user which folder to use, or create one.`,
+                }),
+              };
+            }
+            if (matches.length > 1) {
+              return {
+                type: 'tool_result',
+                tool_use_id: id,
+                content: JSON.stringify({
+                  ...result,
+                  filed: false,
+                  reason: `Several folders match "${folderName}". The doc is in My Drive — ask the user which one, then move it with folder_id.`,
+                  folder_matches: matches,
+                }),
+              };
+            }
+            folderId = matches[0].id;
+            folderName = matches[0].name;
+          }
+
+          const moved = await moveFileToFolder(driveToken, result.documentId, folderId);
+          return {
+            type: 'tool_result',
+            tool_use_id: id,
+            content: JSON.stringify({
+              ...result,
+              filed: true,
+              folder_id: folderId,
+              folder_name: folderName || undefined,
+              parents: moved.parents,
+            }),
+          };
+        } catch (e) {
+          return {
+            type: 'tool_result',
+            tool_use_id: id,
+            content: JSON.stringify({
+              ...result,
+              filed: false,
+              reason: `Doc created but could not be filed: ${e?.message || String(e)}`,
+            }),
+          };
+        }
+      }
+
       return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
     }
     if (name === 'append_google_doc' && user) {

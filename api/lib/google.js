@@ -352,6 +352,59 @@ export async function readGoogleDoc(accessToken, documentId, opts = {}) {
   };
 }
 
+/**
+ * Find Drive folders by name. Needs the full `drive` scope (the google_drive
+ * connector) — a google_docs token only carries `drive.file`, which can't see
+ * folders the app didn't create.
+ */
+export async function findDriveFolders(accessToken, name, maxResults = 5) {
+  const safe = String(name || '').trim().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  if (!safe) return [];
+  const params = new URLSearchParams({
+    q: `mimeType = 'application/vnd.google-apps.folder' and name contains '${safe}' and trashed = false`,
+    pageSize: String(Math.min(10, Math.max(1, maxResults))),
+    fields: 'files(id,name,webViewLink,parents,modifiedTime)',
+    orderBy: 'modifiedTime desc',
+    spaces: 'drive',
+    supportsAllDrives: 'true',
+    includeItemsFromAllDrives: 'true',
+  });
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Drive folder search failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return (data.files || []).map((f) => ({ id: f.id, name: f.name, link: f.webViewLink }));
+}
+
+/** Move a Drive file into a folder, detaching it from its current parents. */
+export async function moveFileToFolder(accessToken, fileId, folderId) {
+  if (!fileId) throw new Error('fileId is required');
+  if (!folderId) throw new Error('folderId is required');
+  const metaRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=parents&supportsAllDrives=true`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!metaRes.ok) throw new Error(`Drive read parents failed: ${metaRes.status} ${await metaRes.text()}`);
+  const meta = await metaRes.json();
+  const previous = (meta.parents || []).join(',');
+
+  const params = new URLSearchParams({
+    addParents: folderId,
+    fields: 'id,name,parents,webViewLink',
+    supportsAllDrives: 'true',
+  });
+  if (previous) params.set('removeParents', previous);
+
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?${params}`,
+    { method: 'PATCH', headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) throw new Error(`Drive move failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return { id: data.id, name: data.name, parents: data.parents || [], link: data.webViewLink };
+}
+
 export async function createGoogleDoc(accessToken, { title, body }) {
   const createRes = await fetch('https://docs.googleapis.com/v1/documents', {
     method: 'POST',
