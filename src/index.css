@@ -40,9 +40,13 @@
 
   .dark {
     color-scheme: dark;
-    --background: 0 0% 19%;
+    /* Ground sits near 10% rather than 19%: the old value read as a mid grey
+       in a dark room, and the surfaces above it had nowhere to lift to. Each
+       step below keeps roughly the same separation from the one under it, so
+       cards, borders and selection still read as distinct layers. */
+    --background: 0 0% 10%;
     --foreground: 240 4% 96%;
-    --card: 0 0% 22%;
+    --card: 0 0% 15%;
     --card-foreground: 240 4% 96%;
     --popover: var(--card);
     --popover-foreground: 240 4% 96%;
@@ -52,16 +56,16 @@
     --secondary-foreground: 0 0% 98%;
     --muted: var(--card);
     --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 25%;
+    --accent: 0 0% 19%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 28%;
+    --border: 0 0% 22%;
     --input: var(--border);
     --ring: 0 0% 83.1%;
     --sidebar: var(--card);
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-selected: 0 0% 29.8%;
+    --sidebar-selected: 0 0% 24%;
     --sidebar-accent: var(--background);
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: var(--border);
@@ -194,10 +198,10 @@ html.dark body {
   color: hsl(var(--foreground));
 }
 html.dark body::before {
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 40%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.014) 40%, transparent 70%);
 }
 html.dark body::after {
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.015) 45%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.011) 45%, transparent 70%);
 }
 
 #root {
@@ -260,7 +264,7 @@ html.dark .chat-glow-orb-a {
   height: min(60vw, 480px);
   top: -10%;
   left: -8%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.014) 45%, transparent 70%);
   animation: chat-glow-drift-a 12s ease-in-out infinite;
 }
 html.dark .chat-glow-orb-b {
@@ -268,7 +272,7 @@ html.dark .chat-glow-orb-b {
   height: min(55vw, 420px);
   top: 30%;
   right: -12%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.015) 50%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.036) 0%, rgba(255, 255, 255, 0.011) 50%, transparent 70%);
   animation: chat-glow-drift-b 15s ease-in-out infinite;
 }
 html.dark .chat-glow-orb-c {
@@ -276,7 +280,7 @@ html.dark .chat-glow-orb-c {
   height: min(65vw, 500px);
   bottom: -14%;
   left: 15%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 50%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.043) 0%, rgba(255, 255, 255, 0.011) 50%, transparent 70%);
   animation: chat-glow-drift-c 18s ease-in-out infinite;
 }
 
