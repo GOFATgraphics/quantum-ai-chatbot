@@ -42,7 +42,10 @@ async function convertAndExtract(accessToken, fileId, name, spec) {
   let tempId = null;
   try {
     const copyRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true&fields=id`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true&fields=id` +
+        // A language hint materially improves OCR accuracy; conversion still
+        // runs without it, so this is a nudge rather than a requirement.
+        (spec.ocr ? '&ocrLanguage=en' : ''),
       {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
@@ -74,9 +77,11 @@ async function convertAndExtract(accessToken, fileId, name, spec) {
     const text = await exportRes.text();
     if (!text.trim()) {
       return {
-        error:
-          `"${name}" converted but contained no extractable text. If it is a scan, the pages may be ` +
-          'too low-resolution for OCR. Attaching the file in chat reads it as images instead.',
+        error: spec.ocr
+          ? `No readable text was found in "${name}". It may be a photo rather than a document, or ` +
+            'too blurred or angled for OCR. Attaching it in chat lets the image itself be looked at.'
+          : `"${name}" converted but contained no extractable text. If it is a scan, the pages may be ` +
+            'too low-resolution for OCR. Attaching the file in chat reads it as images instead.',
       };
     }
     return { text };
@@ -170,6 +175,16 @@ export async function readDriveFile(accessToken, fileId, opts = {}) {
       to: 'application/vnd.google-apps.presentation',
       as: 'text/plain',
     },
+    {
+      // A photographed bill of lading is a document, not a picture. Drive runs
+      // OCR when converting an image to a Doc, which is the same engine that
+      // handles scanned PDFs above.
+      test: /^image\/(jpeg|png|gif|bmp|webp|tiff)$/,
+      ext: /\.(jpe?g|png|gif|bmp|webp|tiff?)$/i,
+      to: 'application/vnd.google-apps.document',
+      as: 'text/plain',
+      ocr: true,
+    },
   ];
 
   const convertible = CONVERTIBLE.find((c) => c.test.test(mime) || c.ext.test(name));
@@ -195,8 +210,9 @@ export async function readDriveFile(accessToken, fileId, opts = {}) {
       ...base,
       text: null,
       error:
-        `Cannot read type "${mime}". Supported: PDF, Word/Excel/PowerPoint, .txt, .md, .csv, .json, ` +
-        'and Google Docs/Sheets/Slides.',
+        `Cannot read type "${mime}". Supported: PDF, Word/Excel/PowerPoint, scanned images, ` +
+        '.txt, .md, .csv, .json, and Google Docs/Sheets/Slides. Audio files in Drive cannot be read ' +
+        'yet - attaching one in chat transcribes it.',
     };
   }
 
@@ -264,11 +280,13 @@ export const READ_DRIVE_FILE_TOOL = {
   name: 'read_drive_file',
   description:
     'Read the text of a Google Drive file by id (from search_drive or list_drive_folder). ' +
-    'Works for PDFs, Word/Excel/PowerPoint files, .txt/.md/.csv/.json, and Google Docs/Sheets/Slides. ' +
-    'PDFs and Office files are converted by Drive on the way through, which also OCRs scanned pages, ' +
+    'Works for PDFs, Word/Excel/PowerPoint files, scanned or photographed images, .txt/.md/.csv/.json, ' +
+    'and Google Docs/Sheets/Slides. ' +
+    'PDFs, Office files and images are converted by Drive on the way through, which OCRs scanned pages ' +
+    'and photographed documents, ' +
     'so this is the right tool for a contract sitting in Drive - do not ask the user to convert or ' +
     're-upload it first. Converting needs the Google Drive connector rather than Docs alone. ' +
-    'For large files use offset + max_chars and follow next_offset until truncated is false. Not for images.',
+    'For large files use offset + max_chars and follow next_offset until truncated is false.',
   input_schema: {
     type: 'object',
     properties: {
