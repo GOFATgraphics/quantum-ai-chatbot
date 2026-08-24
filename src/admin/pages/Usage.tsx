@@ -17,6 +17,7 @@ type Totals = {
   cost_usd: number
   tool_calls: number
   rounds: number
+  web_search_requests: number
 }
 
 type Slice = { key: string; tokens: number }
@@ -362,6 +363,13 @@ export default function Usage(_props: Props) {
                   )
                 })}
               </div>
+              {data.totals.web_search_requests > 0 && (
+                <p className={'mt-3 text-xs ' + faint}>
+                  Plus {data.totals.web_search_requests.toLocaleString()} web search
+                  {data.totals.web_search_requests === 1 ? '' : 'es'} run by Anthropic, billed per search
+                  rather than per token. Their results are counted in the input above.
+                </p>
+              )}
               <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
                 {Object.entries(data.by_endpoint).map(([ep, t]) => (
                   <div key={ep} className="flex items-center justify-between gap-2">
@@ -447,6 +455,7 @@ export default function Usage(_props: Props) {
                                       ['Cache writes', tokenFmt(u.cache_creation_input_tokens)],
                                       ['Output', tokenFmt(u.output_tokens)],
                                       ['Tool calls', u.tool_calls.toLocaleString()],
+                                      ['Web searches', u.web_search_requests.toLocaleString()],
                                       ['API calls', u.rounds.toLocaleString()],
                                     ].map(([k, v]) => (
                                       <div key={k} className="flex items-center justify-between gap-2 text-sm">

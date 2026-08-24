@@ -43,6 +43,7 @@ function emptyTotals() {
     cost_usd: 0,
     tool_calls: 0,
     rounds: 0,
+    web_search_requests: 0,
   };
 }
 
@@ -53,6 +54,7 @@ function addRow(acc, row, cost) {
   acc.cache_creation_input_tokens += Number(row.cache_creation_input_tokens) || 0;
   acc.output_tokens += Number(row.output_tokens) || 0;
   acc.tool_calls += Number(row.tool_calls) || 0;
+  acc.web_search_requests += Number(row.web_search_requests) || 0;
   acc.rounds += Number(row.rounds) || 0;
   acc.total_tokens =
     acc.input_tokens + acc.cache_read_input_tokens + acc.cache_creation_input_tokens + acc.output_tokens;
@@ -71,7 +73,7 @@ async function fetchUsage(admin, sinceIso) {
       .from('token_usage')
       .select(
         'user_id,conversation_id,endpoint,model,input_tokens,output_tokens,' +
-          'cache_read_input_tokens,cache_creation_input_tokens,rounds,tool_calls,' +
+          'cache_read_input_tokens,cache_creation_input_tokens,rounds,tool_calls,web_search_requests,' +
           'duration_ms,peak_context_tokens,context_window,context_breakdown,created_at',
       )
       .gte('created_at', sinceIso)

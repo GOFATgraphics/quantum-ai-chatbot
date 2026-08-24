@@ -26,6 +26,13 @@ const PRICING = {
 };
 const DEFAULT_PRICING = PRICING['claude-sonnet-5'];
 
+/**
+ * Server-side search is billed per request, not per token, and separately from
+ * the tokens its results add to the prompt. Both are real money and neither
+ * shows up in the other.
+ */
+const WEB_SEARCH_USD_PER_1K = 10;
+
 export function pricingFor(model) {
   if (!model) return DEFAULT_PRICING;
   if (PRICING[model]) return PRICING[model];
@@ -41,7 +48,8 @@ export function estimateCostUsd(row) {
     per(row?.input_tokens, p.input) +
     per(row?.output_tokens, p.output) +
     per(row?.cache_creation_input_tokens, p.cacheWrite) +
-    per(row?.cache_read_input_tokens, p.cacheRead)
+    per(row?.cache_read_input_tokens, p.cacheRead) +
+    ((Number(row?.web_search_requests) || 0) / 1000) * WEB_SEARCH_USD_PER_1K
   );
 }
 
@@ -101,6 +109,7 @@ export function createUsageMeter({ userId, conversationId = null, endpoint = 'ch
     output_tokens: 0,
     cache_read_input_tokens: 0,
     cache_creation_input_tokens: 0,
+    web_search_requests: 0,
   };
   let rounds = 0;
   let toolCalls = 0;
@@ -119,6 +128,10 @@ export function createUsageMeter({ userId, conversationId = null, endpoint = 'ch
     totals.cache_read_input_tokens += cacheRead;
     totals.cache_creation_input_tokens += cacheWrite;
     totals.output_tokens += Number(usage.output_tokens) || 0;
+    // Present either already flattened by the caller or under server_tool_use,
+    // depending on which path produced this object.
+    totals.web_search_requests +=
+      Number(usage.web_search_requests ?? usage.server_tool_use?.web_search_requests) || 0;
     // Every round resends the whole prompt, so the sum above overstates how
     // full the window ever got. The largest single request is the real answer.
     peak = Math.max(peak, input + cacheRead + cacheWrite);
@@ -140,7 +153,8 @@ export function createUsageMeter({ userId, conversationId = null, endpoint = 'ch
       if (!userId) return;
       const spent =
         totals.input_tokens + totals.output_tokens +
-        totals.cache_read_input_tokens + totals.cache_creation_input_tokens;
+        totals.cache_read_input_tokens + totals.cache_creation_input_tokens +
+        totals.web_search_requests;
       if (spent === 0) return;
       try {
         const admin = getAdminClient();

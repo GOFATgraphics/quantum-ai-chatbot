@@ -29,6 +29,10 @@ create table if not exists public.token_usage (
   cache_creation_input_tokens bigint not null default 0,
   output_tokens bigint not null default 0,
 
+  -- Searches Anthropic ran server-side during the turn. Billed per request,
+  -- separately from the tokens their results add to the prompt.
+  web_search_requests integer not null default 0,
+
   -- Turn shape: how many API round-trips and tool executions it took.
   rounds integer not null default 1,
   tool_calls integer not null default 0,
@@ -65,3 +69,7 @@ drop policy if exists "token_usage_select_own" on public.token_usage;
 create policy "token_usage_select_own"
   on public.token_usage for select
   using (auth.uid() = user_id);
+
+-- Added after the table shipped; safe to run on an existing install.
+alter table public.token_usage
+  add column if not exists web_search_requests integer not null default 0;

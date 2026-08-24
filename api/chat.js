@@ -259,7 +259,28 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
   // Streaming splits usage across two events: message_start carries the input
   // side (which is final the moment the request is accepted), message_delta
   // carries a running output count whose last value is the total.
-  const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  const usage = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    web_search_requests: 0,
+  };
+  // message_start reports the input as it stood when the request was accepted.
+  // Server-side tools (web_search, web_fetch) run *during* the response and
+  // inject their results into the same message, so the real input can end up
+  // far larger than that opening figure — and the corrected totals arrive in
+  // message_delta. Reading only output_tokens there silently under-counts
+  // every turn that searched the web.
+  const applyUsage = (u) => {
+    if (!u) return;
+    for (const k of ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens']) {
+      if (u[k] != null) usage[k] = Number(u[k]) || 0;
+    }
+    // Billed per search, not per token, so it is tracked separately.
+    const searches = u.server_tool_use?.web_search_requests;
+    if (searches != null) usage.web_search_requests = Number(searches) || 0;
+  };
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -278,13 +299,7 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
         continue;
       }
       if (evt.type === 'message_start') {
-        const u = evt.message?.usage;
-        if (u) {
-          usage.input_tokens = Number(u.input_tokens) || 0;
-          usage.cache_read_input_tokens = Number(u.cache_read_input_tokens) || 0;
-          usage.cache_creation_input_tokens = Number(u.cache_creation_input_tokens) || 0;
-          usage.output_tokens = Number(u.output_tokens) || 0;
-        }
+        applyUsage(evt.message?.usage);
       } else if (evt.type === 'content_block_start') {
         const b = evt.content_block;
         if (b?.type === 'text') contentBlocks.push({ type: 'text', text: '' });
@@ -314,7 +329,9 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
         }
       } else if (evt.type === 'message_delta') {
         if (evt.delta?.stop_reason) stopReason = evt.delta.stop_reason;
-        if (evt.usage?.output_tokens != null) usage.output_tokens = Number(evt.usage.output_tokens) || 0;
+        // Cumulative and authoritative: whatever it carries supersedes
+        // message_start, including a revised input count.
+        applyUsage(evt.usage);
       }
     }
   }
