@@ -26,8 +26,79 @@ function sliceText(full, offset, maxChars) {
 }
 
 /**
+ * Read a PDF or Office file by having Drive convert it, rather than parsing it here.
+ *
+ * Google's own converter is what runs — the same one behind "Open with Google
+ * Docs" — so scanned PDFs come back OCR'd and layout-heavy documents survive,
+ * with no PDF library to ship into a serverless function.
+ *
+ * The copy is a real file in the user's Drive for as long as this takes, so it
+ * is deleted in a finally: an interrupted read must not leave debris behind,
+ * and a failed cleanup must not fail a read that already succeeded.
+ */
+/** fileId arrives already percent-encoded from readDriveFile. */
+async function convertAndExtract(accessToken, fileId, name, spec) {
+  const headers = { Authorization: `Bearer ${accessToken}` };
+  let tempId = null;
+  try {
+    const copyRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true&fields=id`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: `Quantumy temp - ${name}`.slice(0, 120), mimeType: spec.to }),
+      },
+    );
+    if (!copyRes.ok) {
+      const detail = (await copyRes.text()).slice(0, 200);
+      // 403 here is nearly always scope, not permission on the file: converting
+      // needs full Drive access, which the Docs-only connector does not grant.
+      if (copyRes.status === 403) {
+        return {
+          error:
+            'Could not convert this file for reading. This needs the Google Drive connector ' +
+            `(full access), not just Docs. Detail: ${detail}`,
+        };
+      }
+      return { error: `Could not convert "${name}" for reading (${copyRes.status}). ${detail}` };
+    }
+    tempId = (await copyRes.json()).id;
+
+    const exportRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${tempId}/export?mimeType=${encodeURIComponent(spec.as)}`,
+      { headers },
+    );
+    if (!exportRes.ok) {
+      return { error: `Converted "${name}" but could not read it back (${exportRes.status}).` };
+    }
+    const text = await exportRes.text();
+    if (!text.trim()) {
+      return {
+        error:
+          `"${name}" converted but contained no extractable text. If it is a scan, the pages may be ` +
+          'too low-resolution for OCR. Attaching the file in chat reads it as images instead.',
+      };
+    }
+    return { text };
+  } catch (e) {
+    return { error: `Could not read "${name}": ${e?.message || String(e)}` };
+  } finally {
+    if (tempId) {
+      try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${tempId}?supportsAllDrives=true`, {
+          method: 'DELETE',
+          headers,
+        });
+      } catch (_) {
+        // The read is what matters; a stray temp file is not worth failing over.
+      }
+    }
+  }
+}
+
+/**
  * Read a Drive file's text content.
- * Supports offset/max_chars for paging through large .txt dumps.
+ * Supports offset/max_chars for paging through large files.
  */
 export async function readDriveFile(accessToken, fileId, opts = {}) {
   if (!fileId) throw new Error('fileId is required');
@@ -76,6 +147,38 @@ export async function readDriveFile(accessToken, fileId, opts = {}) {
     return { ...base, ...sliceText(full, offset, maxChars) };
   }
 
+  // Formats Google can convert into a Workspace file, and what each becomes.
+  // PDFs and Office documents hold most of the real work in a Drive, and until
+  // now none of them could be read at all.
+  const CONVERTIBLE = [
+    { test: /^application\/pdf$/, ext: /\.pdf$/i, to: 'application/vnd.google-apps.document', as: 'text/plain' },
+    {
+      test: /^application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|rtf|vnd\.oasis\.opendocument\.text)$/,
+      ext: /\.(docx?|rtf|odt)$/i,
+      to: 'application/vnd.google-apps.document',
+      as: 'text/plain',
+    },
+    {
+      test: /^application\/(vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|vnd\.oasis\.opendocument\.spreadsheet)$/,
+      ext: /\.(xlsx?|xlsm|ods)$/i,
+      to: 'application/vnd.google-apps.spreadsheet',
+      as: 'text/csv',
+    },
+    {
+      test: /^application\/(vnd\.ms-powerpoint|vnd\.openxmlformats-officedocument\.presentationml\.presentation|vnd\.oasis\.opendocument\.presentation)$/,
+      ext: /\.(pptx?|odp)$/i,
+      to: 'application/vnd.google-apps.presentation',
+      as: 'text/plain',
+    },
+  ];
+
+  const convertible = CONVERTIBLE.find((c) => c.test.test(mime) || c.ext.test(name));
+  if (convertible) {
+    const extracted = await convertAndExtract(accessToken, id, name, convertible);
+    if (extracted.error) return { ...base, text: null, error: extracted.error };
+    return { ...base, converted: true, ...sliceText(extracted.text, offset, maxChars) };
+  }
+
   const textLike =
     mime.startsWith('text/') ||
     mime === 'application/json' ||
@@ -91,7 +194,9 @@ export async function readDriveFile(accessToken, fileId, opts = {}) {
     return {
       ...base,
       text: null,
-      error: `Cannot read binary type "${mime}". Supported: .txt, .md, .csv, .json, and Google Docs/Sheets/Slides.`,
+      error:
+        `Cannot read type "${mime}". Supported: PDF, Word/Excel/PowerPoint, .txt, .md, .csv, .json, ` +
+        'and Google Docs/Sheets/Slides.',
     };
   }
 
@@ -158,7 +263,12 @@ export async function listDriveFolder(accessToken, folderId, opts = {}) {
 export const READ_DRIVE_FILE_TOOL = {
   name: 'read_drive_file',
   description:
-    'Read text content of a Google Drive file by id (from search_drive or list_drive_folder). Works for .txt, .md, .csv, .json, and Google Docs/Sheets/Slides. For large files use offset + max_chars and follow next_offset until truncated is false. Not for PDF/images.',
+    'Read the text of a Google Drive file by id (from search_drive or list_drive_folder). ' +
+    'Works for PDFs, Word/Excel/PowerPoint files, .txt/.md/.csv/.json, and Google Docs/Sheets/Slides. ' +
+    'PDFs and Office files are converted by Drive on the way through, which also OCRs scanned pages, ' +
+    'so this is the right tool for a contract sitting in Drive - do not ask the user to convert or ' +
+    're-upload it first. Converting needs the Google Drive connector rather than Docs alone. ' +
+    'For large files use offset + max_chars and follow next_offset until truncated is false. Not for images.',
   input_schema: {
     type: 'object',
     properties: {
