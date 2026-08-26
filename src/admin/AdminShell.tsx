@@ -100,7 +100,7 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
     // must be bounded (h-full, not min-h-dvh) or its content spills past the
     // clip and becomes unreachable.
     <div className="h-full min-h-0 overflow-hidden flex bg-settings-canvas text-foreground">
-      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r bg-settings-surface border-border">
+      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r bg-settings-surface/40 border-border/60">
         {navContent}
       </aside>
 
@@ -123,7 +123,11 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
       )}
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <header className="h-14 shrink-0 flex items-center gap-3 px-4 border-b backdrop-blur-sm border-border bg-settings-surface">
+        {/* Transparent, so the page reads as one surface rather than a titled
+            panel bolted onto a canvas. The header sits over the scroll area
+            instead of above it, and a short fade underneath dissolves content
+            passing beneath rather than letting it collide with the title. */}
+        <header className="h-14 shrink-0 flex items-center gap-3 px-4 relative z-10 bg-transparent">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
@@ -137,12 +141,21 @@ export default function AdminShell({ dark, email, activePage, onNavigate, onBack
           </div>
         </header>
 
-        <main
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))]"
-          data-scrollable="true"
-        >
-          {children}
-        </main>
+        <div className="relative flex-1 min-h-0">
+          <main
+            className="h-full overflow-y-auto overscroll-contain p-4 sm:p-6 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))]"
+            data-scrollable="true"
+          >
+            {children}
+          </main>
+          {/* Sits just under the header so scrolled content fades out instead
+              of cutting off at a hard edge. Non-interactive, so it never
+              swallows a click on the content beneath it. */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-settings-canvas to-transparent"
+            aria-hidden
+          />
+        </div>
       </div>
     </div>
   )
