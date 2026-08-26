@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Search, SquarePen, Settings, Link2, Sun, Moon,
-  MessageSquare, FolderKanban, ArrowRight,
-} from 'lucide-react'
+import { Search, SquarePen, Settings, Link2, Sun, Moon, MessageSquare, FolderKanban, ArrowRight, PanelLeft } from 'lucide-react'
 import type { Conversation, Project } from '../lib/supabase'
 
 export type CommandAction = {
@@ -29,6 +26,8 @@ type Props = {
   onOpenSettings: () => void
   onOpenConnectors: () => void
   onToggleTheme: () => void
+  sidebarCollapsed?: boolean
+  onToggleSidebar?: () => void
 }
 
 function matchesQuery(text: string, q: string) {
@@ -52,6 +51,8 @@ export default function CommandPalette({
   onOpenSettings,
   onOpenConnectors,
   onToggleTheme,
+  sidebarCollapsed = false,
+  onToggleSidebar,
 }: Props) {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
@@ -90,6 +91,16 @@ export default function CommandPalette({
         section: 'Actions',
         run: () => { onOpenConnectors(); onClose() },
       },
+      ...(onToggleSidebar
+        ? [{
+            id: 'toggle-sidebar',
+            label: sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar',
+            hint: '\u2318B',
+            icon: <PanelLeft className="w-4 h-4" />,
+            section: 'Actions' as const,
+            run: () => { onToggleSidebar(); onClose() },
+          }]
+        : []),
       {
         id: 'theme',
         label: dark ? 'Switch to light mode' : 'Switch to dark mode',
@@ -137,6 +148,7 @@ export default function CommandPalette({
   }, [
     query, conversations, projects, dark, currentConversationId, currentProjectId,
     onNewChat, onSelectChat, onSelectProject, onOpenSettings, onOpenConnectors, onToggleTheme, onClose,
+    onToggleSidebar, sidebarCollapsed,
   ])
 
   useEffect(() => {
