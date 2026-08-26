@@ -412,6 +412,30 @@ export default async function handler(req, res) {
     });
     let assistantChars = 0;
 
+    /**
+     * Write the usage row while the response is still open.
+     *
+     * This used to live only in a finally after res.end(). On Vercel the
+     * function can be frozen the moment the response completes, so that insert
+     * frequently never landed — chat recorded 6 turns in an hour where the
+     * suggestions endpoint, which records before it replies, recorded 19. The
+     * tokens were billed either way; only the record was lost.
+     *
+     * The cost is one insert before the final SSE event, by which point the
+     * answer is already on screen, so the user waits for nothing.
+     */
+    const finishUsage = async () => {
+      meter.setComposition({
+        system_prompt: systemPrompt.staticPrompt.length,
+        user_context: (systemPrompt.dynamicContext || '').length,
+        tools: tools.length ? JSON.stringify(tools).length : 0,
+        history: historyChars,
+        tool_results: toolCharsUsed,
+        assistant: assistantChars,
+      });
+      await meter.flush();
+    };
+
     if (wantStream) {
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -516,6 +540,7 @@ export default async function handler(req, res) {
             continue;
           }
           const finalText = accumulatedText || 'Sorry, I could not generate a response.';
+          await finishUsage();
           if (wantStream) {
             sseWrite(res, { content: stripEmDashes(finalText) });
             sseWrite(res, { done: true });
@@ -581,6 +606,7 @@ export default async function handler(req, res) {
         ).filter(Boolean);
         if (toolResults.length === 0) {
           const fallback = 'Tool step produced no results. Please try a more specific request.';
+          await finishUsage();
           if (wantStream) {
             sseWrite(res, { content: fallback });
             sseWrite(res, { done: true });
@@ -596,6 +622,7 @@ export default async function handler(req, res) {
         anthropicMessages.push({ role: 'user', content: capToolResults(toolResults) });
       }
       const limitMsg = 'I reached the tool-step ceiling. Ask me to continue from where I left off.';
+      await finishUsage();
       if (wantStream) {
         sseWrite(res, { content: limitMsg });
         sseWrite(res, { done: true });
@@ -604,15 +631,9 @@ export default async function handler(req, res) {
       }
       return res.status(200).json({ content: limitMsg });
     } finally {
-      meter.setComposition({
-        system_prompt: systemPrompt.staticPrompt.length,
-        user_context: (systemPrompt.dynamicContext || '').length,
-        tools: tools.length ? JSON.stringify(tools).length : 0,
-        history: historyChars,
-        tool_results: toolCharsUsed,
-        assistant: assistantChars,
-      });
-      await meter.flush();
+      // Backstop for paths that throw before reaching a response. flush() is
+      // idempotent, so a turn that already recorded is not written twice.
+      await finishUsage();
     }
   } catch (err) {
     console.error('Handler error:', err);
