@@ -625,6 +625,136 @@ export async function updateSheetValues(accessToken, { spreadsheetId, range, val
   };
 }
 
+/**
+ * Comments on a Drive file — Sheets, Docs, anything.
+ *
+ * Comments are not part of the Sheets API. They belong to Drive, because a
+ * comment attaches to a file rather than to a cell, which is also why a comment
+ * cannot be created against a specific cell through the public API: the anchor
+ * format Sheets uses is internal and undocumented. Reading returns whatever
+ * anchor an existing comment carries, so a comment made in the UI can still be
+ * reported against its cell.
+ */
+const COMMENT_FIELDS =
+  'comments(id,content,author(displayName,me),createdTime,modifiedTime,resolved,' +
+  'quotedFileContent(value),anchor,replies(id,content,author(displayName),createdTime,action))';
+
+const MAX_COMMENT_CHARS = 4000;
+
+/** Pull a cell reference out of a Sheets anchor when one is recognisable. */
+function anchorCell(anchor) {
+  if (!anchor) return null;
+  try {
+    const parsed = typeof anchor === 'string' ? JSON.parse(anchor) : anchor;
+    // Shapes vary by file type and none is contractual, so only obvious
+    // range-like values are surfaced and anything else is left alone.
+    const range = parsed?.range || parsed?.a?.[0]?.range || parsed?.a?.[0]?.txt?.range;
+    return typeof range === 'string' ? range : null;
+  } catch {
+    return null;
+  }
+}
+
+function shapeComment(c) {
+  return {
+    id: c.id,
+    author: c.author?.displayName || (c.author?.me ? 'You' : 'Unknown'),
+    content: String(c.content || '').slice(0, MAX_COMMENT_CHARS),
+    created: c.createdTime,
+    modified: c.modifiedTime,
+    resolved: !!c.resolved,
+    cell: anchorCell(c.anchor),
+    quoted: c.quotedFileContent?.value || null,
+    replies: (c.replies || []).map((r) => ({
+      id: r.id,
+      author: r.author?.displayName || 'Unknown',
+      content: String(r.content || '').slice(0, MAX_COMMENT_CHARS),
+      created: r.createdTime,
+      // 'resolve' / 'reopen' arrive as replies with no text of their own.
+      action: r.action || null,
+    })),
+  };
+}
+
+export async function listFileComments(accessToken, fileId, { maxResults = 30, includeResolved = false } = {}) {
+  if (!fileId) throw new Error('file_id is required');
+  const params = new URLSearchParams({
+    fields: `nextPageToken,${COMMENT_FIELDS}`,
+    pageSize: String(Math.min(Math.max(Number(maxResults) || 30, 1), 100)),
+    includeDeleted: 'false',
+  });
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/comments?${params}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (res.status === 404) {
+    throw new Error(`No file found with id ${fileId}, or this account cannot open it.`);
+  }
+  if (!res.ok) throw new Error(`Comments list failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const data = await res.json();
+  const all = (data.comments || []).map(shapeComment);
+  const comments = includeResolved ? all : all.filter((c) => !c.resolved);
+  return {
+    count: comments.length,
+    hidden_resolved: includeResolved ? 0 : all.length - comments.length,
+    comments,
+  };
+}
+
+export async function createFileComment(accessToken, fileId, { content, cell } = {}) {
+  if (!fileId) throw new Error('file_id is required');
+  const text = String(content || '').trim();
+  if (!text) throw new Error('comment text is required');
+  // The cell goes in the text rather than an anchor. An anchor built from a
+  // guessed format would either be rejected or, worse, silently attach the
+  // comment to the wrong place — naming the cell is honest and readable.
+  const body = { content: cell ? `[${String(cell).trim()}] ${text}` : text };
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/comments?fields=id,content,createdTime`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error(`Comment create failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const c = await res.json();
+  return {
+    id: c.id,
+    content: c.content,
+    created: c.createdTime,
+    anchored_to_cell: false,
+    note: cell
+      ? `Posted as a file-level comment naming ${cell}. Google's API cannot attach a comment to a specific cell; only the Sheets UI can.`
+      : undefined,
+  };
+}
+
+export async function replyToFileComment(accessToken, fileId, commentId, { content, resolve } = {}) {
+  if (!fileId) throw new Error('file_id is required');
+  if (!commentId) throw new Error('comment_id is required');
+  const text = String(content || '').trim();
+  // Resolving is itself a reply carrying an action, and Drive rejects a reply
+  // with no content at all, so a bare resolve still needs something to say.
+  if (!text && !resolve) throw new Error('reply text is required');
+  const body = { content: text || 'Resolved.' };
+  if (resolve) body.action = 'resolve';
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/comments/${encodeURIComponent(commentId)}/replies?fields=id,content,createdTime,action`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+  if (res.status === 404) {
+    throw new Error(`No comment ${commentId} on that file. List comments first to get a valid id.`);
+  }
+  if (!res.ok) throw new Error(`Reply failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const r = await res.json();
+  return { id: r.id, content: r.content, created: r.createdTime, resolved: r.action === 'resolve' };
+}
+
 export async function listCalendarEvents(accessToken, { timeMin, timeMax, maxResults = 15, query } = {}) {
   const params = new URLSearchParams({
     singleEvents: 'true',

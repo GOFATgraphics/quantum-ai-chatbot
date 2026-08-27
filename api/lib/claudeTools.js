@@ -15,6 +15,9 @@ import {
   readSheetRange,
   createSpreadsheet,
   updateSheetValues,
+  listFileComments,
+  createFileComment,
+  replyToFileComment,
   sendGmail,
   createGmailDraft,
   modifyGmailMessage,
@@ -295,6 +298,60 @@ export const UPDATE_SHEET_TOOL = {
       append: { type: 'boolean' },
     },
     required: ['spreadsheet_id', 'values'],
+  },
+};
+
+export const READ_COMMENTS_TOOL = {
+  name: 'read_file_comments',
+  description:
+    'Read the comments on a Google Sheet or Doc by file id. Returns each comment with its author, ' +
+    'text, whether it is resolved, any replies, and the cell or passage it is attached to when the ' +
+    'file records one. Resolved comments are left out unless asked for. Get the file id from ' +
+    'search_sheets, search_drive or list_drive_folder.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      file_id: { type: 'string', description: 'Spreadsheet or document id.' },
+      include_resolved: { type: 'boolean', description: 'Include comments already resolved. Default false.' },
+      max_results: { type: 'number', description: '1-100, default 30.' },
+    },
+    required: ['file_id'],
+  },
+};
+
+export const ADD_COMMENT_TOOL = {
+  name: 'add_file_comment',
+  description:
+    'Post a comment on a Google Sheet or Doc. Everyone with access sees it, so confirm the wording ' +
+    'with the user first. Pass cell to name the cell or range it concerns, such as B12 or ' +
+    'Positions!C4:C9, and it is written into the comment text. Google does not let the API pin a ' +
+    'comment to a cell the way the Sheets UI does, so it lands as a file-level comment naming the cell.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      file_id: { type: 'string' },
+      comment: { type: 'string', description: 'The comment text.' },
+      cell: { type: 'string', description: 'Cell or range the comment is about. Optional.' },
+    },
+    required: ['file_id', 'comment'],
+  },
+};
+
+export const REPLY_COMMENT_TOOL = {
+  name: 'reply_to_file_comment',
+  description:
+    'Reply to an existing comment on a Google Sheet or Doc, and optionally mark it resolved. ' +
+    'Get comment_id from read_file_comments. Replies are visible to everyone with access, so ' +
+    'confirm the wording first. Resolving hides the thread from the default view.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      file_id: { type: 'string' },
+      comment_id: { type: 'string', description: 'Comment id from read_file_comments.' },
+      reply: { type: 'string', description: 'Reply text.' },
+      resolve: { type: 'boolean', description: 'Mark the thread resolved. Default false.' },
+    },
+    required: ['file_id', 'comment_id'],
   },
 };
 
@@ -986,6 +1043,62 @@ export async function runTool(block, user, context = {}) {
       });
       return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
     }
+    if (
+      (name === 'read_file_comments' || name === 'add_file_comment' || name === 'reply_to_file_comment') &&
+      user
+    ) {
+      // Comments are a Drive feature, so this needs a Drive-family token even
+      // when the file is a spreadsheet. drive.file from the Sheets or Docs
+      // connector only reaches files Quantumy itself created, which is why the
+      // full Drive connector is named first in the failure message.
+      const token =
+        (await getValidToken(user.id, 'google_drive')) ||
+        (await getValidToken(user.id, 'google_sheets')) ||
+        (await getValidToken(user.id, 'google_docs'));
+      if (!token) {
+        return {
+          type: 'tool_result',
+          tool_use_id: id,
+          content:
+            'Comments need the Google Drive connector. Sheets or Docs alone can only reach files ' +
+            'Quantumy created itself.',
+          is_error: true,
+        };
+      }
+      const fileId = String(input.file_id || '');
+      try {
+        if (name === 'read_file_comments') {
+          const result = await listFileComments(token, fileId, {
+            maxResults: input.max_results,
+            includeResolved: !!input.include_resolved,
+          });
+          return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+        }
+        if (name === 'add_file_comment') {
+          const result = await createFileComment(token, fileId, {
+            content: String(input.comment || ''),
+            cell: input.cell ? String(input.cell) : undefined,
+          });
+          return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+        }
+        const result = await replyToFileComment(token, fileId, String(input.comment_id || ''), {
+          content: String(input.reply || ''),
+          resolve: !!input.resolve,
+        });
+        return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+      } catch (e) {
+        const msg = e?.message || String(e);
+        return {
+          type: 'tool_result',
+          tool_use_id: id,
+          // 403 on a comment is a sharing problem, not a bug — say which.
+          content: /\b403\b/.test(msg)
+            ? `${msg} — this account may have view-only access to that file; commenting needs comment or edit access.`
+            : msg,
+          is_error: true,
+        };
+      }
+    }
     if (name === 'list_calendar_events' && user) {
       const token = await getValidToken(user.id, 'google_calendar');
       if (!token)
@@ -1343,6 +1456,11 @@ export async function loadConnectorsAndTools(user) {
   if (sheetsTok) {
     connected.sheets = true;
     tools.push(SHEETS_LIST_TOOL, SHEETS_READ_TOOL, CREATE_SHEET_TOOL, UPDATE_SHEET_TOOL);
+  }
+  // Comments live in Drive, not in Sheets or Docs, so they are offered whenever
+  // any of the three is connected — the file to comment on could be either.
+  if (sheetsTok || driveTok || docsTok) {
+    tools.push(READ_COMMENTS_TOOL, ADD_COMMENT_TOOL, REPLY_COMMENT_TOOL);
   }
   if (calTok) {
     connected.calendar = true;
