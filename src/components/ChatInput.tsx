@@ -101,6 +101,7 @@ export default function ChatInput({
   // Transcription is the one attachment path slow enough to need its own
   // progress: an hour-long recording is dozens of sequential requests.
   const [fileBusy, setFileBusy] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
   const [listening, setListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -209,12 +210,19 @@ export default function ChatInput({
   const hasText = (!!value.trim() || pendingFiles.length > 0) && !fileBusy
   const onPickFiles = () => fileInputRef.current?.click()
 
-  const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = e.target.files
+  /**
+   * The one place attachments are handled, whatever brought them in — the file
+   * picker, a paste, or a drop. Keeping it list-based rather than tied to the
+   * input event is what lets the other two routes exist at all.
+   */
+  const addFiles = async (list: File[] | FileList | null) => {
     if (!list?.length || !onFilesChange) return
     const MAX_ATTACHMENTS = 5
     const room = Math.max(0, MAX_ATTACHMENTS - pendingFiles.length)
-    if (room === 0) { e.target.value = ''; return }
+    if (room === 0) {
+      setFileError(`You can attach ${MAX_ATTACHMENTS} files at a time — remove one first.`)
+      return
+    }
     const next: PendingFile[] = [...pendingFiles]
     const picked = Array.from(list).slice(0, room)
     const imageCount = picked.filter((f) => f.type.startsWith('image/')).length + next.filter((f) => f.dataUrl).length
@@ -356,7 +364,45 @@ export default function ChatInput({
     }
     onFilesChange(next.slice(0, MAX_ATTACHMENTS))
     setFileError(rejected.length ? rejected.join(' · ') : null)
+  }
+
+  const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const list = e.target.files
+    // Cleared before awaiting, so picking the same file twice in a row still
+    // fires a change event the second time.
+    const files = list ? Array.from(list) : []
     e.target.value = ''
+    await addFiles(files)
+  }
+
+  /**
+   * Screenshots arrive on the clipboard as files with no name, which is the
+   * common case this exists for — the paste is only intercepted when it
+   * actually carries one, so pasting text is untouched.
+   */
+  const onPaste = async (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData?.items || [])
+    const files = items
+      .filter((i) => i.kind === 'file')
+      .map((i) => i.getAsFile())
+      .filter((f): f is File => !!f)
+    if (files.length === 0) return
+    e.preventDefault()
+    await addFiles(
+      files.map((f) =>
+        // A pasted screenshot has no filename; give it one so the chip and the
+        // model both have something to refer to.
+        f.name && f.name !== 'image.png'
+          ? f
+          : new File([f], `pasted-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${(f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')}`, { type: f.type }),
+      ),
+    )
+  }
+
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    await addFiles(e.dataTransfer?.files || null)
   }
 
   const removeFile = (idx: number) => {
@@ -373,7 +419,23 @@ export default function ChatInput({
         : 'Ask anything'
 
   return (
-    <div className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div
+      className="composer-footer relative z-10 shrink-0 px-3 sm:px-5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      onDragOver={(e) => {
+        // Only react to an actual file drag; dragging selected text over the
+        // composer should still behave like text.
+        if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return
+        e.preventDefault()
+        setDragging(true)
+      }}
+      onDragLeave={(e) => {
+        // Fires for every child crossed on the way through, so ignore anything
+        // that is still inside the composer.
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return
+        setDragging(false)
+      }}
+      onDrop={onDrop}
+    >
       <div className="max-w-2xl mx-auto">
         <AnimatePresence>
           {errorHint && (
@@ -421,7 +483,10 @@ export default function ChatInput({
               : '0 0 0 0px transparent',
           }}
           transition={{ duration: 0.25 }}
-          className="glass-surface composer-surface rounded-[26px] px-3 pt-2.5 pb-2"
+          className={
+            'glass-surface composer-surface rounded-[26px] px-3 pt-2.5 pb-2 transition-shadow ' +
+            (dragging ? 'ring-2 ring-primary/60' : '')
+          }
         >
           <AnimatePresence initial={false}>
             {pendingFiles.length > 0 && (
@@ -481,6 +546,7 @@ export default function ChatInput({
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={onKeyDown}
+                onPaste={onPaste}
                 onFocus={() => {
                   setComposerFocus(true)
                   const pin = () => {
