@@ -78,6 +78,7 @@ function fileToBase64(file: File): Promise<string> {
 
 type SttResponse = {
   text?: string
+  diarized?: boolean
   language_code?: string
   words?: { text?: string; speaker_id?: string; type?: string }[]
   error?: string
@@ -96,31 +97,12 @@ async function postAudio(audioBase64: string, mimeType: string): Promise<SttResp
 }
 
 /**
- * Rebuild the transcript with speaker labels when Scribe returned them.
- * Falls back to the plain text whenever the shape isn't what we expect, so a
- * response without diarization still produces a usable transcript.
+ * The server assembles speaker lines and converts spoken figures to digits, so
+ * there is nothing to rebuild here — doing it word by word on this side would
+ * split every number run apart and convert none of them.
  */
-function withSpeakers(data: SttResponse): { text: string; diarized: boolean } {
-  const words = Array.isArray(data.words) ? data.words : []
-  const speakers = new Set(words.map((w) => w?.speaker_id).filter(Boolean))
-  if (words.length === 0 || speakers.size < 2) {
-    return { text: String(data.text || '').trim(), diarized: false }
-  }
-  const lines: string[] = []
-  let current: string | null = null
-  let buf = ''
-  for (const w of words) {
-    const speaker: string | null = w?.speaker_id || current
-    if (speaker !== current) {
-      if (buf.trim()) lines.push(`${current}: ${buf.trim()}`)
-      current = speaker || null
-      buf = ''
-    }
-    buf += w?.text || ''
-  }
-  if (buf.trim()) lines.push(`${current}: ${buf.trim()}`)
-  const text = lines.join('\n')
-  return text.trim() ? { text, diarized: true } : { text: String(data.text || '').trim(), diarized: false }
+function readTranscript(data: SttResponse): { text: string; diarized: boolean } {
+  return { text: String(data.text || '').trim(), diarized: !!data.diarized }
 }
 
 /** Decode to a single 16 kHz mono track. Throws if the browser cannot decode the format. */
@@ -186,7 +168,7 @@ export async function transcribeAudioFile(
   if (file.size <= DIRECT_LIMIT_BYTES) {
     onProgress?.({ done: 0, total: 1 })
     const data = await postAudio(await fileToBase64(file), file.type || 'audio/mpeg')
-    const { text, diarized } = withSpeakers(data)
+    const { text, diarized } = readTranscript(data)
     onProgress?.({ done: 1, total: 1 })
     return { text, durationSec: 0, chunks: 1, truncated: false, diarized }
   }
@@ -203,7 +185,7 @@ export async function transcribeAudioFile(
     const slice = samples.subarray(i * perChunk, Math.min(samples.length, (i + 1) * perChunk))
     if (slice.length === 0) continue
     const data = await postAudio(bytesToBase64(encodeWav(slice, TARGET_RATE)), 'audio/wav')
-    const { text, diarized } = withSpeakers(data)
+    const { text, diarized } = readTranscript(data)
     anyDiarized = anyDiarized || diarized
     if (text) {
       // Chunks are transcribed independently, so a timestamp header is the only

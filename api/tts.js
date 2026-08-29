@@ -66,7 +66,14 @@ export default async function handler(req, res) {
     const lang = (body?.language || 'en').toLowerCase();
     const isHausa = lang === 'ha' || lang === 'hau' || lang === 'hausa';
 
-    const modelId = process.env.ELEVENLABS_TTS_MODEL || 'eleven_flash_v2_5';
+    // eleven_v3 is the most expressive model ElevenLabs offers. It is also not
+    // the one they recommend for interactive use — turbo is — so if it rejects
+    // the request or is unavailable to this account, the call is retried once
+    // on turbo rather than failing. Failing here would drop the client onto the
+    // browser's own synthesiser, which is the robotic voice this is meant to
+    // get away from, so a slightly lesser ElevenLabs voice always wins.
+    const modelId = process.env.ELEVENLABS_TTS_MODEL || 'eleven_v3';
+    const fallbackModelId = process.env.ELEVENLABS_TTS_FALLBACK_MODEL || 'eleven_turbo_v2_5';
     const languageCode = isHausa ? 'ha' : 'en';
 
     const payload = {
@@ -74,9 +81,12 @@ export default async function handler(req, res) {
       model_id: modelId,
       language_code: languageCode,
       voice_settings: {
-        stability: 0.35,
-        similarity_boost: 0.72,
-        style: 0.0,
+        // Low stability makes delivery wander and is a large part of why the
+        // output reads as synthetic; raising it steadies the voice without
+        // flattening it. Higher similarity keeps it closer to the source voice.
+        stability: 0.5,
+        similarity_boost: 0.85,
+        style: 0.15,
         use_speaker_boost: true,
       },
     };
@@ -85,34 +95,57 @@ export default async function handler(req, res) {
     const path = wantStream
       ? `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`
       : `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
-    const url = `${path}?output_format=mp3_22050_32&optimize_streaming_latency=4`;
+    // The old settings were the single biggest cause of a robotic result:
+    // 22 kHz at 32 kbps is telephone-grade, and latency level 4 is the most
+    // aggressive tier, which ElevenLabs trades quality away for. 44.1 kHz at
+    // 128 kbps with a moderate latency setting sounds like a different voice
+    // for a few tens of milliseconds more.
+    const outputFormat = process.env.ELEVENLABS_OUTPUT_FORMAT || 'mp3_44100_128';
+    const latency = process.env.ELEVENLABS_LATENCY || '2';
+    const url = `${path}?output_format=${encodeURIComponent(outputFormat)}&optimize_streaming_latency=${encodeURIComponent(latency)}`;
 
-    const elRes = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'xi-api-key': apiKey,
-        Accept: 'audio/mpeg',
-      },
-      body: JSON.stringify(payload),
-    });
+    const speak = (model) =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'xi-api-key': apiKey,
+          Accept: 'audio/mpeg',
+        },
+        body: JSON.stringify({ ...payload, model_id: model }),
+      });
+
+    let usedModel = modelId;
+    let elRes = await speak(modelId);
+
+    // A 4xx here means this account cannot use that model, or it will not take
+    // these settings — both are permanent for this request, so retrying the
+    // same call is pointless but a different model is worth one attempt. A 5xx
+    // is ElevenLabs being unwell and is left to surface.
+    if (!elRes.ok && elRes.status >= 400 && elRes.status < 500 && fallbackModelId && fallbackModelId !== modelId) {
+      const firstError = await elRes.text().catch(() => '');
+      console.warn(`TTS model ${modelId} refused (${elRes.status}), retrying on ${fallbackModelId}`, firstError.slice(0, 200));
+      usedModel = fallbackModelId;
+      elRes = await speak(fallbackModelId);
+    }
 
     if (!elRes.ok) {
       const errText = await elRes.text().catch(() => '');
-      console.error('ElevenLabs TTS error', elRes.status, errText, { voiceId, modelId });
+      console.error('ElevenLabs TTS error', elRes.status, errText, { voiceId, modelId: usedModel });
       return res.status(502).json({
         error: 'ElevenLabs TTS failed',
         status: elRes.status,
         details: errText.slice(0, 500),
         voiceId,
-        modelId,
+        modelId: usedModel,
       });
     }
 
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Voice-Id', voiceId);
-    res.setHeader('X-Model-Id', modelId);
+    // Which model actually spoke, so a silent downgrade is still visible.
+    res.setHeader('X-Model-Id', usedModel);
 
     if (wantStream && elRes.body && typeof elRes.body.getReader === 'function') {
       // Pipe stream through for lower time-to-first-byte

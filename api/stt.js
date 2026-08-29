@@ -6,6 +6,7 @@
  */
 import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
 import { allowRequest } from './lib/rateLimit.js';
+import { wordsToNumbers } from './lib/numberWords.js';
 
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
@@ -140,9 +141,39 @@ export default async function handler(req, res) {
     }
 
     const data = await elRes.json();
-    const text = (data?.text || '').trim();
+
+    // Speaker grouping happens here rather than on the client so the number
+    // conversion below runs once, over finished lines. Doing it per word would
+    // break every run apart and convert nothing.
+    const words = Array.isArray(data?.words) ? data.words : [];
+    const speakers = new Set(words.map((w) => w?.speaker_id).filter(Boolean));
+    let assembled = String(data?.text || '').trim();
+    let diarized = false;
+    if (diarize && words.length > 0 && speakers.size > 1) {
+      const lines = [];
+      let current = null;
+      let buf = '';
+      for (const w of words) {
+        const speaker = w?.speaker_id || current;
+        if (speaker !== current) {
+          if (buf.trim()) lines.push(`${current}: ${buf.trim()}`);
+          current = speaker || null;
+          buf = '';
+        }
+        buf += w?.text || '';
+      }
+      if (buf.trim()) lines.push(`${current}: ${buf.trim()}`);
+      if (lines.length > 0) { assembled = lines.join('\n'); diarized = true; }
+    }
+
+    // Spoken figures come back as words. In a trade conversation the figures
+    // are the whole point, so they are put back into digits before anyone
+    // reads, searches or pastes the transcript.
+    const text = wordsToNumbers(assembled);
+
     return res.status(200).json({
       text,
+      diarized,
       language_code: data?.language_code || languageCode,
       words: data?.words || undefined,
     });

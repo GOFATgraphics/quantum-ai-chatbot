@@ -130,6 +130,7 @@ export default function MessageActions({ content, onRegenerate }: Props) {
   const [liked, setLiked] = useState<'up' | 'down' | null>(null)
   const [speaking, setSpeaking] = useState(false)
   const [loadingSpeak, setLoadingSpeak] = useState(false)
+  const [usedFallback, setUsedFallback] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const stopFlagRef = useRef(false)
@@ -171,8 +172,16 @@ export default function MessageActions({ content, onRegenerate }: Props) {
     setLoadingSpeak(false)
   }
 
-  const speakBrowserFallback = (plain: string, language: string) => {
+  /**
+   * Last resort only. The browser's built-in synthesiser is markedly more
+   * robotic than ElevenLabs, and falling back to it silently is why the voice
+   * can sound wrong with no sign that anything failed — so it says so, and the
+   * reason is logged for whoever has to work out why.
+   */
+  const speakBrowserFallback = (plain: string, language: string, reason?: unknown) => {
+    if (reason) console.warn('ElevenLabs speech failed, using the browser voice:', reason)
     if (!('speechSynthesis' in window)) return false
+    setUsedFallback(true)
     window.speechSynthesis.cancel()
     const u = new SpeechSynthesisUtterance(plain.slice(0, 1200))
     u.lang = language === 'ha' ? 'ha' : 'en-US'
@@ -193,6 +202,7 @@ export default function MessageActions({ content, onRegenerate }: Props) {
     if (!plain) return
 
     stopFlagRef.current = false
+    setUsedFallback(false)
     setLoadingSpeak(true)
 
     let language = 'en'
@@ -232,7 +242,7 @@ export default function MessageActions({ content, onRegenerate }: Props) {
         } catch {
           // If first chunk fails, try browser TTS once
           if (i === 0) {
-            if (speakBrowserFallback(plain, language)) return
+            if (speakBrowserFallback(plain, language, 'first audio chunk would not play')) return
           }
           break
         }
@@ -245,7 +255,7 @@ export default function MessageActions({ content, onRegenerate }: Props) {
         /* user stopped */
       } else if (!stopFlagRef.current) {
         // Full fallback
-        if (!speakBrowserFallback(plain, language)) {
+        if (!speakBrowserFallback(plain, language, e)) {
           setLoadingSpeak(false)
           setSpeaking(false)
         }
@@ -328,7 +338,13 @@ export default function MessageActions({ content, onRegenerate }: Props) {
         type="button"
         onClick={() => void speak()}
         className={`p-1.5 rounded-full transition ${speaking || loadingSpeak ? active : muted}`}
-        title={speaking ? 'Stop' : 'Read aloud'}
+        title={
+          usedFallback
+            ? 'Read aloud (using the browser voice — ElevenLabs was unreachable)'
+            : speaking
+              ? 'Stop'
+              : 'Read aloud'
+        }
         aria-label={speaking ? 'Stop reading' : 'Read aloud'}
       >
         {loadingSpeak ? (
