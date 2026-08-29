@@ -2,13 +2,15 @@
  *
  * Strategy:
  * - Never cache API / Supabase
- * - Network-first for app shell (HTML, JS, CSS, SVG, manifest)
- * - Cache-first only for other static assets (fonts, images)
+ * - Cache-first for hashed build assets: the filename carries the version, so
+ *   a cached copy can never be stale and there is nothing to revalidate
+ * - Network-first, but with a timeout, for HTML and anything unhashed
+ * - Cache-first for other static assets (fonts, images)
  * - Bump CACHE on every deploy that must reach users immediately
  * - Supports postMessage: { type: 'SKIP_WAITING' | 'CLEAR_CACHE' | 'GET_VERSION' }
  */
-const CACHE = 'quantumy-v10'
-const VERSION = '10'
+const CACHE = 'quantumy-v11'
+const VERSION = '11'
 
 self.addEventListener('install', (event) => {
   // Activate as soon as installed — don't wait for old tabs to close
@@ -43,18 +45,39 @@ function canCache(request, response) {
   return true
 }
 
+/**
+ * How long to wait for the network before serving a cached copy.
+ *
+ * Without this, a request that is merely slow rather than failed blocks the
+ * page for as long as the connection takes to give up — the cached copy sits
+ * there unused, because the old code only fell back when fetch threw. On a
+ * weak mobile connection that is a blank screen for tens of seconds.
+ */
+const NETWORK_TIMEOUT_MS = 3000
+
 async function networkFirst(request) {
   const cache = await caches.open(CACHE)
+  const cached = await cache.match(request)
+
+  let timer
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), NETWORK_TIMEOUT_MS)
+  })
+
   try {
-    const response = await fetch(request)
+    const response = cached
+      ? await Promise.race([fetch(request), timeout])
+      : await fetch(request)
+    if (!response) return cached
     if (canCache(request, response)) {
       cache.put(request, response.clone()).catch(() => {})
     }
     return response
   } catch (err) {
-    const cached = await cache.match(request)
     if (cached) return cached
     throw err
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -69,18 +92,22 @@ async function cacheFirst(request) {
   return response
 }
 
+/**
+ * Build output under /assets/ is content-hashed by Vite: the filename changes
+ * whenever the contents do. A cached copy therefore cannot be stale, so going
+ * to the network for it on every load is pure cost — roughly a megabyte of
+ * JavaScript re-requested before anything renders.
+ */
+function isHashedAsset(url) {
+  return url.pathname.startsWith('/assets/')
+}
+
+/** Unhashed and must stay current: the HTML that points at the hashed assets. */
 function isAppShell(request, url) {
   if (request.mode === 'navigate') return true
   if (url.pathname === '/' || url.pathname === '/index.html') return true
   const p = url.pathname
-  return (
-    p.endsWith('.js') ||
-    p.endsWith('.css') ||
-    p.endsWith('.html') ||
-    p.endsWith('.svg') ||
-    p.endsWith('.webmanifest') ||
-    p.endsWith('.json')
-  )
+  return p.endsWith('.html') || p.endsWith('.webmanifest') || p.endsWith('.json')
 }
 
 self.addEventListener('fetch', (event) => {
@@ -99,6 +126,12 @@ self.addEventListener('fetch', (event) => {
 
   // Never intercept API / backend
   if (url.pathname.startsWith('/api/') || url.pathname.includes('supabase')) {
+    return
+  }
+
+  // Hashed assets first: they are the bulk of the bytes and never change.
+  if (isHashedAsset(url)) {
+    event.respondWith(cacheFirst(request))
     return
   }
 
