@@ -15,6 +15,8 @@ import {
   readSheetRange,
   createSpreadsheet,
   updateSheetValues,
+  readSheetNotes,
+  setSheetNote,
   listFileComments,
   createFileComment,
   replyToFileComment,
@@ -298,6 +300,41 @@ export const UPDATE_SHEET_TOOL = {
       append: { type: 'boolean' },
     },
     required: ['spreadsheet_id', 'values'],
+  },
+};
+
+export const READ_NOTES_TOOL = {
+  name: 'read_sheet_notes',
+  description:
+    'Read the in-cell notes on a Google Sheet — the plain note attached to a cell, shown as a small ' +
+    'corner marker. These are NOT comments: notes have no author and no replies, and a sheet can carry ' +
+    'both independently. Use read_file_comments for comment threads. Returns each note with its cell ' +
+    'reference and the cell value. Pass range to look at one tab or block instead of the whole file.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      spreadsheet_id: { type: 'string' },
+      range: { type: 'string', description: 'A1 range to limit the scan, e.g. Positions or Positions!A1:H50. Optional.' },
+      max_results: { type: 'number', description: '1-200, default 100.' },
+    },
+    required: ['spreadsheet_id'],
+  },
+};
+
+export const SET_NOTE_TOOL = {
+  name: 'set_sheet_note',
+  description:
+    'Write or clear the in-cell note on one Google Sheet cell. Replaces whatever note is there, so ' +
+    'read it first if it should be kept. The cell value and formatting are untouched. Pass an empty ' +
+    'note to clear it. This writes to a shared file, so confirm the cell and wording with the user first.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      spreadsheet_id: { type: 'string' },
+      cell: { type: 'string', description: 'A single cell, e.g. B12 or Positions!B12. Defaults to the first tab if no tab is named.' },
+      note: { type: 'string', description: 'Note text. Empty string clears the note.' },
+    },
+    required: ['spreadsheet_id', 'cell', 'note'],
   },
 };
 
@@ -1099,6 +1136,33 @@ export async function runTool(block, user, context = {}) {
         };
       }
     }
+    if ((name === 'read_sheet_notes' || name === 'set_sheet_note') && user) {
+      const token = await getValidToken(user.id, 'google_sheets');
+      if (!token) {
+        return {
+          type: 'tool_result',
+          tool_use_id: id,
+          content: 'Google Sheets is not connected.',
+          is_error: true,
+        };
+      }
+      try {
+        if (name === 'read_sheet_notes') {
+          const result = await readSheetNotes(token, String(input.spreadsheet_id || ''), {
+            range: input.range ? String(input.range) : undefined,
+            maxResults: input.max_results,
+          });
+          return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+        }
+        const result = await setSheetNote(token, String(input.spreadsheet_id || ''), {
+          cell: String(input.cell || ''),
+          note: String(input.note ?? ''),
+        });
+        return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+      } catch (e) {
+        return { type: 'tool_result', tool_use_id: id, content: e?.message || String(e), is_error: true };
+      }
+    }
     if (name === 'list_calendar_events' && user) {
       const token = await getValidToken(user.id, 'google_calendar');
       if (!token)
@@ -1455,7 +1519,7 @@ export async function loadConnectorsAndTools(user) {
   }
   if (sheetsTok) {
     connected.sheets = true;
-    tools.push(SHEETS_LIST_TOOL, SHEETS_READ_TOOL, CREATE_SHEET_TOOL, UPDATE_SHEET_TOOL);
+    tools.push(SHEETS_LIST_TOOL, SHEETS_READ_TOOL, CREATE_SHEET_TOOL, UPDATE_SHEET_TOOL, READ_NOTES_TOOL, SET_NOTE_TOOL);
   }
   // Comments live in Drive, not in Sheets or Docs, so they are offered whenever
   // any of the three is connected — the file to comment on could be either.

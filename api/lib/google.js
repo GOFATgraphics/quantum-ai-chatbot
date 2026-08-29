@@ -626,6 +626,147 @@ export async function updateSheetValues(accessToken, { spreadsheetId, range, val
 }
 
 /**
+ * In-cell notes — the plain yellow-corner note on a cell.
+ *
+ * Nothing to do with comments: notes live in the Sheets API as a field on the
+ * cell itself, have no author and no thread, and are invisible to the Drive
+ * comments endpoints. A sheet can carry both, and they are read and written
+ * through entirely different APIs.
+ */
+const MAX_NOTE_CHARS = 2000;
+const MAX_NOTES_RETURNED = 200;
+
+/** 'A' -> 0, 'Z' -> 25, 'AA' -> 26. */
+export function colToIndex(letters) {
+  let n = 0;
+  for (const ch of String(letters).toUpperCase()) {
+    const v = ch.charCodeAt(0) - 64;
+    if (v < 1 || v > 26) throw new Error(`Not a column reference: ${letters}`);
+    n = n * 26 + v;
+  }
+  return n - 1;
+}
+
+/** 0 -> 'A', 26 -> 'AA'. */
+export function indexToCol(index) {
+  let n = Number(index) + 1;
+  let out = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    out = String.fromCharCode(65 + rem) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+}
+
+/** Split "Positions!B12" or "B12" into its parts. Sheet names may be quoted and may contain '!'. */
+export function parseA1Cell(ref) {
+  const raw = String(ref || '').trim();
+  if (!raw) throw new Error('A cell reference is required, e.g. B12 or Positions!B12');
+  let sheet = null;
+  let cell = raw;
+  const bang = raw.lastIndexOf('!');
+  if (bang > 0) {
+    sheet = raw.slice(0, bang).replace(/^'(.*)'$/, '$1').replace(/''/g, "'");
+    cell = raw.slice(bang + 1);
+  }
+  const m = /^([A-Za-z]+)(\d+)$/.exec(cell.trim());
+  if (!m) throw new Error(`Could not read "${ref}" as a single cell. Use a form like B12 or Positions!B12.`);
+  return { sheet, col: colToIndex(m[1]), row: Number(m[2]) - 1 };
+}
+
+export async function readSheetNotes(accessToken, spreadsheetId, { range, maxResults } = {}) {
+  if (!spreadsheetId) throw new Error('spreadsheet_id is required');
+  const params = new URLSearchParams({
+    fields: 'sheets(properties(title,sheetId),data(startRow,startColumn,rowData(values(note,formattedValue))))',
+  });
+  if (range) params.append('ranges', range);
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?${params}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (res.status === 404) throw new Error(`No spreadsheet found with id ${spreadsheetId}.`);
+  if (!res.ok) throw new Error(`Notes read failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const data = await res.json();
+
+  const cap = Math.min(Math.max(Number(maxResults) || 100, 1), MAX_NOTES_RETURNED);
+  const notes = [];
+  let truncated = false;
+  for (const sheet of data.sheets || []) {
+    const title = sheet.properties?.title || '';
+    for (const grid of sheet.data || []) {
+      // startRow/startColumn are omitted rather than sent as 0, so a missing
+      // value means the block begins at the top-left of the requested range.
+      const baseRow = grid.startRow || 0;
+      const baseCol = grid.startColumn || 0;
+      (grid.rowData || []).forEach((row, r) => {
+        (row.values || []).forEach((cell, c) => {
+          if (!cell?.note) return;
+          if (notes.length >= cap) { truncated = true; return; }
+          notes.push({
+            cell: `${title}!${indexToCol(baseCol + c)}${baseRow + r + 1}`,
+            note: String(cell.note).slice(0, MAX_NOTE_CHARS),
+            value: cell.formattedValue ?? null,
+          });
+        });
+      });
+    }
+  }
+  return { count: notes.length, truncated, notes };
+}
+
+export async function setSheetNote(accessToken, spreadsheetId, { cell, note } = {}) {
+  if (!spreadsheetId) throw new Error('spreadsheet_id is required');
+  const target = parseA1Cell(cell);
+
+  // batchUpdate addresses cells by numeric grid position, not by name, so the
+  // sheet has to be resolved to its id first.
+  const metaRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets(properties(title,sheetId))`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!metaRes.ok) throw new Error(`Could not open spreadsheet: ${metaRes.status} ${(await metaRes.text()).slice(0, 160)}`);
+  const meta = await metaRes.json();
+  const sheets = meta.sheets || [];
+  const match = target.sheet
+    ? sheets.find((s) => (s.properties?.title || '').toLowerCase() === target.sheet.toLowerCase())
+    : sheets[0];
+  if (!match) {
+    const names = sheets.map((s) => s.properties?.title).filter(Boolean).join(', ');
+    throw new Error(`No tab named "${target.sheet}" in that spreadsheet. Tabs are: ${names || 'none'}.`);
+  }
+
+  const text = String(note ?? '');
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          updateCells: {
+            range: {
+              sheetId: match.properties.sheetId,
+              startRowIndex: target.row,
+              endRowIndex: target.row + 1,
+              startColumnIndex: target.col,
+              endColumnIndex: target.col + 1,
+            },
+            // Only the note field is in the mask, so the cell's value and
+            // formatting are untouched. An empty string clears the note.
+            rows: [{ values: [{ note: text.slice(0, MAX_NOTE_CHARS) }] }],
+            fields: 'note',
+          },
+        }],
+      }),
+    },
+  );
+  if (!res.ok) throw new Error(`Note write failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const label = `${match.properties.title}!${indexToCol(target.col)}${target.row + 1}`;
+  return { cell: label, note: text ? text.slice(0, MAX_NOTE_CHARS) : null, cleared: !text };
+}
+
+/**
  * Comments on a Drive file — Sheets, Docs, anything.
  *
  * Comments are not part of the Sheets API. They belong to Drive, because a
