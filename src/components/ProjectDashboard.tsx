@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  X, FolderKanban, Pencil, Trash2, Check, Loader2, MessageSquare,
+  FolderKanban, Pencil, Trash2, Check, Loader2, MessageSquare,
   Plus, AlertTriangle, ChevronRight, Search,
 } from 'lucide-react'
 import { supabase, type Conversation, type Project, type Note, type NoteType, type NotePriority } from '../lib/supabase'
@@ -214,9 +214,6 @@ export default function ProjectDashboard({
             <Pencil className="w-4 h-4 text-muted-foreground" />
           </button>
         )}
-        <button type="button" onClick={onClose} className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${hover}`} aria-label="Close project dashboard">
-          <X className="w-5 h-5 text-muted-foreground" />
-        </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6">

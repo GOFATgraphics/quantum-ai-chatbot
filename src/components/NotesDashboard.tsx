@@ -330,9 +330,6 @@ export default function NotesDashboard({ user, projects, currentProjectId, onClo
           <h2 className="text-xl font-semibold tracking-tight">Notes</h2>
           <p className={`text-[13px] ${muted}`}>Everything you asked Quantumy to save, organized by topic</p>
         </div>
-        <button type="button" onClick={onClose} className={`glass-btn w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${hover}`} aria-label="Close notes">
-          <X className="w-5 h-5 text-muted-foreground" />
-        </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6">
