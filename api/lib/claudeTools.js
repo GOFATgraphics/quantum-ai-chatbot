@@ -45,6 +45,13 @@ import {
   searchExcelFiles,
 } from './microsoft.js';
 import { READ_DRIVE_FILE_TOOL, LIST_DRIVE_FOLDER_TOOL, handleReadDriveFile, handleListDriveFolder } from './driveRead.js';
+import {
+  SHEET_HISTORY_TOOLS,
+  SHEET_HISTORY_TOOL_NAMES,
+  handleSheetHistoryTool,
+  captureValuesBefore,
+  recordSheetEdit,
+} from './sheetHistory.js';
 
 /** Anthropic server-side tools — executed by Anthropic, not by us */
 export const ANTHROPIC_WEB_SEARCH_TOOL = {
@@ -345,7 +352,10 @@ export const CREATE_SHEET_TOOL = {
 
 export const UPDATE_SHEET_TOOL = {
   name: 'update_sheet',
-  description: 'Write or append values to a Google Spreadsheet.',
+  description:
+    'Write or append values to a Google Spreadsheet. The cells being replaced are recorded first, ' +
+    'so the result carries an undo_id and the change can be reversed with undo_sheet_edit. Mention ' +
+    'that undo is available when a write replaces existing data.',
   input_schema: {
     type: 'object',
     properties: {
@@ -381,7 +391,8 @@ export const SET_NOTE_TOOL = {
   description:
     'Write or clear the in-cell note on one Google Sheet cell. Replaces whatever note is there, so ' +
     'read it first if it should be kept. The cell value and formatting are untouched. Pass an empty ' +
-    'note to clear it. This writes to a shared file, so confirm the cell and wording with the user first.',
+    'note to clear it. This writes to a shared file, so confirm the cell and wording with the user first. ' +
+    'The previous note is recorded, so this can be reversed with undo_sheet_edit.',
   input_schema: {
     type: 'object',
     properties: {
@@ -1184,7 +1195,17 @@ export async function runTool(block, user, context = {}) {
         headers: input.headers,
         rows: input.rows,
       });
-      return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+      // Undoing a creation bins the file rather than destroying it, so this is
+      // recorded like any other edit and is just as reversible.
+      const journal = await recordSheetEdit(getAdminClient(), {
+        userId: user.id,
+        spreadsheetId: result.spreadsheetId,
+        kind: 'create',
+        range: 'file',
+        before: null,
+        after: { title: result.title },
+      });
+      return { type: 'tool_result', tool_use_id: id, content: JSON.stringify({ ...result, ...journal }) };
     }
     if (name === 'update_sheet' && user) {
       const token = await getValidToken(user.id, 'google_sheets');
@@ -1195,13 +1216,53 @@ export async function runTool(block, user, context = {}) {
           content: 'Google Sheets is not connected.',
           is_error: true,
         };
-      const result = await updateSheetValues(token, {
-        spreadsheetId: String(input.spreadsheet_id || ''),
-        range: input.range || 'A1',
-        values: input.values || [],
-        append: !!input.append,
+      const spreadsheetId = String(input.spreadsheet_id || '');
+      const range = input.range || 'A1';
+      const values = input.values || [];
+      const admin = getAdminClient();
+
+      // An append lands wherever the data currently ends, which is not known
+      // until the write comes back — so the block it created is journalled
+      // afterwards, with an empty before-image. A plain write goes to a range
+      // we can work out in advance, so the old cells are read first.
+      if (input.append) {
+        const result = await updateSheetValues(token, { spreadsheetId, range, values, append: true });
+        const written = result.updatedRange;
+        const journal = written
+          ? await recordSheetEdit(admin, {
+              userId: user.id,
+              spreadsheetId,
+              kind: 'values',
+              range: written,
+              before: null,
+              after: values.map((row) => (Array.isArray(row) ? row.map((c) => (c == null ? '' : String(c))) : [String(row ?? '')])),
+            })
+          : { undo_id: null, undoable: false };
+        return {
+          type: 'tool_result',
+          tool_use_id: id,
+          content: JSON.stringify({
+            ...result,
+            ...journal,
+            ...(journal.undoable
+              ? { undo_note: 'Undoing this clears the appended cells; the empty rows themselves stay.' }
+              : {}),
+          }),
+        };
+      }
+
+      const captured = await captureValuesBefore(token, spreadsheetId, range, values);
+      const result = await updateSheetValues(token, { spreadsheetId, range, values, append: false });
+      const journal = await recordSheetEdit(admin, {
+        userId: user.id,
+        spreadsheetId,
+        kind: 'values',
+        range: captured.range,
+        before: captured.before,
+        after: values.map((row) => (Array.isArray(row) ? row.map((c) => (c == null ? '' : String(c))) : [String(row ?? '')])),
+        tooLarge: captured.tooLarge,
       });
-      return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+      return { type: 'tool_result', tool_use_id: id, content: JSON.stringify({ ...result, ...journal }) };
     }
     if (
       (name === 'read_file_comments' || name === 'add_file_comment' || name === 'reply_to_file_comment') &&
@@ -1259,6 +1320,20 @@ export async function runTool(block, user, context = {}) {
         };
       }
     }
+    if (SHEET_HISTORY_TOOL_NAMES.has(name) && user) {
+      // Undoing a values or note edit needs Sheets; undoing a creation needs
+      // Drive, which the Sheets connector covers for files it made itself.
+      const token = await getValidToken(user.id, 'google_sheets');
+      if (!token) {
+        return {
+          type: 'tool_result',
+          tool_use_id: id,
+          content: 'Google Sheets is not connected.',
+          is_error: true,
+        };
+      }
+      return handleSheetHistoryTool(block, user, getAdminClient(), token);
+    }
     if ((name === 'read_sheet_notes' || name === 'set_sheet_note') && user) {
       const token = await getValidToken(user.id, 'google_sheets');
       if (!token) {
@@ -1277,11 +1352,30 @@ export async function runTool(block, user, context = {}) {
           });
           return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
         }
-        const result = await setSheetNote(token, String(input.spreadsheet_id || ''), {
-          cell: String(input.cell || ''),
+        const spreadsheetId = String(input.spreadsheet_id || '');
+        const cell = String(input.cell || '');
+        // Writing a note replaces whatever was there, so the old text is read
+        // back first — otherwise the only copy of it is gone.
+        let previous = null;
+        try {
+          const existing = await readSheetNotes(token, spreadsheetId, { range: cell, maxResults: 1 });
+          previous = existing.notes[0]?.note ?? null;
+        } catch { /* no note there, or the range does not resolve yet */ }
+        const result = await setSheetNote(token, spreadsheetId, {
+          cell,
           note: String(input.note ?? ''),
         });
-        return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
+        const journal = await recordSheetEdit(getAdminClient(), {
+          userId: user.id,
+          spreadsheetId,
+          kind: 'note',
+          // The write resolves the tab name, so the journalled cell is the
+          // fully qualified one and undo cannot land on the wrong tab.
+          range: result.cell,
+          before: previous,
+          after: result.note,
+        });
+        return { type: 'tool_result', tool_use_id: id, content: JSON.stringify({ ...result, ...journal }) };
       } catch (e) {
         return { type: 'tool_result', tool_use_id: id, content: e?.message || String(e), is_error: true };
       }
@@ -1644,6 +1738,7 @@ export async function loadConnectorsAndTools(user) {
   if (sheetsTok) {
     connected.sheets = true;
     tools.push(SHEETS_LIST_TOOL, SHEETS_READ_TOOL, CREATE_SHEET_TOOL, UPDATE_SHEET_TOOL, READ_NOTES_TOOL, SET_NOTE_TOOL);
+    tools.push(...SHEET_HISTORY_TOOLS);
   }
   // Comments live in Drive, not in Sheets or Docs, so they are offered whenever
   // any of the three is connected — the file to comment on could be either.

@@ -773,6 +773,38 @@ export async function readSheetRange(accessToken, spreadsheetId, range = SHEET_D
   };
 }
 
+/**
+ * Read a range exactly as it is stored, for journalling a write.
+ *
+ * Unlike readSheetRange this does not page or trim: an undo needs the whole
+ * block or none of it. It reads formulas rather than results, so restoring a
+ * cell restores "=SUM(B2:B40)" and not the number that formula happened to
+ * produce at the moment it was overwritten.
+ */
+export async function readSheetGrid(accessToken, spreadsheetId, range) {
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}` +
+    `/values/${encodeURIComponent(range)}?valueRenderOption=FORMULA`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) throw new Error(`Sheets read failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const data = await res.json();
+  return data.values || [];
+}
+
+/** Move a spreadsheet to the bin, or take it back out. Undo for create_spreadsheet. */
+export async function setFileTrashed(accessToken, fileId, trashed) {
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trashed: !!trashed }),
+    },
+  );
+  if (!res.ok) throw new Error(`Drive trash failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  return { id: fileId, trashed: !!trashed };
+}
+
 export async function createSpreadsheet(accessToken, { title, headers, rows }) {
   const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
     method: 'POST',
