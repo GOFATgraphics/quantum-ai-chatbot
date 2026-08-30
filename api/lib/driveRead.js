@@ -26,6 +26,85 @@ function sliceText(full, offset, maxChars) {
 }
 
 /**
+ * Is this file JSON, whatever Drive claims its type is?
+ *
+ * Drive is unreliable here: the same .json file is application/json when the
+ * web uploader guessed right, text/plain when it did not, and
+ * application/octet-stream when it came from a script or an API export. So the
+ * name is trusted as much as the type.
+ */
+function looksLikeJson(mime, name) {
+  const m = String(mime || '').toLowerCase();
+  if (m === 'application/json' || m.endsWith('+json') || m === 'application/x-ndjson') return true;
+  return /\.(json|jsonl|ndjson|geojson)$/i.test(String(name || ''));
+}
+
+/**
+ * Make a JSON file readable.
+ *
+ * Machine-written JSON is usually one enormous line, and a single line is the
+ * worst possible shape for this reader: paging cuts it at an arbitrary
+ * character, so every page after the first begins mid-key and the file can
+ * never be understood, only sampled. Re-indenting turns it back into lines,
+ * which both survives paging and is what anyone reading it actually wants.
+ *
+ * The summary matters more than the text for big files. "8,412 records with
+ * these fields" answers most questions outright, and tells the model whether
+ * paging through 4MB of records is worth it at all.
+ */
+function prepareJson(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  try {
+    const value = JSON.parse(trimmed);
+    return { text: JSON.stringify(value, null, 2), summary: describeJson(value) };
+  } catch {
+    /* not a single JSON document — it may still be one per line */
+  }
+
+  // NDJSON / JSON Lines: a log or export format, one record per line.
+  const lines = trimmed.split('\n').filter((l) => l.trim());
+  if (lines.length > 1) {
+    const records = [];
+    for (const line of lines) {
+      try { records.push(JSON.parse(line)); } catch { return null; }
+    }
+    return {
+      text: records.map((r) => JSON.stringify(r, null, 2)).join('\n'),
+      summary: { shape: 'ndjson', records: records.length, fields: fieldsOf(records[0]) },
+    };
+  }
+
+  // Malformed. Hand back the raw text rather than an error: a truncated or
+  // hand-edited file is still worth reading, and saying so is more useful
+  // than refusing it.
+  return null;
+}
+
+function fieldsOf(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value) : undefined;
+}
+
+function describeJson(value) {
+  if (Array.isArray(value)) {
+    return { shape: 'array', records: value.length, fields: fieldsOf(value[0]) };
+  }
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value);
+    // A wrapper around one big list — {"items": [...]} — is the common export
+    // shape, so name the list rather than reporting a single-key object.
+    const listKey = keys.find((k) => Array.isArray(value[k]) && value[k].length > 0);
+    return {
+      shape: 'object',
+      keys,
+      ...(listKey ? { list: listKey, records: value[listKey].length, fields: fieldsOf(value[listKey][0]) } : {}),
+    };
+  }
+  return { shape: typeof value };
+}
+
+/**
  * Read a PDF or Office file by having Drive convert it, rather than parsing it here.
  *
  * Google's own converter is what runs — the same one behind "Open with Google
@@ -194,9 +273,11 @@ export async function readDriveFile(accessToken, fileId, opts = {}) {
     return { ...base, converted: true, ...sliceText(extracted.text, offset, maxChars) };
   }
 
+  const isJson = looksLikeJson(mime, name);
+
   const textLike =
+    isJson ||
     mime.startsWith('text/') ||
-    mime === 'application/json' ||
     mime === 'application/xml' ||
     mime === 'application/javascript' ||
     mime === 'application/x-javascript' ||
@@ -233,6 +314,27 @@ export async function readDriveFile(accessToken, fileId, opts = {}) {
     return { ...base, text: null, error: 'File looks binary; cannot extract text.' };
   }
   const full = buf.toString('utf8');
+
+  if (isJson) {
+    const prepared = prepareJson(full);
+    if (prepared) {
+      return {
+        ...base,
+        format: 'json',
+        json: prepared.summary,
+        formatted: true,
+        ...sliceText(prepared.text, offset, maxChars),
+      };
+    }
+    // Parsing failed, so the file is malformed or truncated. It is still text.
+    return {
+      ...base,
+      format: 'json',
+      json: { shape: 'invalid', note: 'Not valid JSON — returned as raw text.' },
+      ...sliceText(full, offset, maxChars),
+    };
+  }
+
   return { ...base, ...sliceText(full, offset, maxChars) };
 }
 
@@ -286,6 +388,9 @@ export const READ_DRIVE_FILE_TOOL = {
     'and photographed documents, ' +
     'so this is the right tool for a contract sitting in Drive - do not ask the user to convert or ' +
     're-upload it first. Converting needs the Google Drive connector rather than Docs alone. ' +
+    'JSON files (.json, .jsonl, .ndjson, .geojson) are re-indented so they can be read and paged, ' +
+    'and come back with a json summary giving the shape, the record count and the field names - ' +
+    'read that summary before paging through a large file, since it often answers the question on its own. ' +
     'For large files use offset + max_chars and follow next_offset until truncated is false.',
   input_schema: {
     type: 'object',
