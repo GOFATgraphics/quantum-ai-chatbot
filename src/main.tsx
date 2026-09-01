@@ -116,10 +116,30 @@ if ('serviceWorker' in navigator) {
 
       // Reload once when the new SW takes control (avoids mixed old/new assets)
       let refreshing = false
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
+      const reloadOnce = () => {
         if (refreshing) return
         refreshing = true
         window.location.reload()
+      }
+      navigator.serviceWorker.addEventListener('controllerchange', reloadOnce)
+
+      /**
+       * The worker serves the cached shell and checks the network behind it.
+       * When that check finds a different build, this is how the running page
+       * finds out — otherwise it would keep the old bundle until something
+       * else happened to evict it, which is how a deploy goes missing on a
+       * device for days.
+       *
+       * Guarded per tab session as well as per page: if a build ever produced
+       * HTML that differed on every fetch, an unguarded reload here would spin.
+       */
+      navigator.serviceWorker.addEventListener('message', (e) => {
+        if (e.data?.type !== 'SHELL_UPDATED') return
+        try {
+          if (sessionStorage.getItem('quantumy:shell-reloaded') === '1') return
+          sessionStorage.setItem('quantumy:shell-reloaded', '1')
+        } catch { /* private mode — the per-page guard still applies */ }
+        reloadOnce()
       })
     } catch {
       /* offline / private mode */

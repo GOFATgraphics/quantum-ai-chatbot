@@ -4,13 +4,28 @@
  * - Never cache API / Supabase
  * - Cache-first for hashed build assets: the filename carries the version, so
  *   a cached copy can never be stale and there is nothing to revalidate
- * - Network-first, but with a timeout, for HTML and anything unhashed
+ * - Stale-while-revalidate for the HTML shell: served from cache instantly,
+ *   checked against the network every time, and the page is told when it
+ *   changed so it can pick up the new build
  * - Cache-first for other static assets (fonts, images)
- * - Bump CACHE on every deploy that must reach users immediately
  * - Supports postMessage: { type: 'SKIP_WAITING' | 'CLEAR_CACHE' | 'GET_VERSION' }
+ *
+ * Why the shell is not network-first any more.
+ *
+ * It was, with a three second timeout falling back to cache. That has a bad
+ * failure mode: one slow load serves the cached HTML, the cached HTML names
+ * the old hashed asset files, and those are cache-first — so the whole old
+ * app is served from cache, and stays served from cache. Nothing in that loop
+ * ever touches the network again for anything that would reveal a new build.
+ * A deploy could then simply never arrive on that device.
+ *
+ * Serving the cached shell and revalidating behind it fixes both halves at
+ * once: the page paints immediately rather than waiting on the network, and
+ * the check for a new build happens on every single load instead of only when
+ * sw.js itself happens to change.
  */
-const CACHE = 'quantumy-v11'
-const VERSION = '11'
+const CACHE = 'quantumy-v12'
+const VERSION = '12'
 
 self.addEventListener('install', (event) => {
   // Activate as soon as installed — don't wait for old tabs to close
@@ -45,40 +60,50 @@ function canCache(request, response) {
   return true
 }
 
-/**
- * How long to wait for the network before serving a cached copy.
- *
- * Without this, a request that is merely slow rather than failed blocks the
- * page for as long as the connection takes to give up — the cached copy sits
- * there unused, because the old code only fell back when fetch threw. On a
- * weak mobile connection that is a blank screen for tens of seconds.
- */
-const NETWORK_TIMEOUT_MS = 3000
+async function notifyClients(message) {
+  const clients = await self.clients.matchAll({ type: 'window' })
+  for (const client of clients) client.postMessage(message)
+}
 
-async function networkFirst(request) {
+/**
+ * Serve the app shell from cache and check the network behind it.
+ *
+ * The revalidation is not optional and is not raced against a timer: it runs
+ * on every load, and when the HTML that comes back differs from the copy that
+ * was served, open pages are told. That message is what makes a deploy reach a
+ * device that is already running an older build — without it, the only trigger
+ * is sw.js changing, which a deploy need not do.
+ *
+ * The comparison is on the body text. index.html carries the hashed script and
+ * stylesheet names, so any real build changes it, and a rebuild that produces
+ * identical output correctly says nothing.
+ */
+async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE)
   const cached = await cache.match(request)
 
-  let timer
-  const timeout = new Promise((resolve) => {
-    timer = setTimeout(() => resolve(null), NETWORK_TIMEOUT_MS)
-  })
-
-  try {
-    const response = cached
-      ? await Promise.race([fetch(request), timeout])
-      : await fetch(request)
-    if (!response) return cached
-    if (canCache(request, response)) {
-      cache.put(request, response.clone()).catch(() => {})
+  const revalidate = (async () => {
+    const response = await fetch(request)
+    if (!canCache(request, response)) return response
+    if (cached) {
+      const [before, after] = await Promise.all([cached.clone().text(), response.clone().text()])
+      if (before !== after) {
+        await cache.put(request, response.clone())
+        await notifyClients({ type: 'SHELL_UPDATED', version: VERSION })
+        return response
+      }
     }
+    await cache.put(request, response.clone())
     return response
-  } catch (err) {
-    if (cached) return cached
-    throw err
-  } finally {
-    clearTimeout(timer)
+  })()
+
+  if (cached) {
+    // Failures here are expected offline and must not surface as an unhandled
+    // rejection; the page already has its answer.
+    revalidate.catch(() => {})
+    return cached
   }
+  return revalidate
 }
 
 async function cacheFirst(request) {
@@ -136,7 +161,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isAppShell(request, url)) {
-    event.respondWith(networkFirst(request))
+    event.respondWith(staleWhileRevalidate(request))
     return
   }
 
