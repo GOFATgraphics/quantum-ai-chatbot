@@ -20,8 +20,8 @@ import { getAdminClient } from './supabaseAdmin.js';
  * list-price estimates, and this is the single place to change if that shifts.
  */
 const PRICING = {
-  'claude-sonnet-5': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
-  'claude-opus-5': { input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.5 },
+  'claude-sonnet-5': { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 },
+  'claude-opus-5': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
   'claude-haiku-4-5': { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
 };
 const DEFAULT_PRICING = PRICING['claude-sonnet-5'];
