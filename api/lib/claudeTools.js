@@ -35,7 +35,7 @@ import {
 } from './microsoft.js';
 import { READ_DRIVE_FILE_TOOL, LIST_DRIVE_FOLDER_TOOL, handleReadDriveFile, handleListDriveFolder } from './driveRead.js';
 
-// Notes feature is paused pending relaunch. Flip to re-enable; nothing else to change.
+// BACKEND Notes flag. Frontend mirror is src/lib/features.ts — flip BOTH together to re-enable; nothing else to change.
 export const NOTES_ENABLED = false;
 
 /** Anthropic server-side tools — executed by Anthropic, not by us */
