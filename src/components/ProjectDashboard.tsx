@@ -206,10 +206,21 @@ export default function ProjectDashboard({
     }
   }
 
-  const updateChecklist = async (n: Note, checklist: ChecklistItem[]) => {
-    setNotes((p) => p.map((x) => (x.id === n.id ? { ...x, checklist } : x)))
-    const { error: dbError } = await supabase.from('notes').update({ checklist, updated_at: new Date().toISOString() }).eq('id', n.id)
-    if (dbError) setError('Could not update checklist. Try again.')
+  const updateChecklist = async (noteId: string, updater: (prev: ChecklistItem[]) => ChecklistItem[]) => {
+    let previous: ChecklistItem[] = []
+    let nextChecklist: ChecklistItem[] = []
+    setNotes((p) => {
+      const note = p.find((x) => x.id === noteId)
+      if (!note) return p
+      previous = note.checklist || []
+      nextChecklist = updater(previous)
+      return p.map((x) => (x.id === noteId ? { ...x, checklist: nextChecklist } : x))
+    })
+    const { error: dbError } = await supabase.from('notes').update({ checklist: nextChecklist, updated_at: new Date().toISOString() }).eq('id', noteId)
+    if (dbError) {
+      setError('Could not update checklist. Try again.')
+      setNotes((p) => p.map((x) => (x.id === noteId ? { ...x, checklist: previous } : x)))
+    }
   }
 
   const toggleExpanded = (id: string) => {
@@ -444,11 +455,11 @@ export default function ProjectDashboard({
                     onSetStatus={(status) => setNoteStatus(n, status)}
                     onDelete={() => removeNote(n.id)}
                     onToggleChecklistItem={(itemId) =>
-                      updateChecklist(n, n.checklist.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it)))
+                      updateChecklist(n.id, (prev) => prev.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it)))
                     }
-                    onRemoveChecklistItem={(itemId) => updateChecklist(n, n.checklist.filter((it) => it.id !== itemId))}
+                    onRemoveChecklistItem={(itemId) => updateChecklist(n.id, (prev) => prev.filter((it) => it.id !== itemId))}
                     onAddChecklistItem={(text) =>
-                      updateChecklist(n, [...n.checklist, { id: crypto.randomUUID(), text, done: false }])
+                      updateChecklist(n.id, (prev) => [...prev, { id: crypto.randomUUID(), text, done: false }])
                     }
                   />
                 ))}
