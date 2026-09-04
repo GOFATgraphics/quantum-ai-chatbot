@@ -182,8 +182,21 @@ function sseWrite(res, obj) {
 
 const CACHE_CONTROL = { type: 'ephemeral' };
 
-/** Tags the last block of the last message so the growing prefix gets cached round to round. */
-function withCacheBreakpoint(messages) {
+/**
+ * Tags the last block of the last message so the growing prefix gets cached
+ * round to round, then appends `tail` — the per-request user context — *after*
+ * that breakpoint.
+ *
+ * The order is the whole point. Caching is a prefix match, and the tail is
+ * rebuilt from the database on every request, so anywhere inside the cached
+ * prefix it would strand every breakpoint the previous requests wrote: the
+ * bytes they pointed at no longer exist, no entry matches, and the entire
+ * conversation gets re-billed as a cache write instead of read at a tenth of
+ * the price. Sitting after the breakpoint it is just the uncached remainder,
+ * a few hundred tokens at full price, and the history in front of it keeps
+ * hitting cache.
+ */
+function withCacheBreakpoint(messages, tail = null) {
   if (!messages?.length) return messages;
   const out = messages.slice(0, -1);
   const last = messages[messages.length - 1];
@@ -193,6 +206,7 @@ function withCacheBreakpoint(messages) {
   } else if (Array.isArray(content) && content.length) {
     content = content.map((b, i) => (i === content.length - 1 ? { ...b, cache_control: CACHE_CONTROL } : b));
   }
+  if (tail && Array.isArray(content)) content = [...content, { type: 'text', text: tail }];
   out.push({ ...last, content });
   return out;
 }
@@ -205,15 +219,32 @@ function withToolsCacheBreakpoint(tools) {
   return out;
 }
 
-/** Static rules block is cache_control-tagged (stays cached across memory/project churn); dynamic per-user context is not, since it changes almost every request and tagging it would only add cache-write overhead for no reuse. */
+/**
+ * System carries the static rules block only, cache_control-tagged.
+ *
+ * Per-user context (memory, project, name) used to sit here too, untagged. That
+ * looked free — it is never worth a cache write of its own — but position, not
+ * tagging, is what costs money: render order is tools -> system -> messages, so
+ * a volatile block here sits ahead of the entire conversation, and one
+ * save_memory call invalidated the cached history behind it. It now rides at
+ * the tail of the newest message instead (see withCacheBreakpoint), which
+ * changes nothing the model reads and leaves the prefix in front of it intact.
+ *
+ * The purpose-built channel for this is a `role: "system"` message inside
+ * `messages`, but Sonnet 5 rejects those, so a text block on the user turn is
+ * the available route.
+ */
 function systemBlocks(system) {
-  const blocks = [{ type: 'text', text: system.staticPrompt, cache_control: CACHE_CONTROL }];
-  if (system.dynamicContext) blocks.push({ type: 'text', text: system.dynamicContext });
-  return blocks;
+  return [{ type: 'text', text: system.staticPrompt, cache_control: CACHE_CONTROL }];
 }
 
 async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system: systemBlocks(system), messages: withCacheBreakpoint(messages) };
+  const body = {
+    model: MODEL,
+    max_tokens: maxTokens,
+    system: systemBlocks(system),
+    messages: withCacheBreakpoint(messages, system.dynamicContext),
+  };
   if (tools?.length) body.tools = withToolsCacheBreakpoint(tools);
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -235,7 +266,7 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
     model: MODEL,
     max_tokens: maxTokens,
     system: systemBlocks(system),
-    messages: withCacheBreakpoint(messages),
+    messages: withCacheBreakpoint(messages, system.dynamicContext),
     stream: true,
   };
   if (tools?.length) body.tools = withToolsCacheBreakpoint(tools);
