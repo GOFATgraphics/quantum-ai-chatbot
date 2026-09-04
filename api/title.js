@@ -2,7 +2,9 @@ import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
 import { allowRequest } from './lib/rateLimit.js';
 import { recordUsage } from './lib/tokenUsage.js';
 
-const MODEL = 'claude-sonnet-5';
+// Naming a chat in six words is not work that repays a frontier model, and this
+// fires once per conversation on the user's first exchange.
+const MODEL = 'claude-haiku-4-5';
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
 

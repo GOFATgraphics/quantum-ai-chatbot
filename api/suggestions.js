@@ -2,7 +2,9 @@ import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
 import { allowRequest } from './lib/rateLimit.js';
 import { recordUsage } from './lib/tokenUsage.js';
 
-const MODEL = 'claude-sonnet-5';
+// Fires after most replies, so it is the one auxiliary call whose model choice
+// shows up on the bill. Three short follow-up prompts do not need Sonnet.
+const MODEL = 'claude-haiku-4-5';
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
 
