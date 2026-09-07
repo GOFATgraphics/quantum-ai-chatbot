@@ -12,6 +12,7 @@
  * The service-role client is never handed out unless that check passes.
  */
 import { getAdminClient, getUserFromAuthHeader } from './supabaseAdmin.js';
+import { allowedOrigin } from './cors.js';
 
 export async function requireAdmin(req, res) {
   const user = await getUserFromAuthHeader(req);
@@ -42,7 +43,8 @@ export async function requireAdmin(req, res) {
 
 /** Standard CORS/preflight handling shared by the admin endpoints. */
 export function applyAdminCors(req, res, methods = 'GET, OPTIONS') {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin());
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', methods);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {

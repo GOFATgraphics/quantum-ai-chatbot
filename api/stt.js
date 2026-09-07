@@ -7,6 +7,7 @@
 import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
 import { allowRequest } from './lib/rateLimit.js';
 import { wordsToNumbers } from './lib/numberWords.js';
+import { allowedOrigin } from './lib/cors.js';
 
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
@@ -56,7 +57,8 @@ function readRawBody(req) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin());
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();

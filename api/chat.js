@@ -2,6 +2,7 @@ import { getUserFromAuthHeader, getAdminClient } from './lib/supabaseAdmin.js';
 import { loadConnectorsAndTools, runTool } from './lib/claudeTools.js';
 import { allowRequest } from './lib/rateLimit.js';
 import { createUsageMeter } from './lib/tokenUsage.js';
+import { allowedOrigin } from './lib/cors.js';
 
 export const config = { maxDuration: 300 };
 
@@ -386,7 +387,8 @@ function sendSseError(res, message) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin());
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();

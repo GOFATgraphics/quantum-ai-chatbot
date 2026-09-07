@@ -7,6 +7,7 @@
  */
 import { getUserFromAuthHeader } from './lib/supabaseAdmin.js';
 import { allowRequest } from './lib/rateLimit.js';
+import { allowedOrigin } from './lib/cors.js';
 
 // Read-aloud chunks a reply into ~380-char pieces and prefetches ahead, so
 // this needs headroom above chat's limit for a burst of legitimate use.
@@ -14,7 +15,8 @@ const RATE_LIMIT = 40;
 const RATE_WINDOW_MS = 60_000;
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin());
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
