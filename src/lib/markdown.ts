@@ -121,6 +121,7 @@ export function formatMarkdown(text: string): string {
   }
 
   const isSafeUrl = (url: string) => {
+    if (url.startsWith('data:application/pdf;base64,')) return true
     try {
       const u = new URL(url.replace(new RegExp('&' + 'amp;', 'g'), '&'))
       return u.protocol === 'https:' || u.protocol === 'http:'
@@ -152,10 +153,12 @@ export function formatMarkdown(text: string): string {
       .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
 
     t = t.replace(
-      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      /\[([^\]]+)\]\(((?:https?:\/\/|data:application\/pdf;base64,)[^)\s]+)\)/g,
       (_m, label, url) => {
         if (!isSafeUrl(url)) return label
-        return `<a class="md-link" href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`
+        const isDownload = url.startsWith('data:application/pdf')
+        const downloadAttr = isDownload ? ` download="document.pdf"` : ''
+        return `<a class="md-link" href="${url}" target="_blank" rel="noopener noreferrer"${downloadAttr}>${label}</a>`
       }
     )
 

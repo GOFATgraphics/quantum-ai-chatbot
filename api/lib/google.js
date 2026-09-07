@@ -405,6 +405,230 @@ export async function moveFileToFolder(accessToken, fileId, folderId) {
   return { id: data.id, name: data.name, parents: data.parents || [], link: data.webViewLink };
 }
 
+/**
+ * Upload an arbitrary file (e.g. generated PDF) directly into Google Drive
+ */
+export async function uploadDriveFile(accessToken, { name, mimeType = 'application/pdf', buffer, folderId }) {
+  const boundary = '-------QuantumDriveUploadBoundary' + Date.now();
+  const delimiter = `\r\n--${boundary}\r\n`;
+  const closeDelimiter = `\r\n--${boundary}--`;
+
+  const metadata = {
+    name: name || 'Untitled Document',
+    mimeType,
+  };
+  if (folderId) {
+    metadata.parents = [folderId];
+  }
+
+  const metaHeader = `Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}`;
+  const mediaHeader = `Content-Type: ${mimeType}\r\n\r\n`;
+
+  const bodyBuffer = Buffer.concat([
+    Buffer.from(delimiter + metaHeader + delimiter + mediaHeader),
+    Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer),
+    Buffer.from(closeDelimiter),
+  ]);
+
+  const res = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,webViewLink,webContentLink,parents',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+        'Content-Length': String(bodyBuffer.length),
+      },
+      body: bodyBuffer,
+    }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Drive upload failed: ${res.status} ${errText}`);
+  }
+
+  const data = await res.json();
+  return {
+    id: data.id,
+    name: data.name,
+    link: data.webViewLink,
+    downloadLink: data.webContentLink,
+    parents: data.parents || [],
+  };
+}
+
+/**
+ * Parse markdown text and generate Google Docs API batchUpdate styling requests
+ */
+function buildDocStylingRequests(body) {
+  const lines = String(body || '').split('\n');
+  const requests = [];
+  let plainText = '';
+  let currentIndex = 1; // Google Docs body begins at index 1
+
+  const styledSegments = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    let lineType = 'normal';
+    let content = rawLine;
+
+    if (/^#\s+/.test(content)) {
+      lineType = 'h1';
+      content = content.replace(/^#\s+/, '');
+    } else if (/^##\s+/.test(content)) {
+      lineType = 'h2';
+      content = content.replace(/^##\s+/, '');
+    } else if (/^###\s+/.test(content)) {
+      lineType = 'h3';
+      content = content.replace(/^###\s+/, '');
+    } else if (/^>\s+/.test(content)) {
+      lineType = 'quote';
+      content = content.replace(/^>\s+/, '');
+    } else if (/^[-*]\s+/.test(content)) {
+      lineType = 'bullet';
+      content = content.replace(/^[-*]\s+/, '');
+    }
+
+    // Process inline bold (**text**) while tracking exact string indices
+    const boldRanges = [];
+    const boldRegex = /\*\*(.*?)\*\*/g;
+    let match;
+    let cleanedContent = '';
+    let lastIdx = 0;
+
+    while ((match = boldRegex.exec(content)) !== null) {
+      cleanedContent += content.slice(lastIdx, match.index);
+      const boldStart = cleanedContent.length;
+      cleanedContent += match[1];
+      const boldEnd = cleanedContent.length;
+      boldRanges.push({ start: boldStart, end: boldEnd });
+      lastIdx = match.index + match[0].length;
+    }
+    cleanedContent += content.slice(lastIdx);
+
+    const lineText = cleanedContent + '\n';
+    const startIndex = currentIndex;
+    const endIndex = currentIndex + lineText.length;
+
+    styledSegments.push({
+      type: lineType,
+      startIndex,
+      endIndex,
+      boldRanges: boldRanges.map((r) => ({
+        startIndex: startIndex + r.start,
+        endIndex: startIndex + r.end,
+      })),
+    });
+
+    plainText += lineText;
+    currentIndex = endIndex;
+  }
+
+  // 1. Insert full text
+  requests.push({
+    insertText: { location: { index: 1 }, text: plainText },
+  });
+
+  // 2. Apply paragraph and text styling
+  for (const seg of styledSegments) {
+    if (seg.endIndex <= seg.startIndex) continue;
+
+    if (seg.type === 'h1') {
+      requests.push({
+        updateParagraphStyle: {
+          range: { startIndex: seg.startIndex, endIndex: seg.endIndex },
+          paragraphStyle: { namedStyleType: 'HEADING_1' },
+          fields: 'namedStyleType',
+        },
+      });
+      requests.push({
+        updateTextStyle: {
+          range: { startIndex: seg.startIndex, endIndex: seg.endIndex - 1 },
+          textStyle: {
+            bold: true,
+            fontSize: { magnitude: 18, unit: 'PT' },
+            foregroundColor: { color: { rgbColor: { red: 0.06, green: 0.09, blue: 0.16 } } },
+          },
+          fields: 'bold,fontSize,foregroundColor',
+        },
+      });
+    } else if (seg.type === 'h2') {
+      requests.push({
+        updateParagraphStyle: {
+          range: { startIndex: seg.startIndex, endIndex: seg.endIndex },
+          paragraphStyle: { namedStyleType: 'HEADING_2' },
+          fields: 'namedStyleType',
+        },
+      });
+      requests.push({
+        updateTextStyle: {
+          range: { startIndex: seg.startIndex, endIndex: seg.endIndex - 1 },
+          textStyle: {
+            bold: true,
+            fontSize: { magnitude: 14, unit: 'PT' },
+            foregroundColor: { color: { rgbColor: { red: 0.12, green: 0.16, blue: 0.24 } } },
+          },
+          fields: 'bold,fontSize,foregroundColor',
+        },
+      });
+    } else if (seg.type === 'h3') {
+      requests.push({
+        updateParagraphStyle: {
+          range: { startIndex: seg.startIndex, endIndex: seg.endIndex },
+          paragraphStyle: { namedStyleType: 'HEADING_3' },
+          fields: 'namedStyleType',
+        },
+      });
+      requests.push({
+        updateTextStyle: {
+          range: { startIndex: seg.startIndex, endIndex: seg.endIndex - 1 },
+          textStyle: {
+            bold: true,
+            fontSize: { magnitude: 12, unit: 'PT' },
+            foregroundColor: { color: { rgbColor: { red: 0.15, green: 0.39, blue: 0.92 } } },
+          },
+          fields: 'bold,fontSize,foregroundColor',
+        },
+      });
+    } else if (seg.type === 'bullet') {
+      requests.push({
+        createParagraphBullets: {
+          range: { startIndex: seg.startIndex, endIndex: seg.endIndex },
+          bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+        },
+      });
+    } else if (seg.type === 'quote') {
+      requests.push({
+        updateTextStyle: {
+          range: { startIndex: seg.startIndex, endIndex: seg.endIndex - 1 },
+          textStyle: {
+            italic: true,
+            foregroundColor: { color: { rgbColor: { red: 0.35, green: 0.42, blue: 0.52 } } },
+          },
+          fields: 'italic,foregroundColor',
+        },
+      });
+    }
+
+    // Inline bolding
+    for (const b of seg.boldRanges) {
+      if (b.endIndex > b.startIndex) {
+        requests.push({
+          updateTextStyle: {
+            range: { startIndex: b.startIndex, endIndex: b.endIndex },
+            textStyle: { bold: true },
+            fields: 'bold',
+          },
+        });
+      }
+    }
+  }
+
+  return requests;
+}
+
 export async function createGoogleDoc(accessToken, { title, body }) {
   const createRes = await fetch('https://docs.googleapis.com/v1/documents', {
     method: 'POST',
@@ -414,25 +638,36 @@ export async function createGoogleDoc(accessToken, { title, body }) {
   if (!createRes.ok) throw new Error(`Docs create failed: ${createRes.status} ${await createRes.text()}`);
   const doc = await createRes.json();
   const documentId = doc.documentId;
+
   if (body && String(body).trim()) {
-    const text = String(body);
-    const updateRes = await fetch(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [{ insertText: { location: { index: 1 }, text } }],
-      }),
-    });
-    if (!updateRes.ok) {
-      const t = await updateRes.text();
-      return {
-        documentId,
-        title: doc.title,
-        link: `https://docs.google.com/document/d/${documentId}/edit`,
-        bodyError: t.slice(0, 200),
-      };
+    try {
+      // Build rich formatted styling requests
+      const requests = buildDocStylingRequests(body);
+      const updateRes = await fetch(
+        `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests }),
+        }
+      );
+
+      if (!updateRes.ok) {
+        // Fallback: simple text insertion if rich batch fails
+        console.warn('Rich doc formatting failed, falling back to simple text insert');
+        await fetch(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: [{ insertText: { location: { index: 1 }, text: String(body) } }],
+          }),
+        });
+      }
+    } catch (e) {
+      console.error('Doc styling error:', e);
     }
   }
+
   return {
     documentId,
     title: doc.title || title,

@@ -28,7 +28,9 @@ import {
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
+  uploadDriveFile,
 } from './google.js';
+import { generateExecutivePdf } from './pdfGenerator.js';
 import {
   replyGmail,
   forwardGmail,
@@ -215,19 +217,72 @@ export const DOCS_TOOL = {
 export const CREATE_DOC_TOOL = {
   name: 'create_google_doc',
   description:
-    'Create a new Google Doc with optional body text. By default it lands loose in My Drive; pass folder_id, or folder_name to file it into an existing Drive folder (e.g. "Trade Contracts"). Filing into a folder needs the Google Drive connector — with only Docs connected the doc is still created, and the result says it could not be filed.',
+    'Create a new Google Doc with styled formatting (headings #/##/###, bold text, bullet lists, quotes). By default it lands in My Drive; pass folder_id, or folder_name to file it into a Drive folder. Use Markdown in body to automatically produce formatted headings, bullet lists, and styling.',
   input_schema: {
     type: 'object',
     properties: {
-      title: { type: 'string' },
-      body: { type: 'string' },
+      title: { type: 'string', description: 'Document title' },
+      body: { type: 'string', description: 'Document body in Markdown format (# Heading 1, ## Heading 2, - bullets, **bold**)' },
       folder_id: { type: 'string', description: 'Drive folder id, if already known.' },
       folder_name: {
         type: 'string',
-        description: 'Folder name to look up instead of an id. If several match, the doc is left in My Drive and the matches are returned so the user can pick.',
+        description: 'Folder name to look up instead of an id. If several match, the doc is left in My Drive and matches are returned.',
       },
     },
     required: ['title'],
+  },
+};
+
+export const GENERATE_PDF_TOOL = {
+  name: 'generate_pdf_document',
+  description:
+    'Generate an executive-grade, polished PDF document or report. Features cover banner, status badge, metadata, optional KPI summary metric cards, summary callout box, styled data tables with alternating row shading, and dynamic headers/footers with page numbers. If Google Drive is connected, it automatically saves to Drive and returns the link. Also provides an instant chat download link.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'Document title' },
+      subtitle: { type: 'string', description: 'Subtitle or brief description' },
+      author: { type: 'string', description: 'Author or organization' },
+      date: { type: 'string', description: 'Document date string' },
+      status_badge: { type: 'string', description: 'Header status badge, e.g. "CONFIDENTIAL", "EXECUTIVE SUMMARY", "FINAL"' },
+      theme: { type: 'string', enum: ['navy', 'emerald', 'charcoal'], description: 'Visual color theme (default "navy")' },
+      summary_box: { type: 'string', description: 'Executive summary or key highlights callout box' },
+      metrics: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', description: 'Metric label (e.g. "Total Revenue")' },
+            value: { type: 'string', description: 'Metric value (e.g. "$1.2M")' },
+          },
+          required: ['label', 'value'],
+        },
+        description: 'Up to 4 key KPI metric cards',
+      },
+      sections: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Section title' },
+            content: { type: 'string', description: 'Paragraph text' },
+            bullets: { type: 'array', items: { type: 'string' }, description: 'Bullet points' },
+            table: {
+              type: 'object',
+              properties: {
+                headers: { type: 'array', items: { type: 'string' } },
+                rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+              },
+            },
+          },
+          required: ['title'],
+        },
+        description: 'Document sections with content, bullet lists, and tables',
+      },
+      folder_name: { type: 'string', description: 'Optional Drive folder name to file into' },
+      folder_id: { type: 'string', description: 'Optional Drive folder ID to file into' },
+    },
+    required: ['title', 'sections'],
   },
 };
 
@@ -994,6 +1049,74 @@ export async function runTool(block, user, context = {}) {
 
       return { type: 'tool_result', tool_use_id: id, content: JSON.stringify(result) };
     }
+    if (name === 'generate_pdf_document') {
+      const pdfBuffer = await generateExecutivePdf({
+        title: input.title,
+        subtitle: input.subtitle,
+        author: input.author || (user?.email ? user.email.split('@')[0] : 'Quantum AI Workspace'),
+        date: input.date,
+        statusBadge: input.status_badge || 'CONFIDENTIAL',
+        theme: input.theme || 'navy',
+        summaryBox: input.summary_box,
+        metrics: input.metrics,
+        sections: input.sections,
+      });
+
+      let driveResult = null;
+      const driveToken = user
+        ? (await getValidToken(user.id, 'google_drive')) || (await getValidToken(user.id, 'google_docs'))
+        : null;
+
+      if (driveToken && user) {
+        try {
+          let folderId = input.folder_id ? String(input.folder_id) : null;
+          const folderName = input.folder_name ? String(input.folder_name) : null;
+
+          if (!folderId && folderName) {
+            const matches = await findDriveFolders(driveToken, folderName);
+            if (matches.length > 0) {
+              folderId = matches[0].id;
+            }
+          }
+
+          const filename = `${String(input.title || 'Document').replace(/[/\\?%*:|"<>]/g, '-')}.pdf`;
+          driveResult = await uploadDriveFile(driveToken, {
+            name: filename,
+            mimeType: 'application/pdf',
+            buffer: pdfBuffer,
+            folderId,
+          });
+        } catch (err) {
+          console.warn('PDF drive upload failed:', err.message);
+        }
+      }
+
+      const base64Data = pdfBuffer.toString('base64');
+      const safeTitle = String(input.title || 'document').replace(/[/\\?%*:|"<>]/g, '-');
+      const dataUrl = `data:application/pdf;base64,${base64Data}`;
+
+      return {
+        type: 'tool_result',
+        tool_use_id: id,
+        content: JSON.stringify({
+          generated: true,
+          title: input.title,
+          size_bytes: pdfBuffer.length,
+          drive_file: driveResult
+            ? {
+                id: driveResult.id,
+                name: driveResult.name,
+                view_link: driveResult.link,
+                download_link: driveResult.downloadLink,
+              }
+            : null,
+          markdown_download: `[📄 Download ${safeTitle}.pdf](${dataUrl})`,
+          message: driveResult
+            ? `Successfully generated executive PDF and saved to Google Drive: "${driveResult.name}".`
+            : `Successfully generated executive PDF (${(pdfBuffer.length / 1024).toFixed(1)} KB).`,
+        }),
+      };
+    }
     if (name === 'append_google_doc' && user) {
       const token = await getValidToken(user.id, 'google_docs');
       if (!token)
@@ -1478,6 +1601,7 @@ export async function loadConnectorsAndTools(user) {
     LIST_NOTES_TOOL,
     UPDATE_NOTE_TOOL,
     DELETE_NOTE_TOOL,
+    GENERATE_PDF_TOOL,
   ];
   if (!user) return { connected, tools };
 
