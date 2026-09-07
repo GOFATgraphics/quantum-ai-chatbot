@@ -5,6 +5,7 @@ import {
   getGoogleEmail,
 } from '../lib/google.js';
 import { getAdminClient } from '../lib/supabaseAdmin.js';
+import { verifyState } from '../lib/oauthState.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).send('Method not allowed');
@@ -25,11 +26,12 @@ export default async function handler(req, res) {
       return res.redirect(`${home}?connector_error=missing_code`);
     }
 
+    // The signature is what makes userId below safe to write against.
     let state;
     try {
-      state = JSON.parse(Buffer.from(stateRaw.toString(), 'base64url').toString());
-    } catch {
-      return res.redirect(`${home}?connector_error=invalid_state`);
+      state = verifyState(stateRaw);
+    } catch (e) {
+      return res.redirect(`${home}?connector_error=${encodeURIComponent(e.message)}`);
     }
 
     const { userId, provider } = state;

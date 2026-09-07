@@ -1,5 +1,6 @@
 import { MS_PROVIDER_SCOPES, getMicrosoftConfig, buildMicrosoftAuthUrl } from '../lib/microsoft.js';
 import { getUserFromAuthHeader } from '../lib/supabaseAdmin.js';
+import { signState } from '../lib/oauthState.js';
 
 export default async function handler(req, res) {
   try {
@@ -19,9 +20,7 @@ export default async function handler(req, res) {
     }
 
     const redirectUri = `${appUrl}/api/connectors/microsoft-callback`;
-    const state = Buffer.from(
-      JSON.stringify({ userId: user.id, provider, t: Date.now() })
-    ).toString('base64url');
+    const state = signState({ userId: user.id, provider });
 
     const url = buildMicrosoftAuthUrl({
       clientId,

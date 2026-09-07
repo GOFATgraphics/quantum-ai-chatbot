@@ -1,8 +1,11 @@
 import { PROVIDER_SCOPES, getGoogleConfig, buildAuthUrl } from '../lib/google.js';
 import { getUserFromAuthHeader } from '../lib/supabaseAdmin.js';
+import { signState } from '../lib/oauthState.js';
+import { allowedOrigin } from '../lib/cors.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin());
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
@@ -33,9 +36,7 @@ export default async function handler(req, res) {
     }
 
     const redirectUri = `${appUrl}/api/connectors/google-callback`;
-    const state = Buffer.from(
-      JSON.stringify({ userId: user.id, provider, t: Date.now() })
-    ).toString('base64url');
+    const state = signState({ userId: user.id, provider });
 
     const url = buildAuthUrl({
       clientId,

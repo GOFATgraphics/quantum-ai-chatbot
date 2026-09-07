@@ -5,6 +5,7 @@ import {
   getMicrosoftEmail,
 } from '../lib/microsoft.js';
 import { getAdminClient } from '../lib/supabaseAdmin.js';
+import { verifyState } from '../lib/oauthState.js';
 
 export default async function handler(req, res) {
   const home = (process.env.APP_URL || '').replace(/\/$/, '') || '/';
@@ -15,11 +16,12 @@ export default async function handler(req, res) {
     if (err) return res.redirect(`${home}?connector_error=${encodeURIComponent(String(err))}`);
     if (!code || !stateRaw) return res.redirect(`${home}?connector_error=missing_code`);
 
+    // The signature is what makes userId below safe to write against.
     let state;
     try {
-      state = JSON.parse(Buffer.from(String(stateRaw), 'base64url').toString('utf8'));
-    } catch {
-      return res.redirect(`${home}?connector_error=bad_state`);
+      state = verifyState(stateRaw);
+    } catch (e) {
+      return res.redirect(`${home}?connector_error=${encodeURIComponent(e.message)}`);
     }
     const { userId, provider } = state;
     if (!userId || !MS_PROVIDER_SCOPES[provider]) {
