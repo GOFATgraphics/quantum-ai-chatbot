@@ -33,8 +33,15 @@ type UserUsage = Totals & {
   avg_peak_context_tokens: number
   max_peak_context_tokens: number
   avg_cost_per_turn: number
+  active_days: number
+  avg_cost_per_active_day: number
+  avg_turns_per_active_day: number
+  busiest_day: { date: string; cost_usd: number; turns: number } | null
   breakdown: Slice[]
 }
+
+/** One user's activity on one day. Only days they used something appear. */
+type UserDay = Totals & { user_id: string; date: string }
 
 type Usage = {
   generated_at: string
@@ -54,6 +61,8 @@ type Usage = {
     avg_fill_pct: number; max_fill_pct: number; breakdown: Slice[]; samples: number
   }
   by_day: DayPoint[]
+  by_user_day?: UserDay[]
+  by_user_day_truncated?: boolean
   by_endpoint: Record<string, Totals>
   by_model: Record<string, Totals>
   users: UserUsage[]
@@ -173,12 +182,166 @@ function CostBars({ data }: { data: DayPoint[] }) {
   )
 }
 
+/**
+ * Enough hues to tell the heaviest users apart, with everyone else folded into
+ * one muted band. Distinguishing twenty people by colour is a fiction; naming
+ * the six that account for the spend and calling the rest "others" is not.
+ */
+const USER_COLORS = [
+  '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2',
+]
+const OTHER_COLOR = '#94a3b8'
+const NAMED_USERS = 6
+
+const shortName = (u: UserUsage) => u.name || u.email?.split('@')[0] || u.id.slice(0, 8)
+
+/**
+ * Daily spend split by user.
+ *
+ * The overall daily chart shows a spike; this one shows whose it was. Each
+ * column is one day, each band within it one user, so the answer to "why was
+ * Tuesday expensive" is legible without cross-referencing two tables.
+ */
+function StackedByUser({
+  days, rows, users, metric,
+}: {
+  days: DayPoint[]
+  rows: UserDay[]
+  users: UserUsage[]
+  metric: 'cost_usd' | 'total_tokens' | 'turns'
+}) {
+  const named = users.slice(0, NAMED_USERS)
+  const colorOf = new Map(named.map((u, i) => [u.id, USER_COLORS[i % USER_COLORS.length]]))
+  const labelOf = new Map(users.map((u) => [u.id, shortName(u)]))
+
+  // Bucket by date once, then order each day's bands so the named users keep
+  // the same vertical order across every column and the eye can follow one.
+  const byDate = new Map<string, UserDay[]>()
+  for (const r of rows) {
+    const list = byDate.get(r.date)
+    if (list) list.push(r)
+    else byDate.set(r.date, [r])
+  }
+  const rank = new Map(named.map((u, i) => [u.id, i]))
+  const order = (a: UserDay, b: UserDay) =>
+    (rank.get(a.user_id) ?? NAMED_USERS) - (rank.get(b.user_id) ?? NAMED_USERS)
+
+  const dayTotal = (list: UserDay[]) => list.reduce((s, r) => s + Number(r[metric] || 0), 0)
+  const max = Math.max(1e-9, ...days.map((d) => dayTotal(byDate.get(d.date) || [])))
+  const fmt = metric === 'cost_usd' ? money : metric === 'turns'
+    ? (n: number) => n.toLocaleString()
+    : tokenFmt
+
+  return (
+    <div>
+      <div className="flex items-end gap-[2px] h-32">
+        {days.map((d) => {
+          const list = (byDate.get(d.date) || []).slice().sort(order)
+          const total = dayTotal(list)
+          return (
+            <div key={d.date} className="flex-1 flex flex-col justify-end group relative min-w-0">
+              <div className="flex flex-col-reverse" style={{ height: `${(total / max) * 100}%` }}>
+                {list.map((r) => (
+                  <div
+                    key={r.user_id}
+                    style={{
+                      height: `${(Number(r[metric] || 0) / Math.max(1e-9, total)) * 100}%`,
+                      backgroundColor: colorOf.get(r.user_id) || OTHER_COLOR,
+                    }}
+                  />
+                ))}
+              </div>
+              {total > 0 && (
+                <div
+                  className={
+                    'pointer-events-none absolute bottom-full mb-1 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap ' +
+                    'opacity-0 group-hover:opacity-100 transition text-[10px] px-2 py-1.5 rounded shadow-lg ' +
+                    'bg-popover text-popover-foreground border border-border text-left'
+                  }
+                >
+                  <div className="font-medium mb-0.5">{d.date} · {fmt(total)}</div>
+                  {list.slice(0, 8).map((r) => (
+                    <div key={r.user_id} className="flex items-center gap-1.5">
+                      <span
+                        className="w-2 h-2 rounded-sm shrink-0"
+                        style={{ backgroundColor: colorOf.get(r.user_id) || OTHER_COLOR }}
+                      />
+                      <span className="flex-1">{labelOf.get(r.user_id) || r.user_id.slice(0, 8)}</span>
+                      <span className="tabular-nums">{fmt(Number(r[metric] || 0))}</span>
+                    </div>
+                  ))}
+                  {list.length > 8 && <div className="opacity-70">+{list.length - 8} more</div>}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex justify-between mt-1.5 text-[10px] text-muted-foreground">
+        <span>{days[0]?.date.slice(5)}</span>
+        <span>{days[days.length - 1]?.date.slice(5)}</span>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+        {named.map((u) => (
+          <div key={u.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: colorOf.get(u.id) }} />
+            {shortName(u)}
+          </div>
+        ))}
+        {users.length > NAMED_USERS && (
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: OTHER_COLOR }} />
+            {users.length - NAMED_USERS} others
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** One user's own daily series, drawn inside their expanded row. */
+function UserDayBars({ days, rows, metric }: { days: DayPoint[]; rows: UserDay[]; metric: 'cost_usd' | 'total_tokens' | 'turns' }) {
+  const byDate = new Map(rows.map((r) => [r.date, r]))
+  const max = Math.max(1e-9, ...rows.map((r) => Number(r[metric] || 0)))
+  const fmt = metric === 'cost_usd' ? money : metric === 'turns'
+    ? (n: number) => n.toLocaleString()
+    : tokenFmt
+  return (
+    <div>
+      <div className="flex items-end gap-[2px] h-16">
+        {days.map((d) => {
+          const r = byDate.get(d.date)
+          const v = Number(r?.[metric] || 0)
+          return (
+            <div key={d.date} className="flex-1 flex flex-col justify-end group relative min-w-0">
+              <div
+                className={'rounded-sm ' + (v > 0 ? 'bg-foreground/70' : 'bg-border')}
+                style={{ height: v > 0 ? `${Math.max(4, (v / max) * 100)}%` : '2px' }}
+              />
+              <div
+                className={
+                  'pointer-events-none absolute bottom-full mb-1 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap ' +
+                  'opacity-0 group-hover:opacity-100 transition text-[10px] px-1.5 py-0.5 rounded ' +
+                  'bg-popover text-popover-foreground border border-border'
+                }
+              >
+                {d.date.slice(5)}: {v > 0 ? `${fmt(v)} · ${r?.turns} turns` : 'no activity'}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function Usage(_props: Props) {
   const [data, setData] = useState<Usage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [metric, setMetric] = useState<'cost_usd' | 'total_tokens' | 'turns'>('cost_usd')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -381,11 +544,54 @@ export default function Usage(_props: Props) {
             </div>
           </div>
 
+          {data.by_user_day && data.by_user_day.length > 0 && (
+            <div className={'rounded-2xl border ' + cardBg}>
+              <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <h3 className={'text-sm font-semibold ' + title}>Daily usage by user</h3>
+                  <p className={'mt-0.5 text-xs ' + faint}>
+                    Each column is one day, split by who spent it · hover a day for the breakdown
+                  </p>
+                </div>
+                {/* Cost answers "what did this run us", tokens "who is heavy",
+                    turns "who is actually using it" — different questions that
+                    can disagree, so all three are one click apart. */}
+                <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
+                  {([
+                    ['cost_usd', 'Cost'],
+                    ['total_tokens', 'Tokens'],
+                    ['turns', 'Turns'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setMetric(key)}
+                      className={
+                        'px-3 py-1.5 text-xs font-medium transition ' +
+                        (metric === key ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-accent')
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="px-5 py-4">
+                <StackedByUser days={data.by_day} rows={data.by_user_day} users={data.users} metric={metric} />
+                {data.by_user_day_truncated && (
+                  <p className={'mt-3 text-xs ' + faint}>
+                    Only the most recent days are charted — the per-user grid hit its size limit.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className={'rounded-2xl border overflow-hidden ' + cardBg}>
             <div className="px-5 py-4 border-b border-border">
               <h3 className={'text-sm font-semibold ' + title}>Per-user spend</h3>
               <p className={'mt-0.5 text-xs ' + faint}>
-                Ranked by cost · click a row for that user's context breakdown
+                Ranked by cost · click a row for that user's daily activity and context breakdown
               </p>
             </div>
             {data.users.length === 0 ? (
@@ -395,7 +601,7 @@ export default function Usage(_props: Props) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className={'text-left ' + faint}>
-                      {['User', 'Cost', 'Per turn', 'Turns', 'Tokens', 'Avg context', 'Last used', ''].map((h) => (
+                      {['User', 'Cost', 'Per day', 'Active days', 'Per turn', 'Turns', 'Tokens', 'Avg context', 'Last used', ''].map((h) => (
                         <th key={h} className="px-4 py-2 text-[11px] font-medium uppercase tracking-wider whitespace-nowrap">
                           {h}
                         </th>
@@ -423,6 +629,11 @@ export default function Usage(_props: Props) {
                               {u.name && u.email && <div className={'text-[11px] truncate ' + faint}>{u.email}</div>}
                             </td>
                             <td className="px-4 py-2.5 tabular-nums font-medium text-foreground">{money(u.cost_usd)}</td>
+                            <td className={'px-4 py-2.5 tabular-nums ' + faint}>{money(u.avg_cost_per_active_day)}</td>
+                            <td className={'px-4 py-2.5 tabular-nums ' + faint}>
+                              {u.active_days}
+                              <span className="opacity-60"> / {data.window_days}</span>
+                            </td>
                             <td className={'px-4 py-2.5 tabular-nums ' + faint}>{money(u.avg_cost_per_turn)}</td>
                             <td className="px-4 py-2.5 tabular-nums text-foreground">{u.turns.toLocaleString()}</td>
                             <td className={'px-4 py-2.5 tabular-nums ' + faint}>{tokenFmt(u.total_tokens)}</td>
@@ -436,7 +647,28 @@ export default function Usage(_props: Props) {
                           </tr>
                           {open && (
                             <tr className="border-t border-border bg-muted/40">
-                              <td colSpan={8} className="px-4 py-4">
+                              <td colSpan={10} className="px-4 py-4">
+                                {data.by_user_day && (
+                                  <div className="mb-5">
+                                    <div className={'flex items-baseline justify-between gap-3 mb-2 ' + faint}>
+                                      <span className="text-[11px] font-medium uppercase tracking-wider">
+                                        Day by day · {u.active_days} active {u.active_days === 1 ? 'day' : 'days'} of{' '}
+                                        {data.window_days}, averaging {money(u.avg_cost_per_active_day)} and{' '}
+                                        {u.avg_turns_per_active_day} turns on the days they showed up
+                                      </span>
+                                      {u.busiest_day && (
+                                        <span className="text-[11px] whitespace-nowrap">
+                                          busiest {u.busiest_day.date.slice(5)} · {money(u.busiest_day.cost_usd)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <UserDayBars
+                                      days={data.by_day}
+                                      rows={data.by_user_day.filter((r) => r.user_id === u.id)}
+                                      metric={metric}
+                                    />
+                                  </div>
+                                )}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                                   <div className="lg:col-span-2">
                                     <div className={'text-[11px] font-medium uppercase tracking-wider mb-2 ' + faint}>

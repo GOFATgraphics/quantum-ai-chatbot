@@ -16,6 +16,17 @@ const MAX_WINDOW_DAYS = 365;
 const ROW_CAP = 100_000;
 const PAGE = 1000;
 
+/**
+ * Ceiling on the per-user-per-day grid.
+ *
+ * The grid is emitted sparsely — one entry per user per day they actually used
+ * something — because a dense one is users x days whether anyone was there or
+ * not, and a year for a hundred people is 36,500 mostly-empty rows shipped to a
+ * browser. Sparse, a quiet weekend costs nothing. The cap is a backstop for a
+ * workspace large enough that even the sparse grid is not worth sending whole.
+ */
+const USER_DAY_CAP = 20_000;
+
 const COMPONENTS = ['system_prompt', 'user_context', 'tools', 'history', 'tool_results', 'assistant'];
 
 function emptyDays(days) {
@@ -132,6 +143,8 @@ export default async function handler(req, res) {
     const byModel = new Map();
     const byUser = new Map();
     const byConversation = new Map();
+    /** Keyed "userId|YYYY-MM-DD" — the cross-tab behind "who drove that spike". */
+    const byUserDay = new Map();
 
     // Context composition is averaged across turns weighted by nothing — each
     // turn counts once, so one huge outlier cannot define the typical shape.
@@ -192,6 +205,15 @@ export default async function handler(req, res) {
           for (const k of COMPONENTS) u.comp[k] += Number(row.context_breakdown[k]) || 0;
           u.compSamples += 1;
         }
+
+        // Only days inside the requested window are tabulated, so the grid
+        // lines up exactly with by_day and cannot carry a stray edge day that
+        // the chart has no column for.
+        if (di !== undefined) {
+          const key = `${row.user_id}|${day}`;
+          if (!byUserDay.has(key)) byUserDay.set(key, emptyTotals());
+          addRow(byUserDay.get(key), row, cost);
+        }
       }
 
       if (row.conversation_id) {
@@ -233,9 +255,35 @@ export default async function handler(req, res) {
     const billedInput =
       totals.input_tokens + totals.cache_read_input_tokens + totals.cache_creation_input_tokens;
 
+    // Sorted by day so a client can read a user's series straight off without
+    // re-sorting, and so the truncation below drops the oldest rather than an
+    // arbitrary slice of the map.
+    const userDayRows = [...byUserDay.entries()]
+      .map(([key, acc]) => {
+        const split = key.lastIndexOf('|');
+        return { user_id: key.slice(0, split), date: key.slice(split + 1), ...round(acc) };
+      })
+      .sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? -1 : 1));
+
+    const userDayTruncated = userDayRows.length > USER_DAY_CAP;
+    const byUserDayOut = userDayTruncated ? userDayRows.slice(-USER_DAY_CAP) : userDayRows;
+
+    /** Per-user daily shape, so one busy afternoon reads differently from steady use. */
+    const dayStatsByUser = new Map();
+    for (const r of userDayRows) {
+      let s = dayStatsByUser.get(r.user_id);
+      if (!s) dayStatsByUser.set(r.user_id, (s = { days: 0, busiest: null }));
+      s.days += 1;
+      if (!s.busiest || r.cost_usd > s.busiest.cost_usd) {
+        s.busiest = { date: r.date, cost_usd: r.cost_usd, turns: r.turns };
+      }
+    }
+
     const users = [...byUser.entries()]
       .map(([id, u]) => {
         const p = profileById.get(id);
+        const s = dayStatsByUser.get(id);
+        const activeDays = s?.days || 0;
         return {
           id,
           email: p?.email || null,
@@ -246,6 +294,12 @@ export default async function handler(req, res) {
           avg_peak_context_tokens: u.peakSamples > 0 ? Math.round(u.peakSum / u.peakSamples) : 0,
           max_peak_context_tokens: u.peakMax,
           avg_cost_per_turn: u.acc.turns > 0 ? +(u.acc.cost_usd / u.acc.turns).toFixed(4) : 0,
+          // Averaged over days they actually appeared, not over the window:
+          // dividing by 30 when someone used it twice describes nobody.
+          active_days: activeDays,
+          avg_cost_per_active_day: activeDays > 0 ? +(u.acc.cost_usd / activeDays).toFixed(4) : 0,
+          avg_turns_per_active_day: activeDays > 0 ? +(u.acc.turns / activeDays).toFixed(1) : 0,
+          busiest_day: s?.busiest || null,
           breakdown: avgBreakdown(u.comp, u.compSamples),
         };
       })
@@ -312,6 +366,10 @@ export default async function handler(req, res) {
         samples: compSamples,
       },
       by_day: byDay.map((d) => ({ ...d, cost_usd: +d.cost_usd.toFixed(4) })),
+      // Sparse: one entry per user per day they were active. Days nobody used
+      // are simply absent rather than shipped as zeroes.
+      by_user_day: byUserDayOut,
+      by_user_day_truncated: userDayTruncated,
       by_endpoint: mapTotals(byEndpoint),
       by_model: mapTotals(byModel),
       users,
