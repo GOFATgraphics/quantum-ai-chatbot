@@ -54,7 +54,7 @@ export const PALETTES = {
  * @param {Object} options
  * @param {string} options.title - Document title
  * @param {string} [options.subtitle] - Document subtitle / description
- * @param {string} [options.author] - Author / prepared by (e.g. "Quantum AI Workspace")
+ * @param {string} [options.author] - Author / prepared by (e.g. "Quantumy")
  * @param {string} [options.date] - Document date
  * @param {string} [options.statusBadge] - Pill badge (e.g. "EXECUTIVE SUMMARY", "CONFIDENTIAL", "FINAL")
  * @param {string} [options.theme='navy'] - 'navy' | 'emerald' | 'charcoal'
@@ -66,7 +66,7 @@ export const PALETTES = {
 export async function generateExecutivePdf({
   title = 'Executive Report',
   subtitle = '',
-  author = 'Quantum AI Workspace',
+  author = 'Quantumy',
   date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
   statusBadge = 'CONFIDENTIAL',
   theme = 'navy',
@@ -277,43 +277,59 @@ export async function generateExecutivePdf({
         const colCount = headers.length;
         if (colCount > 0) {
           const colWidth = contentWidth / colCount;
-          const rowHeight = 22;
+          const cellPadX = 6;
+          const cellPadY = 6;
+          const cellWidth = colWidth - cellPadX * 2;
+          const MIN_ROW_HEIGHT = 22;
 
-          checkPageBreak(rowHeight * 2 + 10);
-          let tableY = doc.y + 4;
+          /**
+           * How tall this row has to be to hold its longest cell.
+           *
+           * A fixed height was the bug: the row box was 22pt, but the text in
+           * it wrapped as far as it needed to, so a long root-cause
+           * description ran on past the bottom of its own row and the next row
+           * was then painted over the top of it. Measuring first means the box
+           * is always at least as tall as what goes in it.
+           */
+          const measureRow = (cells, font, size) => {
+            doc.font(font).fontSize(size);
+            let tallest = 0;
+            for (let c = 0; c < colCount; c++) {
+              const text = String(cells?.[c] ?? '');
+              if (!text) continue;
+              tallest = Math.max(tallest, doc.heightOfString(text, { width: cellWidth }));
+            }
+            return Math.max(MIN_ROW_HEIGHT, Math.ceil(tallest) + cellPadY * 2);
+          };
 
-          // Header Row
-          doc.save();
-          doc.rect(48, tableY, contentWidth, rowHeight).fill(palette.tableHeaderBg);
-          headers.forEach((header, colIdx) => {
-            doc.font('Helvetica-Bold').fontSize(8.5).fillColor(palette.tableHeaderText).text(
-              String(header).toUpperCase(),
-              48 + colIdx * colWidth + 6,
-              tableY + 6,
-              { width: colWidth - 12, ellipsis: true }
-            );
-          });
-          doc.restore();
-          tableY += rowHeight;
+          const headerHeight = measureRow(headers.map((h) => String(h).toUpperCase()), 'Helvetica-Bold', 8.5);
 
-          // Data Rows
+          const drawHeader = (y) => {
+            doc.save();
+            doc.rect(48, y, contentWidth, headerHeight).fill(palette.tableHeaderBg);
+            headers.forEach((header, colIdx) => {
+              doc.font('Helvetica-Bold').fontSize(8.5).fillColor(palette.tableHeaderText).text(
+                String(header).toUpperCase(),
+                48 + colIdx * colWidth + cellPadX,
+                y + cellPadY,
+                { width: cellWidth }
+              );
+            });
+            doc.restore();
+            return y + headerHeight;
+          };
+
+          checkPageBreak(headerHeight + MIN_ROW_HEIGHT + 10);
+          let tableY = drawHeader(doc.y + 4);
+
           rows.forEach((row, rowIdx) => {
+            const rowHeight = measureRow(row, 'Helvetica', 9);
+
+            // The break test uses this row's real height, so a tall row moves
+            // to the next page whole instead of being clipped at the margin.
             if (tableY + rowHeight > doc.page.height - 60) {
               doc.addPage();
-              tableY = 48;
-              // Re-draw header on new page
-              doc.save();
-              doc.rect(48, tableY, contentWidth, rowHeight).fill(palette.tableHeaderBg);
-              headers.forEach((header, colIdx) => {
-                doc.font('Helvetica-Bold').fontSize(8.5).fillColor(palette.tableHeaderText).text(
-                  String(header).toUpperCase(),
-                  48 + colIdx * colWidth + 6,
-                  tableY + 6,
-                  { width: colWidth - 12, ellipsis: true }
-                );
-              });
-              doc.restore();
-              tableY += rowHeight;
+              tableY = drawHeader(48);
             }
 
             const isAlt = rowIdx % 2 === 1;
@@ -327,9 +343,9 @@ export async function generateExecutivePdf({
               if (colIdx >= colCount) return;
               doc.font('Helvetica').fontSize(9).fillColor(palette.textDark).text(
                 String(cell ?? ''),
-                48 + colIdx * colWidth + 6,
-                tableY + 6,
-                { width: colWidth - 12, ellipsis: true }
+                48 + colIdx * colWidth + cellPadX,
+                tableY + cellPadY,
+                { width: cellWidth }
               );
             });
             doc.restore();
@@ -348,9 +364,21 @@ export async function generateExecutivePdf({
     // --- 5. FOOTERS & PAGE NUMBERS (Run across all pages) ---
     const pageRange = doc.bufferedPageRange();
     const totalPages = pageRange.count;
+    const firstPage = pageRange.start;
 
-    for (let i = 0; i < totalPages; i++) {
+    for (let i = firstPage; i < firstPage + totalPages; i++) {
       doc.switchToPage(i);
+
+      /**
+       * A footer sits below the bottom margin by definition, and PDFKit reads
+       * writing there as "this text does not fit" and helpfully starts a new
+       * page for it. That is where the blank trailing pages came from: two
+       * footer strings per page, each landing on a fresh page of its own, so a
+       * two page brief came out as six with the footers stranded on four of
+       * them. Dropping the bottom margin for the stamping pass leaves nowhere
+       * to overflow to.
+       */
+      doc.page.margins.bottom = 0;
 
       // Running Header (Pages 2+)
       if (i > 0) {
@@ -367,13 +395,15 @@ export async function generateExecutivePdf({
       const footerY = doc.page.height - 36;
       doc.save();
       doc.moveTo(48, footerY - 6).lineTo(48 + contentWidth, footerY - 6).strokeColor(palette.border).lineWidth(0.5).stroke();
-      doc.font('Helvetica').fontSize(8).fillColor(palette.textMuted).text('CONFIDENTIAL • GENERATED BY QUANTUM AI', 48, footerY, {
+      doc.font('Helvetica').fontSize(8).fillColor(palette.textMuted).text('CONFIDENTIAL • GENERATED BY QUANTUMY', 48, footerY, {
         width: contentWidth / 2,
         align: 'left',
+        lineBreak: false,
       });
-      doc.font('Helvetica').fontSize(8).fillColor(palette.textMuted).text(`Page ${i + 1} of ${totalPages}`, 48 + contentWidth / 2, footerY, {
+      doc.font('Helvetica').fontSize(8).fillColor(palette.textMuted).text(`Page ${i - firstPage + 1} of ${totalPages}`, 48 + contentWidth / 2, footerY, {
         width: contentWidth / 2,
         align: 'right',
+        lineBreak: false,
       });
       doc.restore();
     }
