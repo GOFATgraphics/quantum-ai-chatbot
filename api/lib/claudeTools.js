@@ -45,6 +45,17 @@ import {
   searchExcelFiles,
 } from './microsoft.js';
 import { READ_DRIVE_FILE_TOOL, LIST_DRIVE_FOLDER_TOOL, handleReadDriveFile, handleListDriveFolder } from './driveRead.js';
+import { terms as termsOf } from './memoryRetrieval.js';
+
+/**
+ * The longest a single saved fact may be.
+ *
+ * Facts are matched against the conversation and injected into prompts, so
+ * length is a recurring cost, not a one-off storage one. The existing store
+ * has facts of 3,342 and 5,330 characters; at that size one fact is most of a
+ * memory block on its own.
+ */
+const MAX_FACT_CHARS = 800;
 import {
   SHEET_HISTORY_TOOLS,
   SHEET_HISTORY_TOOL_NAMES,
@@ -580,6 +591,27 @@ export const SAVE_MEMORY_TOOL = {
       category: { type: 'string', description: '"general", "preference", "instruction", "work", "people", "project", or "behavior" for a noticed interaction pattern' },
     },
     required: ['fact'],
+  },
+};
+
+/**
+ * The escape hatch for topic-filtered memory.
+ *
+ * Only the facts matching the current topic are put in the prompt (see
+ * lib/memoryRetrieval.js). Without a way to reach the rest, filtering would
+ * turn "I don't have that in the prompt" into "I never knew that", which is
+ * the exact failure the honesty rules exist to prevent. This searches the
+ * whole store, so nothing saved is ever actually unreachable.
+ */
+export const RECALL_MEMORY_TOOL = {
+  name: 'recall_memory',
+  description:
+    'Search everything saved about this user, including facts not shown in the prompt. The prompt only carries the saved facts that matched the current topic, so call this whenever the user refers to something they told you before that you cannot see, asks what you remember, or asks about a person, project, or system you have no fact about in front of you. Prefer this over saying you do not remember.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Words to search for, e.g. a project, person, or system name. Omit to list everything saved.' },
+    },
   },
 };
 
@@ -1518,6 +1550,20 @@ export async function runTool(block, user, context = {}) {
           content: 'Empty fact; nothing saved.',
           is_error: true,
         };
+      // Facts are retrieved and put in prompts, so an essay saved as one
+      // "fact" is billed on every turn it matches and crowds out the others.
+      // Rejected rather than truncated: half a fact that reads as whole is
+      // worse than no fact, and the model can split it and call again.
+      if (fact.length > MAX_FACT_CHARS) {
+        return {
+          type: 'tool_result',
+          tool_use_id: id,
+          content:
+            `Not saved: that fact is ${fact.length} characters and the limit is ${MAX_FACT_CHARS}. ` +
+            'Split it into several separate facts, each one self-contained and about a single thing, and save them one at a time.',
+          is_error: true,
+        };
+      }
       const admin = getAdminClient();
       await admin.from('user_memory').insert({
         user_id: user.id,
@@ -1526,6 +1572,37 @@ export async function runTool(block, user, context = {}) {
         source: 'chat',
       });
       return { type: 'tool_result', tool_use_id: id, content: `Saved memory: ${fact}` };
+    }
+    if (name === 'recall_memory' && user) {
+      const admin = getAdminClient();
+      const { data, error } = await admin
+        .from('user_memory')
+        .select('fact, category, updated_at')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(200);
+      if (error) {
+        return { type: 'tool_result', tool_use_id: id, content: `Could not read memory: ${error.message}`, is_error: true };
+      }
+      const all = data || [];
+      const wanted = [...termsOf(input.query)];
+      // No query means "what do you know about me": return everything, newest
+      // first, rather than nothing.
+      const hits = wanted.length
+        ? all.filter((m) => {
+            const hay = `${m.fact} ${m.category || ''}`.toLowerCase();
+            return wanted.some((t) => hay.includes(t));
+          })
+        : all;
+      return {
+        type: 'tool_result',
+        tool_use_id: id,
+        content: JSON.stringify({
+          searched: all.length,
+          matched: hits.length,
+          facts: hits.slice(0, 40).map((m) => ({ fact: m.fact, category: m.category })),
+        }),
+      };
     }
     if (name === 'save_note' && user) {
       const note = String(input.note || '').trim();
@@ -1691,6 +1768,7 @@ export async function loadConnectorsAndTools(user) {
     ANTHROPIC_WEB_SEARCH_TOOL,
     ANTHROPIC_WEB_FETCH_TOOL,
     SAVE_MEMORY_TOOL,
+    RECALL_MEMORY_TOOL,
     SAVE_NOTE_TOOL,
     LIST_NOTES_TOOL,
     UPDATE_NOTE_TOOL,
