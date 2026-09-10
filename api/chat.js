@@ -46,6 +46,45 @@ function dropThinkingBlocks(blocks) {
   return blocks.filter((b) => b?.type !== 'thinking' && b?.type !== 'redacted_thinking');
 }
 
+/**
+ * Drop half-finished server-side tool calls from an assistant turn.
+ *
+ * Anthropic runs MCP and web tools on its own side and returns the call and
+ * its result as two separate blocks. When the token ceiling lands between
+ * them, the turn ends holding an mcp_tool_use with no mcp_tool_result - and
+ * replaying that is a hard 400: "mcp_tool_use ... was found without a
+ * corresponding mcp_tool_result". Since the whole conversation is resent every
+ * message, that one orphan kills every later message in the thread too, which
+ * is how it showed up: not as a failed tool call, as a dead conversation.
+ *
+ * Both directions are dropped. A result whose call is missing is equally
+ * invalid, and would strand the model with an answer to a question it cannot
+ * see. Local tool_use blocks are left alone - those are paired up by the tool
+ * loop itself, which is a different mechanism with its own handling.
+ */
+export function reconcileServerToolBlocks(blocks) {
+  if (!Array.isArray(blocks)) return { content: [], dropped: [] };
+  const isUse = (b) => typeof b?.type === 'string' && b.type !== 'tool_use' && b.type.endsWith('_tool_use');
+  const isResult = (b) => typeof b?.type === 'string' && b.type !== 'tool_result' && b.type.endsWith('_tool_result');
+
+  const resultFor = new Set(blocks.filter(isResult).map((b) => b.tool_use_id).filter(Boolean));
+  const useFor = new Set(blocks.filter(isUse).map((b) => b.id).filter(Boolean));
+
+  const dropped = [];
+  const content = blocks.filter((b) => {
+    if (isUse(b) && !resultFor.has(b.id)) {
+      dropped.push(b.name || b.type);
+      return false;
+    }
+    if (isResult(b) && b.tool_use_id && !useFor.has(b.tool_use_id)) {
+      dropped.push(b.type);
+      return false;
+    }
+    return true;
+  });
+  return { content, dropped };
+}
+
 // Long-lived conversations resend their full history on every message with no
 // cap, so a thread that grows to hundreds of exchanges (or has a few large
 // pasted files in it) gets proportionally more expensive forever. Keep the
@@ -694,7 +733,9 @@ export default async function handler(req, res) {
             mcp,
           });
         }
-        const content = dropThinkingBlocks(data.content);
+        const { content, dropped: orphanedServerTools } = reconcileServerToolBlocks(
+          dropThinkingBlocks(data.content)
+        );
         meter.addRound();
         meter.addUsage(data.usage);
         meter.setStopReason(data.stop_reason);
@@ -758,7 +799,10 @@ export default async function handler(req, res) {
          * executor, which is the distinction that matters for execution.
          */
         const mcpToolBlocks = content.filter((b) => b.type === 'mcp_tool_use');
-        meter.addToolCalls(clientToolBlocks.length + mcpToolBlocks.length);
+        // Orphans are counted too: the call was attempted and billed, it just
+        // did not come back. A dashboard that hides attempts understates what
+        // the turn actually cost.
+        meter.addToolCalls(clientToolBlocks.length + mcpToolBlocks.length + orphanedServerTools.length);
         if (clientToolBlocks.length === 0) {
           const textOut = (wantStream ? data.text : extractText(content)) || extractText(content) || '';
           accumulatedText += textOut;
@@ -777,14 +821,19 @@ export default async function handler(req, res) {
           }
           if (data.stop_reason === 'max_tokens' && continuations < MAX_CONTINUATIONS) {
             continuations += 1;
+            // If the ceiling landed mid tool call, the call was removed above
+            // to keep the turn valid. Saying so is the difference between the
+            // model reissuing it and the model carrying on as though it had
+            // the answer - the same failure as a truncated local tool call.
+            const cont = orphanedServerTools.length
+              ? `Your ${[...new Set(orphanedServerTools)].join(' and ')} call was cut off before its result came back, so it did not complete and returned nothing. Do not describe its result. Issue it again if you still need it, then continue where you left off.`
+              : 'Continue exactly where you left off, mid-sentence or mid-code-block if needed. Do not repeat anything already written, do not add any preamble or acknowledgement.';
             anthropicMessages = [
               ...anthropicMessages,
-              { role: 'assistant', content },
-              {
-                role: 'user',
-                content:
-                  'Continue exactly where you left off, mid-sentence or mid-code-block if needed. Do not repeat anything already written, do not add any preamble or acknowledgement.',
-              },
+              // Dropping an orphan can empty the turn entirely, and an
+              // assistant message with no content is itself a 400.
+              ...(content.length ? [{ role: 'assistant', content }] : []),
+              { role: 'user', content: cont },
             ];
             continue;
           }
