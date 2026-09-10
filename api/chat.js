@@ -250,7 +250,25 @@ function systemBlocks(system) {
 function applyMcp(body, headers, mcp) {
   if (!mcp?.mcp_servers?.length) return;
   body.mcp_servers = mcp.mcp_servers;
-  body.tools = [...(body.tools || []), ...mcp.toolsets];
+
+  /**
+   * The toolsets must go in front of the cache breakpoint, not after it.
+   *
+   * This first appended them to a tool list that had already been tagged, so
+   * the breakpoint sat on the last local tool and everything the MCP servers
+   * contributed fell outside the cached prefix. An MCP server's tools are not
+   * two lines of JSON - the toolset entry expands to that server's whole
+   * catalogue, which for a Make account is one tool per on-demand scenario -
+   * and all of it was then re-billed as fresh input on every round of every
+   * turn, at ten times the cache-read rate. Caching is a prefix match, so
+   * where the breakpoint sits is the entire difference.
+   *
+   * The old tag is stripped rather than left in place: two breakpoints would
+   * work, but chat.js already spends three of the four the API allows, and
+   * one at the end of the whole list is what actually wants caching.
+   */
+  const local = (body.tools || []).map(({ cache_control, ...rest }) => rest);
+  body.tools = withToolsCacheBreakpoint([...local, ...mcp.toolsets]);
   headers['anthropic-beta'] = MCP_BETA;
 }
 
