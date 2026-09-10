@@ -16,6 +16,7 @@ import { allowedOrigin } from '../lib/cors.js';
 import {
   validateUrl,
   validateToken,
+  parseAllowedTools,
   slugName,
   nameFromUrl,
   MAX_SERVERS_PER_USER,
@@ -25,7 +26,7 @@ const RATE_LIMIT = 30;
 const RATE_WINDOW_MS = 60_000;
 
 /** Columns safe to return. auth_token is deliberately absent. */
-const SAFE = 'id,name,label,url,enabled,last_error,last_used_at,created_at,updated_at';
+const SAFE = 'id,name,label,url,enabled,allowed_tools,last_error,last_used_at,created_at,updated_at';
 
 function tableMissing(error) {
   return /relation .*mcp_servers.* does not exist|schema cache/i.test(error?.message || '');
@@ -81,6 +82,8 @@ export default async function handler(req, res) {
       if (!urlCheck.ok) return res.status(400).json({ error: urlCheck.error });
       const tokenCheck = validateToken(body.token);
       if (!tokenCheck.ok) return res.status(400).json({ error: tokenCheck.error });
+      const toolsCheck = parseAllowedTools(body.allowed_tools);
+      if (!toolsCheck.ok) return res.status(400).json({ error: toolsCheck.error });
 
       const label = String(body.label || '').trim().slice(0, 120) || null;
       const name = slugName(body.name || label || nameFromUrl(urlCheck.url));
@@ -104,6 +107,7 @@ export default async function handler(req, res) {
         label,
         url: urlCheck.url,
         enabled: body.enabled === false ? false : true,
+        allowed_tools: toolsCheck.tools,
         last_error: null,
         updated_at: new Date().toISOString(),
       };

@@ -107,6 +107,27 @@ export function validateUrl(raw) {
   return { ok: true, url: url.toString() };
 }
 
+/**
+ * An allowlist of tool names to expose from a server.
+ *
+ * A server's toolset expands to its entire catalogue, and the catalogue is
+ * prompt: a Make account contributes tens of thousands of tokens of tool
+ * definitions to every single request, whether or not any of them is wanted.
+ * Naming the handful actually used cuts that, and narrows what the model can
+ * reach for on a shared workspace.
+ */
+export function parseAllowedTools(raw) {
+  if (raw == null || raw === '') return { ok: true, tools: null };
+  const list = (Array.isArray(raw) ? raw : String(raw).split(','))
+    .map((t) => String(t).trim())
+    .filter(Boolean)
+    .slice(0, 100);
+  if (list.length === 0) return { ok: true, tools: null };
+  const bad = list.find((t) => !/^[A-Za-z0-9_.:-]{1,128}$/.test(t));
+  if (bad) return { ok: false, error: `"${bad}" is not a valid tool name.` };
+  return { ok: true, tools: [...new Set(list)] };
+}
+
 export function validateToken(raw) {
   const value = raw == null ? '' : String(raw).trim();
   if (!value) return { ok: true, token: null };
@@ -131,7 +152,7 @@ export async function loadMcpServers(userId) {
     const admin = getAdminClient();
     const { data, error } = await admin
       .from('mcp_servers')
-      .select('id,name,label,url,auth_token,enabled')
+      .select('id,name,label,url,auth_token,enabled,allowed_tools')
       .eq('user_id', userId)
       .eq('enabled', true)
       .order('created_at', { ascending: true })
@@ -170,7 +191,20 @@ export function buildMcpRequest(servers) {
       name,
       ...(s.auth_token ? { authorization_token: s.auth_token } : {}),
     });
-    toolsets.push({ type: 'mcp_toolset', mcp_server_name: name });
+
+    // With an allowlist the toolset switches to deny-by-default and names the
+    // wanted tools one by one, so only those reach the prompt.
+    const allowed = Array.isArray(s.allowed_tools) ? s.allowed_tools.filter(Boolean) : null;
+    if (allowed && allowed.length > 0) {
+      toolsets.push({
+        type: 'mcp_toolset',
+        mcp_server_name: name,
+        default_config: { enabled: false },
+        configs: Object.fromEntries(allowed.map((t) => [t, { enabled: true }])),
+      });
+    } else {
+      toolsets.push({ type: 'mcp_toolset', mcp_server_name: name });
+    }
   }
   return { mcp_servers, toolsets };
 }

@@ -102,7 +102,27 @@ export function scaleComposition(chars, peakTokens) {
  * @param {string} [opts.model]
  * @param {number} [opts.contextWindow]
  */
-export function createUsageMeter({ userId, conversationId = null, endpoint = 'chat', model = null, contextWindow = 200_000 }) {
+/**
+ * Context windows per model, so "how full was the prompt" is measured against
+ * the real ceiling. A flat 200k was recorded for every turn, which made a
+ * 418k-token Sonnet 5 request read as 209% full - a figure that cannot be
+ * true and quietly makes the fill percentage meaningless.
+ */
+const CONTEXT_WINDOWS = {
+  'claude-sonnet-5': 1_000_000,
+  'claude-opus-5': 1_000_000,
+  'claude-haiku-4-5': 200_000,
+};
+const DEFAULT_CONTEXT_WINDOW = 200_000;
+
+export function contextWindowFor(model) {
+  if (!model) return DEFAULT_CONTEXT_WINDOW;
+  if (CONTEXT_WINDOWS[model]) return CONTEXT_WINDOWS[model];
+  const hit = Object.keys(CONTEXT_WINDOWS).find((k) => String(model).startsWith(k));
+  return hit ? CONTEXT_WINDOWS[hit] : DEFAULT_CONTEXT_WINDOW;
+}
+
+export function createUsageMeter({ userId, conversationId = null, endpoint = 'chat', model = null, contextWindow = null }) {
   const startedAt = Date.now();
   const totals = {
     input_tokens: 0,
@@ -169,7 +189,7 @@ export function createUsageMeter({ userId, conversationId = null, endpoint = 'ch
           duration_ms: Date.now() - startedAt,
           stop_reason: stopReason,
           peak_context_tokens: peak,
-          context_window: contextWindow,
+          context_window: contextWindow || contextWindowFor(model),
           context_breakdown: scaleComposition(composition, peak),
         });
         if (error) console.warn('token_usage insert failed:', error.message);

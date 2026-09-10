@@ -13,6 +13,7 @@ type McpServer = {
   label: string | null
   url: string
   enabled: boolean
+  allowed_tools: string[] | null
   last_error: string | null
 }
 
@@ -44,6 +45,7 @@ export default function Connectors({ accessToken, onClose }: Props) {
   const [mcpUrl, setMcpUrl] = useState('')
   const [mcpLabel, setMcpLabel] = useState('')
   const [mcpToken, setMcpToken] = useState('')
+  const [mcpTools, setMcpTools] = useState('')
   const [mcpBusy, setMcpBusy] = useState(false)
   const [mcpError, setMcpError] = useState<string | null>(null)
   const [justConnected, setJustConnected] = useState<string | null>(null)
@@ -113,14 +115,19 @@ export default function Connectors({ accessToken, onClose }: Props) {
       const res = await fetch('/api/connectors/mcp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
-        body: JSON.stringify({ url, label: mcpLabel.trim() || null, token: mcpToken.trim() || null }),
+        body: JSON.stringify({
+          url,
+          label: mcpLabel.trim() || null,
+          token: mcpToken.trim() || null,
+          allowed_tools: mcpTools.trim() || null,
+        }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
         setMcpError(body.error || 'Could not add that server')
         return
       }
-      setMcpUrl(''); setMcpLabel(''); setMcpToken(''); setShowMcpForm(false)
+      setMcpUrl(''); setMcpLabel(''); setMcpToken(''); setMcpTools(''); setShowMcpForm(false)
       await loadMcp()
     } catch (e: any) {
       setMcpError(e?.message || 'Could not add that server')
@@ -427,7 +434,10 @@ export default function Connectors({ accessToken, onClose }: Props) {
                           {server.label || server.name}
                         </p>
                         <p className={`text-[12px] truncate ${server.last_error ? 'text-destructive' : textMuted}`}>
-                          {server.last_error || server.url}
+                          {server.last_error
+                            || (server.allowed_tools?.length
+                              ? `${server.allowed_tools.length} tool${server.allowed_tools.length === 1 ? '' : 's'} · ${server.url}`
+                              : server.url)}
                         </p>
                       </div>
                       <button
@@ -471,6 +481,15 @@ export default function Connectors({ accessToken, onClose }: Props) {
                         type="password"
                         autoComplete="off"
                         placeholder="Access token (optional)"
+                        className="w-full h-11 rounded-xl px-3 text-[15px] outline-none glass-panel text-foreground placeholder:text-muted-foreground"
+                      />
+                      {/* Every tool a server offers is sent with every message,
+                          so a large server is a standing cost. Naming the ones
+                          actually used keeps the rest out of the prompt. */}
+                      <input
+                        value={mcpTools}
+                        onChange={(e) => setMcpTools(e.target.value)}
+                        placeholder="Only these tools, comma separated (optional)"
                         className="w-full h-11 rounded-xl px-3 text-[15px] outline-none glass-panel text-foreground placeholder:text-muted-foreground"
                       />
                       {mcpError && <p className="text-[13px] text-destructive">{mcpError}</p>}

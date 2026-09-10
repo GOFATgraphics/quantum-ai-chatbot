@@ -698,7 +698,17 @@ export default async function handler(req, res) {
         }
 
         const clientToolBlocks = content.filter((b) => b.type === 'tool_use' && b.name);
-        meter.addToolCalls(clientToolBlocks.length);
+        /**
+         * MCP tools run on Anthropic's side, so they arrive as mcp_tool_use
+         * rather than tool_use and were counted as nothing at all. A turn that
+         * listed eleven Make scenarios and read a blueprint was recorded as
+         * zero tool calls in one round - which is not a small inaccuracy on a
+         * usage dashboard, it is the dashboard saying the expensive thing did
+         * not happen. They are counted here; they still never reach the local
+         * executor, which is the distinction that matters for execution.
+         */
+        const mcpToolBlocks = content.filter((b) => b.type === 'mcp_tool_use');
+        meter.addToolCalls(clientToolBlocks.length + mcpToolBlocks.length);
         if (clientToolBlocks.length === 0) {
           const textOut = (wantStream ? data.text : extractText(content)) || extractText(content) || '';
           accumulatedText += textOut;
