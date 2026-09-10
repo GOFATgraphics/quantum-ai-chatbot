@@ -191,6 +191,9 @@ const USER_COLORS = [
   '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2',
 ]
 const OTHER_COLOR = '#94a3b8'
+/** Chart heights in pixels, because the bars are measured against them. */
+const CHART_H = 128
+const ROW_CHART_H = 64
 const NAMED_USERS = 6
 
 const shortName = (u: UserUsage) => u.name || u.email?.split('@')[0] || u.id.slice(0, 8)
@@ -234,23 +237,32 @@ function StackedByUser({
 
   return (
     <div>
-      <div className="flex items-end gap-[2px] h-32">
+      <div className="flex items-end gap-[2px]" style={{ height: CHART_H }}>
         {days.map((d) => {
           const list = (byDate.get(d.date) || []).slice().sort(order)
           const total = dayTotal(list)
           return (
             <div key={d.date} className="flex-1 flex flex-col justify-end group relative min-w-0">
-              <div className="flex flex-col-reverse" style={{ height: `${(total / max) * 100}%` }}>
-                {list.map((r) => (
-                  <div
-                    key={r.user_id}
-                    style={{
-                      height: `${(Number(r[metric] || 0) / Math.max(1e-9, total)) * 100}%`,
-                      backgroundColor: colorOf.get(r.user_id) || OTHER_COLOR,
-                    }}
-                  />
-                ))}
-              </div>
+              {/* Heights in pixels, not percentages.
+                  A percentage height resolves against the parent, and the
+                  parent here is a flex item under `items-end`, so its own
+                  height is content-derived rather than definite - a column of
+                  empty divs measuring nothing. Stacking made it worse: the
+                  bands were a percentage of a percentage, so even where the
+                  outer one resolved the inner one collapsed. Every band is now
+                  measured off the chart height directly, which is a real
+                  number and cannot collapse.
+                  Bottom-up, so the first user in the sorted list sits at the
+                  foot of every column and the eye can follow one across. */}
+              {list.slice().reverse().map((r) => (
+                <div
+                  key={r.user_id}
+                  style={{
+                    height: Math.max(1, (Number(r[metric] || 0) / max) * CHART_H),
+                    backgroundColor: colorOf.get(r.user_id) || OTHER_COLOR,
+                  }}
+                />
+              ))}
               {total > 0 && (
                 <div
                   className={
@@ -308,7 +320,7 @@ function UserDayBars({ days, rows, metric }: { days: DayPoint[]; rows: UserDay[]
     : tokenFmt
   return (
     <div>
-      <div className="flex items-end gap-[2px] h-16">
+      <div className="flex items-end gap-[2px]" style={{ height: ROW_CHART_H }}>
         {days.map((d) => {
           const r = byDate.get(d.date)
           const v = Number(r?.[metric] || 0)
@@ -316,7 +328,7 @@ function UserDayBars({ days, rows, metric }: { days: DayPoint[]; rows: UserDay[]
             <div key={d.date} className="flex-1 flex flex-col justify-end group relative min-w-0">
               <div
                 className={'rounded-sm ' + (v > 0 ? 'bg-foreground/70' : 'bg-border')}
-                style={{ height: v > 0 ? `${Math.max(4, (v / max) * 100)}%` : '2px' }}
+                style={{ height: v > 0 ? Math.max(3, (v / max) * ROW_CHART_H) : 2 }}
               />
               <div
                 className={
