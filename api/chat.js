@@ -3,6 +3,7 @@ import { loadConnectorsAndTools, runTool } from './lib/claudeTools.js';
 import { allowRequest } from './lib/rateLimit.js';
 import { createUsageMeter } from './lib/tokenUsage.js';
 import { allowedOrigin } from './lib/cors.js';
+import { MCP_BETA, loadMcpServers, buildMcpRequest, mcpPromptLines } from './lib/mcpServers.js';
 
 export const config = { maxDuration: 300 };
 
@@ -239,7 +240,21 @@ function systemBlocks(system) {
   return [{ type: 'text', text: system.staticPrompt, cache_control: CACHE_CONTROL }];
 }
 
-async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) {
+/**
+ * The MCP connector is two fields that only work together: a server in
+ * `mcp_servers` and an `mcp_toolset` in `tools` naming it. Sending either
+ * alone is a validation error, so they are applied in one place, and the beta
+ * header goes on only when there is actually a server to connect - an unused
+ * beta flag is a needless difference between requests.
+ */
+function applyMcp(body, headers, mcp) {
+  if (!mcp?.mcp_servers?.length) return;
+  body.mcp_servers = mcp.mcp_servers;
+  body.tools = [...(body.tools || []), ...mcp.toolsets];
+  headers['anthropic-beta'] = MCP_BETA;
+}
+
+async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096, mcp }) {
   const body = {
     model: MODEL,
     max_tokens: maxTokens,
@@ -247,9 +262,11 @@ async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) 
     messages: withCacheBreakpoint(messages, system.dynamicContext),
   };
   if (tools?.length) body.tools = withToolsCacheBreakpoint(tools);
+  const headers = { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' };
+  applyMcp(body, headers, mcp);
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    headers,
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -262,7 +279,7 @@ async function runClaude({ apiKey, system, messages, tools, maxTokens = 4096 }) 
   return response.json();
 }
 
-export async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTokens = 4096 }) {
+export async function runClaudeStream({ apiKey, system, messages, tools, onDelta, maxTokens = 4096, mcp }) {
   const body = {
     model: MODEL,
     max_tokens: maxTokens,
@@ -271,9 +288,11 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
     stream: true,
   };
   if (tools?.length) body.tools = withToolsCacheBreakpoint(tools);
+  const headers = { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' };
+  applyMcp(body, headers, mcp);
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    headers,
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -334,10 +353,30 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
         applyUsage(evt.message?.usage);
       } else if (evt.type === 'content_block_start') {
         const b = evt.content_block;
-        if (b?.type === 'text') contentBlocks.push({ type: 'text', text: '' });
-        else if (b?.type === 'tool_use') {
+        if (b?.type === 'text') {
+          currentTool = null;
+          contentBlocks.push({ type: 'text', text: '' });
+        } else if (b?.type === 'tool_use') {
           currentTool = { type: 'tool_use', id: b.id, name: b.name, input: '', partial_json: '' };
           contentBlocks.push(currentTool);
+        } else if (b) {
+          // Anything else Anthropic ran on its side: mcp_tool_use and its
+          // result, web_search_tool_result, and whatever comes next. These
+          // used to be dropped, which was harmless while every block was text
+          // or a local tool call and quietly corrupting once it was not - the
+          // turn is replayed to the API as the assistant message, so a
+          // missing mcp_tool_use leaves its result orphaned and the model
+          // loses what it just did. Kept whole, with arguments accumulated the
+          // same way as a local call when the block streams any.
+          const passthrough = { ...b };
+          if (passthrough.input === undefined && b.type.endsWith('_tool_use')) {
+            passthrough.input = {};
+            passthrough.partial_json = '';
+            currentTool = passthrough;
+          } else {
+            currentTool = null;
+          }
+          contentBlocks.push(passthrough);
         }
       } else if (evt.type === 'content_block_delta') {
         const d = evt.delta;
@@ -386,6 +425,12 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
       if (b.truncated || !b.name) out.truncated = true;
       return out;
     }
+    // Passthrough blocks keep their own shape; only the streaming scratch
+    // field is dropped, since sending it back would not be valid content.
+    if (b.partial_json !== undefined) {
+      const { partial_json, truncated, ...rest } = b;
+      return rest;
+    }
     return b;
   });
   return { stop_reason: stopReason || 'end_turn', content: normalized, text: textAcc, usage };
@@ -428,18 +473,25 @@ export default async function handler(req, res) {
     let project = null;
     let connected = { gmail: false, drive: false, docs: false, sheets: false, calendar: false, outlook: false, excel: false };
     let tools = [];
-    const [connectorsResult, memoryResult, projectResult] = await Promise.all([
+    const [connectorsResult, memoryResult, projectResult, mcpServers] = await Promise.all([
       loadConnectorsAndTools(user).catch(() => ({ connected, tools: [] })),
       user ? loadUserMemory(user.id) : Promise.resolve([]),
       user && body?.projectId ? loadProjectContext(user.id, body.projectId) : Promise.resolve(null),
+      user ? loadMcpServers(user.id) : Promise.resolve([]),
     ]);
     connected = connectorsResult.connected;
     tools = connectorsResult.tools;
     memory = memoryResult;
     project = projectResult;
 
+    // Anthropic connects to these itself, so there is nothing to execute here
+    // and nothing to add to the local tool list - only the two request fields.
+    const mcp = buildMcpRequest(mcpServers);
+
     const systemPrompt = {
-      staticPrompt: buildStaticSystemPrompt({ connected }),
+      // Which servers are connected belongs in the static block: it changes
+      // when someone adds one, not every request, so it stays cached.
+      staticPrompt: buildStaticSystemPrompt({ connected }) + mcpPromptLines(mcpServers),
       dynamicContext: buildDynamicContext({ memory, project, firstName: body?.firstName || null }),
     };
 
@@ -535,6 +587,9 @@ export default async function handler(req, res) {
     /** Reissuing a cut-off tool call is worth a couple of tries, not an unbounded loop. */
     const MAX_TRUNCATION_RETRIES = 2;
     let truncationRetries = 0;
+    /** Resumes after a server tool pauses the turn. Bounded like every other retry. */
+    const MAX_PAUSES = 6;
+    let pauses = 0;
 
     // Usage is written no matter how the turn ends — normal finish, tool-step
     // ceiling, or a thrown provider error mid-loop — so cost reporting cannot
@@ -550,6 +605,7 @@ export default async function handler(req, res) {
             messages: anthropicMessages,
             tools: tools.length ? tools : undefined,
             maxTokens,
+            mcp,
             onDelta: (delta) => {
               try {
                 // Raw, unstripped: stripEmDashes needs to see whole words/phrases, and
@@ -567,6 +623,7 @@ export default async function handler(req, res) {
             messages: anthropicMessages,
             tools: tools.length ? tools : undefined,
             maxTokens,
+            mcp,
           });
         }
         const content = data.content || [];
@@ -627,6 +684,19 @@ export default async function handler(req, res) {
         if (clientToolBlocks.length === 0) {
           const textOut = (wantStream ? data.text : extractText(content)) || extractText(content) || '';
           accumulatedText += textOut;
+          /**
+           * A server-side tool - web search, web fetch, an MCP server - can
+           * hand the turn back mid-flight with pause_turn, meaning "I am not
+           * finished, send this straight back to continue". Treating that as
+           * the end of the turn stops the work half done and presents whatever
+           * had been said so far as the answer. Passing the turn back is the
+           * documented way to resume it.
+           */
+          if (data.stop_reason === 'pause_turn' && pauses < MAX_PAUSES && content.length > 0) {
+            pauses += 1;
+            anthropicMessages = [...anthropicMessages, { role: 'assistant', content }];
+            continue;
+          }
           if (data.stop_reason === 'max_tokens' && continuations < MAX_CONTINUATIONS) {
             continuations += 1;
             anthropicMessages = [

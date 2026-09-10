@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, Check, Plug, Plus, Trash2 } from 'lucide-react'
 import { supabase, CONNECTOR_CATALOG, type Connector } from '../lib/supabase'
 import {
   GmailIcon, DriveIcon, SheetsIcon, DocsIcon, CalendarIcon, OutlookIcon, ExcelIcon,
 } from './BrandIcons'
+
+/** The token is never returned by the API, so it is absent here by design. */
+type McpServer = {
+  id: string
+  name: string
+  label: string | null
+  url: string
+  enabled: boolean
+  last_error: string | null
+}
 
 type Props = {
   dark: boolean
@@ -28,6 +38,14 @@ export default function Connectors({ accessToken, onClose }: Props) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [mcp, setMcp] = useState<McpServer[]>([])
+  const [mcpMissing, setMcpMissing] = useState(false)
+  const [showMcpForm, setShowMcpForm] = useState(false)
+  const [mcpUrl, setMcpUrl] = useState('')
+  const [mcpLabel, setMcpLabel] = useState('')
+  const [mcpToken, setMcpToken] = useState('')
+  const [mcpBusy, setMcpBusy] = useState(false)
+  const [mcpError, setMcpError] = useState<string | null>(null)
   const [justConnected, setJustConnected] = useState<string | null>(null)
 
   const bg = 'bg-settings-canvas'
@@ -67,8 +85,70 @@ export default function Connectors({ accessToken, onClose }: Props) {
     }
   }
 
+  /**
+   * MCP servers come from the API rather than straight from Supabase, because
+   * the row's auth token is not readable by the browser at all - the endpoint
+   * is the only thing that can see it, and it never sends it back.
+   */
+  const loadMcp = async () => {
+    try {
+      const res = await fetch('/api/connectors/mcp', {
+        headers: { Authorization: 'Bearer ' + accessToken },
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) return
+      setMcpMissing(!!body.not_installed)
+      setMcp((body.servers || []) as McpServer[])
+    } catch {
+      /* offline; the rest of the panel still works */
+    }
+  }
+
+  const saveMcp = async () => {
+    const url = mcpUrl.trim()
+    if (!url || mcpBusy) return
+    setMcpBusy(true)
+    setMcpError(null)
+    try {
+      const res = await fetch('/api/connectors/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+        body: JSON.stringify({ url, label: mcpLabel.trim() || null, token: mcpToken.trim() || null }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setMcpError(body.error || 'Could not add that server')
+        return
+      }
+      setMcpUrl(''); setMcpLabel(''); setMcpToken(''); setShowMcpForm(false)
+      await loadMcp()
+    } catch (e: any) {
+      setMcpError(e?.message || 'Could not add that server')
+    } finally {
+      setMcpBusy(false)
+    }
+  }
+
+  const toggleMcp = async (server: McpServer) => {
+    setMcp((p) => p.map((s) => (s.id === server.id ? { ...s, enabled: !s.enabled } : s)))
+    await fetch('/api/connectors/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+      body: JSON.stringify({ id: server.id, enabled: !server.enabled }),
+    }).catch(() => {})
+  }
+
+  const removeMcp = async (server: McpServer) => {
+    setMcp((p) => p.filter((s) => s.id !== server.id))
+    await fetch('/api/connectors/mcp?id=' + encodeURIComponent(server.id), {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + accessToken },
+    }).catch(() => {})
+  }
+
   useEffect(() => {
     load()
+    loadMcp()
     const params = new URLSearchParams(window.location.search)
     const connected = params.get('connected')
     if (connected || params.get('connector_error')) {
@@ -306,6 +386,138 @@ export default function Connectors({ accessToken, onClose }: Props) {
             {connectedList.length === 0 && suggestedList.length === 0 && (
               <p className={`text-center py-12 text-[15px] ${textMuted}`}>No connectors available</p>
             )}
+
+            {/* Anything speaking MCP. Unlike the connectors above, adding one
+                needs no code and no deploy: paste a URL and its tools are
+                available on the next message. */}
+            <div>
+              <div className="flex items-center justify-between px-1 mb-2">
+                <p className={`text-[13px] font-medium ${textMuted}`}>MCP servers</p>
+                {!showMcpForm && !mcpMissing && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowMcpForm(true); setMcpError(null) }}
+                    className={`flex items-center gap-1 text-[13px] font-medium ${textMain}`}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add
+                  </button>
+                )}
+              </div>
+
+              {mcpMissing ? (
+                <div className={`rounded-[20px] ${card} px-4 py-4`}>
+                  <p className={`text-[14px] ${textMuted}`}>
+                    Run supabase/mcp-servers.sql to enable custom MCP servers.
+                  </p>
+                </div>
+              ) : (
+                <div className={`rounded-[20px] overflow-hidden ${card}`}>
+                  {mcp.map((server, i) => (
+                    <div
+                      key={server.id}
+                      className={`flex items-center gap-3.5 px-3.5 py-[14px] ${
+                        i < mcp.length - 1 || showMcpForm ? `border-b ${rowBorder}` : ''
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${iconBg}`}>
+                        <Plug className={`w-[18px] h-[18px] ${server.enabled ? textMain : textMuted}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[16px] font-medium truncate ${textMain}`}>
+                          {server.label || server.name}
+                        </p>
+                        <p className={`text-[12px] truncate ${server.last_error ? 'text-destructive' : textMuted}`}>
+                          {server.last_error || server.url}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleMcp(server)}
+                        className={`shrink-0 h-[30px] px-3 rounded-full text-[13px] font-medium transition ${
+                          server.enabled ? 'bg-secondary text-foreground' : `${textMuted}`
+                        }`}
+                      >
+                        {server.enabled ? 'On' : 'Off'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeMcp(server)}
+                        aria-label={`Remove ${server.label || server.name}`}
+                        className={`shrink-0 p-1.5 ${textMuted} hover:text-destructive`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {showMcpForm && (
+                    <div className="px-3.5 py-3.5 space-y-2.5">
+                      <input
+                        autoFocus
+                        value={mcpUrl}
+                        onChange={(e) => setMcpUrl(e.target.value)}
+                        placeholder="https://mcp.example.com/sse"
+                        className="w-full h-11 rounded-xl px-3 text-[15px] outline-none glass-panel text-foreground placeholder:text-muted-foreground"
+                      />
+                      <input
+                        value={mcpLabel}
+                        onChange={(e) => setMcpLabel(e.target.value)}
+                        placeholder="Name (optional)"
+                        className="w-full h-11 rounded-xl px-3 text-[15px] outline-none glass-panel text-foreground placeholder:text-muted-foreground"
+                      />
+                      <input
+                        value={mcpToken}
+                        onChange={(e) => setMcpToken(e.target.value)}
+                        type="password"
+                        autoComplete="off"
+                        placeholder="Access token (optional)"
+                        className="w-full h-11 rounded-xl px-3 text-[15px] outline-none glass-panel text-foreground placeholder:text-muted-foreground"
+                      />
+                      {mcpError && <p className="text-[13px] text-destructive">{mcpError}</p>}
+                      <p className={`text-[12px] ${textMuted}`}>
+                        Quantumy will be able to use whatever tools this server offers. Only add
+                        servers you trust.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setShowMcpForm(false); setMcpError(null) }}
+                          className={`flex-1 h-10 rounded-xl text-[14px] font-medium ${textMuted}`}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveMcp}
+                          disabled={!mcpUrl.trim() || mcpBusy}
+                          className="flex-1 h-10 rounded-xl text-[14px] font-medium bg-primary text-primary-foreground disabled:opacity-40 flex items-center justify-center gap-1.5"
+                        >
+                          {mcpBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                          Connect
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {mcp.length === 0 && !showMcpForm && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMcpForm(true)}
+                      className={`w-full flex items-center gap-3.5 px-3.5 py-[14px] text-left active:opacity-80`}
+                    >
+                      <div className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${iconBg}`}>
+                        <Plug className={`w-[18px] h-[18px] ${textMuted}`} />
+                      </div>
+                      <div className="flex-1">
+                        <p className={`text-[16px] font-medium ${textMain}`}>Add an MCP server</p>
+                        <p className={`text-[12px] ${textMuted}`}>Slack, Linear, Notion, your own</p>
+                      </div>
+                      <ChevronRight className="w-[18px] h-[18px] shrink-0 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
