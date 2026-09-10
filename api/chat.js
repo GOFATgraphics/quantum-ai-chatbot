@@ -29,6 +29,22 @@ function extractText(blocks) {
   return stripEmDashes(blocks.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim());
 }
 
+/**
+ * Drop thinking blocks from an assistant turn before it is replayed.
+ *
+ * Quantumy never asks for extended thinking, but the API can still return
+ * thinking blocks, and a turn is replayed verbatim as the assistant message on
+ * the next round. Sending one back is a 400 - either because it arrived empty
+ * or because thinking is not enabled on the request - and because the whole
+ * conversation is resent every message, one bad block poisons every message
+ * after it rather than just the turn it came from. The text and the tool calls
+ * are what the next round needs; the thinking is not.
+ */
+function dropThinkingBlocks(blocks) {
+  if (!Array.isArray(blocks)) return [];
+  return blocks.filter((b) => b?.type !== 'thinking' && b?.type !== 'redacted_thinking');
+}
+
 // Long-lived conversations resend their full history on every message with no
 // cap, so a thread that grows to hundreds of exchanges (or has a few large
 // pasted files in it) gets proportionally more expensive forever. Keep the
@@ -325,6 +341,10 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
   let buffer = '', stopReason = null, textAcc = '';
   const contentBlocks = [];
   let currentTool = null;
+  // The block currently open, whatever its type. currentTool tracks only the
+  // subset whose arguments stream as JSON; deltas for other kinds - thinking
+  // text, a thinking signature - need the block itself.
+  let currentBlock = null;
   // Streaming splits usage across two events: message_start carries the input
   // side (which is final the moment the request is accepted), message_delta
   // carries a running output count whose last value is the total.
@@ -373,9 +393,11 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
         const b = evt.content_block;
         if (b?.type === 'text') {
           currentTool = null;
-          contentBlocks.push({ type: 'text', text: '' });
+          currentBlock = { type: 'text', text: '' };
+          contentBlocks.push(currentBlock);
         } else if (b?.type === 'tool_use') {
           currentTool = { type: 'tool_use', id: b.id, name: b.name, input: '', partial_json: '' };
+          currentBlock = currentTool;
           contentBlocks.push(currentTool);
         } else if (b) {
           // Anything else Anthropic ran on its side: mcp_tool_use and its
@@ -394,6 +416,7 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
           } else {
             currentTool = null;
           }
+          currentBlock = passthrough;
           contentBlocks.push(passthrough);
         }
       } else if (evt.type === 'content_block_delta') {
@@ -405,6 +428,15 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
           if (onDelta) onDelta(d.text);
         } else if (d?.type === 'input_json_delta' && currentTool) {
           currentTool.partial_json = (currentTool.partial_json || '') + (d.partial_json || '');
+        } else if (d?.type === 'thinking_delta' && currentBlock) {
+          // A thinking block arrives empty and fills through deltas. Ignoring
+          // them left the block with thinking: "", and replaying that as the
+          // assistant turn is rejected outright - "each thinking block must
+          // contain thinking" - which killed every following message in the
+          // conversation, not just the one that produced it.
+          currentBlock.thinking = (currentBlock.thinking || '') + (d.thinking || '');
+        } else if (d?.type === 'signature_delta' && currentBlock) {
+          currentBlock.signature = (currentBlock.signature || '') + (d.signature || '');
         }
       } else if (evt.type === 'content_block_stop') {
         if (currentTool) {
@@ -423,6 +455,7 @@ export async function runClaudeStream({ apiKey, system, messages, tools, onDelta
           delete currentTool.partial_json;
           currentTool = null;
         }
+        currentBlock = null;
       } else if (evt.type === 'message_delta') {
         if (evt.delta?.stop_reason) stopReason = evt.delta.stop_reason;
         // Cumulative and authoritative: whatever it carries supersedes
@@ -644,7 +677,7 @@ export default async function handler(req, res) {
             mcp,
           });
         }
-        const content = data.content || [];
+        const content = dropThinkingBlocks(data.content);
         meter.addRound();
         meter.addUsage(data.usage);
         meter.setStopReason(data.stop_reason);
