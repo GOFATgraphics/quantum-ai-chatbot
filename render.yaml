@@ -1,5 +1,4 @@
 # Blueprint: Render Dashboard → New → Blueprint → this repo
-# Or create the web service manually using the same commands.
 services:
   - type: web
     name: quantumy
@@ -39,6 +38,27 @@ services:
       - key: SERPER_API_KEY
         sync: false
       - key: BRAVE_SEARCH_API_KEY
+        sync: false
+
+  - type: worker
+    name: quantumy-agent-worker
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install
+    startCommand: node worker.js
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
         sync: false
 
   - type: cron
