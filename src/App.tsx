@@ -16,6 +16,7 @@ import CommandPalette from './components/CommandPalette'
 import ProjectsWorkspace from './components/ProjectsWorkspace'
 import ProjectDashboard from './components/ProjectDashboard'
 import NotesDashboard from './components/NotesDashboard'
+import ConnectorStatusBadges from './components/ConnectorStatusBadges'
 
 const MODEL = { id: 'quantumy', name: 'Quantumy', anthropic: 'claude-sonnet-5' as const }
 
@@ -134,6 +135,31 @@ export default function App() {
   const abortByConvRef = useRef<Map<string, AbortController>>(new Map())
   const messagesRef = useRef<ChatMessage[]>([])
   const currentConversationIdRef = useRef<string | null>(null)
+  const [activeConnectors, setActiveConnectors] = useState<string[]>([])
+
+  const loadActiveConnectors = useCallback(async () => {
+    const uid = session?.user?.id
+    if (!uid) {
+      setActiveConnectors([])
+      return
+    }
+    try {
+      const { data } = await supabase
+        .from('connectors')
+        .select('provider')
+        .eq('user_id', uid)
+        .eq('status', 'connected')
+      if (data) {
+        setActiveConnectors(data.map((r: any) => r.provider))
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [session?.user?.id])
+
+  useEffect(() => {
+    loadActiveConnectors()
+  }, [loadActiveConnectors, showConnectors])
 
   useEffect(() => { messagesRef.current = messages }, [messages])
   useEffect(() => { currentConversationIdRef.current = currentConversationId }, [currentConversationId])
@@ -926,10 +952,14 @@ export default function App() {
                 <PanelLeft className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex justify-center">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 min-w-0">
               <div className="flex items-center gap-1.5 px-3 h-10 rounded-full text-[14px] font-medium text-foreground">
-                <span className="truncate max-w-[140px] sm:max-w-none">{MODEL.name}</span>
+                <span className="truncate max-w-[100px] sm:max-w-none">{MODEL.name}</span>
               </div>
+              <ConnectorStatusBadges
+                activeConnectors={activeConnectors}
+                onOpenConnectors={() => setShowConnectors(true)}
+              />
             </div>
             <div className="flex items-center justify-end gap-1.5 min-w-0">
               <button type="button" onClick={cycleTheme} className={'glass-btn w-10 h-10 rounded-full flex items-center justify-center transition text-foreground'} aria-label={'Theme: ' + themeMode}>
@@ -954,7 +984,13 @@ export default function App() {
             </div>
           ) : isEmpty ? (
             <div className="flex-1 flex items-center justify-center px-4 pt-[calc(3.5rem+env(safe-area-inset-top))]">
-              <EmptyState greeting={greetingLine || creativeGreeting(firstName)} dark={dark} composing={composerFocused} />
+              <EmptyState
+                greeting={greetingLine || creativeGreeting(firstName)}
+                dark={dark}
+                composing={composerFocused}
+                activeConnectors={activeConnectors}
+                onOpenConnectors={() => setShowConnectors(true)}
+              />
             </div>
           ) : (
             <main

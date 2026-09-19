@@ -1,13 +1,21 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import { ConnectorShowcase } from './ConnectorStatusBadges'
 
 type Props = {
   greeting: string
   dark: boolean
   /** True while the composer is focused / user is typing */
   composing?: boolean
+  activeConnectors?: string[]
+  onOpenConnectors?: () => void
 }
 
-export default function EmptyState({ greeting, composing = false }: Props) {
+export default function EmptyState({
+  greeting,
+  composing = false,
+  activeConnectors = [],
+  onOpenConnectors,
+}: Props) {
   const reduceMotion = useReducedMotion()
 
   return (
@@ -25,13 +33,26 @@ export default function EmptyState({ greeting, composing = false }: Props) {
           y: composing ? -6 : 0,
         }}
         transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 flex flex-col items-center text-center w-full max-w-lg"
+        className="relative z-10 flex flex-col items-center text-center w-full max-w-xl"
       >
         <h1
           className="empty-greeting text-[1.75rem] sm:text-[2.05rem] font-semibold tracking-[-0.03em] leading-[1.22] max-w-md text-foreground"
         >
           {greeting}
         </h1>
+
+        {!composing && onOpenConnectors && (
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.3 }}
+          >
+            <ConnectorShowcase
+              activeConnectors={activeConnectors}
+              onOpenConnectors={onOpenConnectors}
+            />
+          </motion.div>
+        )}
       </motion.div>
     </div>
   )
